@@ -88,6 +88,54 @@ for (let i = 0; i < tips.length; i++) {
 
 **Never skip the planning phase.** Even for small features, create a brief plan that lists the steps. This ensures nothing is forgotten and provides visibility into progress.
 
+### Commit Regularly to Git
+**Make frequent, focused commits throughout development.**
+
+**Commit guidelines:**
+- Commit after completing each logical unit of work (feature, bug fix, refactor)
+- Commit when marking tasks complete in `IMPLEMENTATION_PLAN.md`
+- Commit at the end of each work session
+- Write clear, descriptive commit messages that explain the "why"
+
+**Commit message format:**
+```
+<type>: <short summary>
+
+<optional detailed description>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+**Common commit types:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `refactor:` - Code refactoring (no functionality change)
+- `test:` - Add or update tests
+- `docs:` - Documentation changes
+- `chore:` - Build, dependencies, or tooling changes
+
+**Example:**
+```bash
+git add . && git commit -m "$(cat <<'EOF'
+feat: Implement tip calculation algorithm
+
+Add TipCalculationService with server proration and support staff logic.
+Includes cap enforcement and comprehensive unit tests.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+**When to push:**
+- Push to GitHub after completing a feature or meaningful milestone
+- Push at the end of each work session
+- Push before switching to a different task or taking a break
+
 ## Architecture Highlights
 
 ### Multi-Tenant Design
