@@ -4,292 +4,89 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a cloud-native, multi-tenant tip pooling management system for restaurants and coffee shops. The system automates tip calculation and distribution, provides transparency to employees, and maintains complete audit trails for compliance.
+**Tip Pooling Management System** - A cloud-native, multi-tenant SaaS application for restaurants to automate tip calculation and distribution.
 
-**Status:** Pre-development phase. Only PRD and TDD exist currently.
+**Current Status:** Pre-development (documentation phase complete)
 
 **Key Documentation:**
-- `tip-pooling-system-prd.md` - Complete product requirements and feature specifications
-- `tip-pooling-system-tdd.md` - Technical architecture, database schema, and implementation plan
+- `tip-pooling-system-prd.md` - Product Requirements Document (complete feature specifications)
+- `tip-pooling-system-tdd.md` - Technical Design Document (architecture, database schema, API design)
+- `tip-pooling-system-test-plan.md` - Comprehensive test plan with 140+ test scenarios
+- `IMPLEMENTATION_PLAN.md` - 20-week phased implementation plan (500+ tasks)
 
-## Technology Stack (Planned)
+## Architecture Overview
 
-### Frontend
-- **Framework:** React 18.x with TypeScript 5.x
-- **UI Library:** Material-UI (MUI) v5
-- **State Management:** React Context API + React Query
-- **Form Handling:** React Hook Form + Zod validation
-- **Charts:** Recharts
-
-### Backend
-- **Runtime:** Node.js 20.x LTS with TypeScript 5.x
-- **Framework:** Express.js 4.x
+### Technology Stack
+- **Backend:** Node.js 20 + TypeScript 5.x, Express.js, Prisma ORM
 - **Database:** PostgreSQL 15 (Amazon RDS)
-- **ORM:** Prisma 5.x
-- **Authentication:** AWS Cognito
-- **Testing:** Jest + Supertest
+- **Frontend:** React 18 + TypeScript 5.x, Material-UI v5, React Query
+- **Infrastructure:** AWS Serverless (Lambda, API Gateway, RDS, S3, CloudFront, Cognito, SES)
+- **IaC:** Terraform for all infrastructure
+- **Testing:** Jest (backend), Vitest (frontend), Playwright (E2E)
 
-### Infrastructure (AWS)
-- **Compute:** AWS Lambda + API Gateway (serverless)
-- **Database:** Amazon RDS PostgreSQL (Multi-AZ)
-- **Storage:** Amazon S3
-- **Email:** Amazon SES
-- **CDN:** Amazon CloudFront
-- **Monitoring:** Amazon CloudWatch + X-Ray
+### Multi-Tenant Architecture
+**Critical:** This is a multi-tenant system with shared database architecture.
 
-## Coding Principles
+**Tenant Isolation Strategy:**
+- Every table has a `tenant_id` column (foreign key to tenants table)
+- Middleware automatically scopes ALL queries by `tenant_id` from JWT token
+- NEVER trust client-provided `tenant_id` - always derive from authenticated JWT
+- Use partial unique indexes where needed: `WHERE is_deleted = FALSE`
 
-### Minimize Lines of Code
-**The primary goal when writing code is to minimize the number of lines.** Write concise, direct code that solves the problem with minimal complexity.
+**Security Requirements:**
+- All API endpoints require JWT authentication (except magic link endpoints)
+- Role-based authorization: ADMIN, MANAGER, EMPLOYEE (enum in database)
+- Tenant isolation enforced at middleware level (before any database query)
+- Magic link rate limiting: 3 per email/hour, 10 per IP/hour
 
-**Guidelines:**
-- Favor brevity over verbosity - express logic in the fewest lines possible
-- Avoid unnecessary abstractions, helper functions, or wrapper utilities
-- Use language features and built-in methods instead of custom implementations
-- Eliminate redundant code, intermediate variables, and excessive comments
-- Choose simple, direct solutions over complex, "clever" ones
-- If you can accomplish something in one line instead of five, do it
+### Database Schema Key Points
 
-**Example - Prefer this:**
-```typescript
-const activeTips = tips.filter(t => !t.isDeleted && t.amount > 0);
-```
-
-**Over this:**
-```typescript
-// Filter tips to only include active ones with amounts
-const activeTips = [];
-for (let i = 0; i < tips.length; i++) {
-  const tip = tips[i];
-  if (tip.isDeleted === false) {
-    if (tip.amount > 0) {
-      activeTips.push(tip);
-    }
-  }
-}
-```
-
-## Development Workflow
-
-### Plan Before Implementing
-**CRITICAL: Before implementing any feature, always enter plan mode first.**
-
-**Required workflow:**
-1. **Enter Plan Mode** - Use the EnterPlanMode tool to switch to planning
-2. **Create Implementation Plan** - List all steps needed to complete the task in `IMPLEMENTATION_PLAN.md`
-3. **Get Approval** - Exit plan mode and present the plan to the user
-4. **Implement** - Work through the tasks in the plan
-5. **Update Progress** - As you complete each step, update `IMPLEMENTATION_PLAN.md` by marking tasks complete `[x]`
-
-**Tracking progress in IMPLEMENTATION_PLAN.md:**
-- `[ ]` - Not started
-- `[~]` - In progress
-- `[x]` - Completed
-
-**Never skip the planning phase.** Even for small features, create a brief plan that lists the steps. This ensures nothing is forgotten and provides visibility into progress.
-
-### Commit Regularly to Git
-**Make frequent, focused commits throughout development.**
-
-**Commit guidelines:**
-- Commit after completing each logical unit of work (feature, bug fix, refactor)
-- Commit when marking tasks complete in `IMPLEMENTATION_PLAN.md`
-- Commit at the end of each work session
-- Write clear, descriptive commit messages that explain the "why"
-
-**Commit message format:**
-```
-<type>: <short summary>
-
-<optional detailed description>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
-```
-
-**Common commit types:**
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `refactor:` - Code refactoring (no functionality change)
-- `test:` - Add or update tests
-- `docs:` - Documentation changes
-- `chore:` - Build, dependencies, or tooling changes
-
-**Example:**
-```bash
-git add . && git commit -m "$(cat <<'EOF'
-feat: Implement tip calculation algorithm
-
-Add TipCalculationService with server proration and support staff logic.
-Includes cap enforcement and comprehensive unit tests.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
-EOF
-)"
-```
-
-**When to push:**
-- Push to GitHub after completing a feature or meaningful milestone
-- Push at the end of each work session
-- Push before switching to a different task or taking a break
-
-## Architecture Highlights
-
-### Multi-Tenant Design
-The system uses a **shared database with tenant isolation** strategy. Every table has a `tenant_id` column, and middleware enforces tenant-scoped queries on all requests. Row-level security (RLS) prevents cross-tenant data access.
-
-### Core Business Logic
-The tip calculation algorithm (defined in TDD section 5.1) is the heart of the system:
-1. Pools all tips for the day
-2. Prorates tips to servers based on hours worked
-3. Calculates support staff (bussers/expeditors) tips from servers they worked with
-4. Enforces cap: support staff cannot earn more than highest server on their shift
-5. Generates detailed breakdowns with effective hourly rates
-
-### Audit Trail
-All data modifications are tracked:
-- Edits create new records and soft-delete old ones (never actually delete)
-- Complete audit log with who/when/what changed
-- 7-year retention for compliance (FLSA requirements)
-
-## Database Schema Key Points
+**Soft Deletes Everywhere:**
+- Use `is_deleted` boolean + `deleted_at` timestamp
+- NEVER hard delete records (7-year retention for FLSA compliance)
+- Create new records instead of updating (for audit trail)
 
 **Critical Tables:**
-- `tenants` - Restaurant locations (multi-tenant root)
-- `employees` - Staff members with roles (SERVER, BUSSER, EXPEDITOR)
-- `tip_entries` - Daily tip pool entries with computed columns for cash/electronic/total
-- `tip_calculations` - Per-employee breakdown of tips, pay, effective rate
-- `audit_logs` - Immutable change history using JSONB for old/new values
+- `tip_entries` - Has `cash_sales` field (NOT just closing - starting drawer)
+- Formula: `cash_tips = closing_drawer - starting_drawer - cash_sales`
+- Total tips: `cash_tips + electronic_tips`
+- Partial unique index: Only ONE active entry per tenant per date
 
-**Important Constraints:**
-- Unique constraint on `(tenant_id, entry_date, is_deleted)` prevents duplicate active entries
-- All tables reference `tenant_id` for isolation
-- Soft deletes use `is_deleted` boolean + `deleted_at` timestamp
+**Audit Trail:**
+- `audit_logs` table tracks ALL modifications
+- Stores old/new values in JSONB columns
+- Immutable (never update or delete audit logs)
 
-## Development Commands (When Implemented)
-
-### Backend
-```bash
-# Install dependencies
-npm install
-
-# Run database migrations
-npx prisma migrate dev
-
-# Generate Prisma client
-npx prisma generate
-
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-
-# Run integration tests
-npm run test:integration
-
-# Lint
-npm run lint
-
-# Type check
-npm run type-check
-```
-
-### Frontend
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-
-# Run tests
-npm test
-
-# Build for production
-npm run build
-
-# Lint
-npm run lint
-```
-
-### Database
-```bash
-# Create new migration
-npx prisma migrate dev --name <migration-name>
-
-# Apply migrations to production
-npx prisma migrate deploy
-
-# Open Prisma Studio (database GUI)
-npx prisma studio
-
-# Reset database (WARNING: destroys all data)
-npx prisma migrate reset
-```
-
-### Infrastructure (Terraform)
-```bash
-# Initialize Terraform
-terraform init
-
-# Plan changes
-terraform plan
-
-# Apply changes
-terraform apply
-
-# Destroy infrastructure
-terraform destroy
-```
-
-## Implementation Phases
-
-The TDD outlines a 13-week implementation plan:
-1. **Foundation** (Weeks 1-2) - AWS setup, database, CI/CD
-2. **Core Backend** (Weeks 3-4) - APIs for tenants, users, employees, config
-3. **Tip Calculation** (Week 5) - Core algorithm implementation
-4. **Frontend Auth** (Week 6) - Login, navigation, role-based routing
-5. **Admin Features** (Week 7) - Employee/shift/config management UI
-6. **Tip Entry UI** (Week 8) - Daily tip entry form with preview
-7. **Data Management** (Week 9) - Edit, audit trail, history views
-8. **Employee Portal** (Week 10) - Magic link login, 30-day tip history
-9. **Reporting** (Week 11) - CSV export, charts, daily/weekly/monthly reports
-10. **Testing & Polish** (Week 12) - E2E tests, load testing, security audit
-11. **UAT & Production** (Week 13) - Staging deploy, user testing, go-live
-
-## Critical Implementation Notes
+**Magic Link Authentication:**
+- `magic_link_tokens` table with 15-minute expiry
+- Single-use tokens (`is_used` flag)
+- Indexes on email and IP address for rate limiting queries
 
 ### Tip Calculation Algorithm
-- **Location:** Backend service at `tip_calculations/tip-calculation-service.ts` (to be created)
-- **Must handle:** Multiple shifts per employee, shared shift logic, support staff caps
-- **Testing:** Requires comprehensive unit tests with edge cases (see TDD section 5.1)
 
-### Authentication Flows
-- **Admin/Manager:** Standard username/password via AWS Cognito
-- **Employee:** Passwordless magic link (15-minute expiry, single-use tokens)
+**Location:** `src/services/tip-calculation.service.ts` (to be created)
 
-### Security Requirements
-- All tenant queries MUST be scoped by `tenant_id` in middleware
-- Never trust client-provided `tenant_id` - always derive from JWT token
-- Input validation using Zod schemas (shared between frontend/backend)
-- All soft deletes must set `is_deleted=true` AND `deleted_at=NOW()`
+**Core Logic:**
+1. Pool all tips for the day (single pool across all shifts)
+2. Prorate to servers based on total hours worked (NOT per shift)
+3. Support staff receives percentage from servers they worked same shifts with
+4. Cap: Support staff cannot earn more than highest earning server on their shift
+5. Rounding: Remainder goes to highest earner (ensure total distributed = tip pool ±$0.01)
 
-### Data Integrity Rules
-- When editing tip entries: create new record + soft delete old + link via `replaced_by_id`
-- Employee rate changes: insert into `employee_rate_history` with `effective_date`
-- Support staff config changes: insert new row with `effective_date`, use correct config for calculation date
+**Critical Validations:**
+- At least one SERVER must exist (throw error if only support staff)
+- Total server hours > 0 (throw error if all servers have 0 hours)
+- Tip pool >= 0 (no negative tips)
+- Hours worked: 0.5 <= hours <= 16 per employee
 
-## API Conventions
+**Test Coverage Required:**
+- 90%+ code coverage for calculation service
+- All 20 test scenarios in test plan (TC-CALC-001 through TC-CALC-020)
+- Manual verification with PRD examples
 
-**Endpoint Structure:** `/api/v1/<resource>`
+### API Design Patterns
 
-**Authentication:** JWT Bearer token in `Authorization` header
-
-**Response Format:**
+**Standard Response Format:**
 ```json
 {
   "success": true,
@@ -304,59 +101,271 @@ The TDD outlines a 13-week implementation plan:
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable message",
-    "details": [/* validation errors if applicable */]
+    "details": [/* validation errors */]
   }
 }
 ```
 
-## Testing Strategy
+**Pagination:**
+- Query params: `?page=1&limit=50`
+- Default limit: 50, max limit: 100
 
-### Unit Tests
-- **Backend:** All services, especially tip calculation algorithm (target 80% coverage)
-- **Frontend:** Form validation, calculation display, routing (target 70% coverage)
+**API Versioning:**
+- All endpoints: `/api/v1/*`
 
-### Integration Tests
-- API endpoints with real database (use test database)
-- Multi-tenant isolation verification
-- Authentication/authorization flows
+### Frontend Architecture
 
-### E2E Tests
-- Manager: Login → Create tip entry → View results
-- Employee: Magic link login → View 30-day history
-- Admin: Configure shifts → Manager uses new shift
+**State Management:**
+- React Context for auth state
+- React Query for server state (caching, optimistic updates)
+- No Redux (keep it simple)
 
-### Load Testing
-- Simulate 100 concurrent users
-- Test with 50 employees per tip entry
-- Verify < 5 second calculation time
+**Form Handling:**
+- React Hook Form + Zod validation
+- Share Zod schemas between frontend and backend (create shared types package)
 
-## Cost Monitoring
+**Key Features:**
+- Live calculation preview (debounced 500ms, calls `/api/v1/tips/preview`)
+- Timezone-aware date display (all dates shown in tenant's timezone)
+- Duplicate entry prevention with override option
+- Cash sales field (defaults to 0 for credit-card-only restaurants)
 
-AWS resources should stay within these monthly targets:
-- **Single tenant:** $35-55/month
-- **10 tenants:** $130-170/month (~$13-17/tenant at scale)
+## Development Workflow
 
-Set up AWS Budgets with alerts at $50, $100, $150.
+### Planning Phase (Required for Non-Trivial Features)
+**CRITICAL:** Always enter plan mode before implementing features.
 
-## Compliance Notes
+**When to use plan mode:**
+- New feature implementation (multi-file changes)
+- Database schema changes
+- API endpoint additions
+- Algorithm modifications
 
-**FLSA (Fair Labor Standards Act):**
-- Only customer-facing employees in tip pool (servers, bussers, expeditors)
-- Management cannot participate in tip pool
-- Transparent calculations required
-- 7-year audit trail retention
+**Workflow:**
+1. Use EnterPlanMode tool
+2. Explore codebase and design approach
+3. Create implementation plan in `IMPLEMENTATION_PLAN.md`
+4. Update task status: `[ ]` → `[~]` (in progress) → `[x]` (complete)
+5. Exit plan mode and implement
 
-**Data Privacy:**
-- Minimal PII collection (name, email only)
-- No SSN or payment info stored
-- 7-year retention, then archival/deletion
+### Git Commit Guidelines
 
-## Future Enhancements (Out of Scope for v1.0)
+**Required format:**
+```
+<type>: <short summary>
 
-- Email notifications to employees
-- POS system integration
-- Payroll system integration
-- Mobile apps (iOS/Android)
-- Real-time tip tracking
-- Multi-currency support
-- Scheduling integration
+<optional detailed description>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+**Commit types:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `refactor:` - Code refactoring
+- `test:` - Add or update tests
+- `docs:` - Documentation changes
+- `chore:` - Build, dependencies, tooling
+
+**When to commit:**
+- After completing each logical unit of work
+- When marking tasks complete in `IMPLEMENTATION_PLAN.md`
+- Before switching to a different task
+
+## Critical Implementation Notes
+
+### 1. Cash Tips Calculation (PRD Section 3.4.1, TDD Section 3.2.7)
+
+The formula accounts for cash sales revenue:
+```
+cash_tips = closing_drawer - starting_drawer - cash_sales
+```
+
+**Why?** The drawer contains: starting float + cash sales + cash tips
+
+**Example:**
+- Starting: $500, Closing: $1,800, Cash Sales: $1,000
+- Cash tips = $1,800 - $500 - $1,000 = **$300** ✓
+
+**Special cases:**
+- Credit-card-only restaurant: `cash_sales = 0` (defaults to 0)
+- Separate tip jar: `starting = 0, closing = total tips, cash_sales = 0`
+
+### 2. Partial Unique Index for Tip Entries (TDD Section 3.2.7)
+
+**DO NOT use regular UNIQUE constraint:**
+```sql
+-- ❌ WRONG - prevents edit workflow
+UNIQUE(tenant_id, entry_date, is_deleted)
+
+-- ✅ CORRECT - only enforces uniqueness on active entries
+CREATE UNIQUE INDEX idx_tip_entries_unique_active
+ON tip_entries(tenant_id, entry_date)
+WHERE is_deleted = FALSE;
+```
+
+**Why?** Edit workflow creates new record before soft-deleting old one. Both temporarily exist during transaction.
+
+### 3. Timezone Handling (PRD Section 3.4.1)
+
+**Storage:**
+- Dates: Store as DATE type (timezone-agnostic)
+- Timestamps: Store in UTC (created_at, updated_at)
+
+**Display:**
+- All dates/times converted to tenant's timezone (from tenants.timezone column)
+- Use IANA timezone identifiers (e.g., "America/Los_Angeles")
+
+**Date Selection:**
+- Allow past entries: Up to 30 days back
+- Allow future entries: Up to 2 days ahead
+
+### 4. Magic Link Security (PRD Section 3.1.3, TDD Section 3.2.11)
+
+**Rate Limiting (CRITICAL):**
+```typescript
+// Check email rate limit
+const emailCount = await prisma.magic_link_tokens.count({
+  where: {
+    email,
+    created_at: { gte: new Date(Date.now() - 3600000) } // 1 hour ago
+  }
+});
+if (emailCount >= 3) throw new RateLimitError();
+
+// Check IP rate limit
+const ipCount = await prisma.magic_link_tokens.count({
+  where: {
+    ip_address,
+    created_at: { gte: new Date(Date.now() - 3600000) }
+  }
+});
+if (ipCount >= 10) throw new RateLimitError();
+```
+
+**Token Validation:**
+- Expires after 15 minutes
+- Single-use only (check `is_used` flag)
+- Mark as used BEFORE generating JWT (prevent race conditions)
+
+### 5. Database Connection Pooling (TDD Section 6.3.3)
+
+**Start WITHOUT RDS Proxy** (saves $15/month):
+```typescript
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  connection_limit = 5  // Low limit per Lambda instance
+}
+```
+
+**Add RDS Proxy ONLY when:**
+- Lambda concurrent executions > 50
+- Database connection count > 80% of max_connections
+- Seeing "too many connections" errors
+
+### 6. Tip Calculation Rounding (PRD Section 3.4.5, TDD Section 5.1)
+
+**Rounding Rules:**
+1. Round all intermediate calculations to 2 decimals
+2. Sum all distributed tips
+3. If `totalDistributed !== totalTipPool` (within $0.01):
+   - Add difference to highest earner
+   - Ensures total distributed = exact tip pool amount
+
+**Example:**
+```typescript
+const roundingDiff = Number((totalTipPool - totalDistributed).toFixed(2));
+if (Math.abs(roundingDiff) > 0.01) {
+  const highestEarner = allCalcs.reduce((max, calc) =>
+    calc.finalTips > max.finalTips ? calc : max
+  );
+  highestEarner.finalTips += roundingDiff;
+}
+```
+
+## Testing Requirements
+
+### Test Coverage Targets
+- Backend: 80%+ overall, 90%+ for tip calculation service
+- Frontend: 70%+ overall
+- E2E: All critical workflows (5 scenarios minimum)
+
+### Test Pyramid
+```
+           /\
+          /E2E\         10% - End-to-End Tests
+         /------\
+        /  API   \      30% - Integration/API Tests
+       /----------\
+      /    UNIT    \    60% - Unit Tests
+     /--------------\
+```
+
+### Critical Test Scenarios
+- See `tip-pooling-system-test-plan.md` for all 140+ test cases
+- TC-CALC-001 through TC-CALC-020: Tip calculation algorithm
+- TC-E2E-001 through TC-E2E-005: End-to-end workflows
+- TC-SEC-001 through TC-SEC-028: Security tests (OWASP Top 10)
+
+## Common Pitfalls to Avoid
+
+1. **Multi-tenant data leakage** - Always scope by tenant_id in middleware
+2. **Hard deletes** - Use soft deletes (is_deleted flag) for everything
+3. **Forgotten cash_sales** - Don't calculate cash tips as just closing - starting
+4. **Regular UNIQUE constraints** - Use partial indexes for soft-deleted data
+5. **Client-provided tenant_id** - Never trust, always derive from JWT
+6. **Missing validation** - Validate: at least 1 server, hours > 0, tip pool >= 0
+7. **Incorrect rounding** - Ensure total distributed = tip pool exactly
+
+## Security Checklist
+
+Before any deployment:
+- [ ] All endpoints require authentication (except public endpoints)
+- [ ] Tenant isolation tested (cannot access other tenant's data)
+- [ ] Input validation on all endpoints (Zod schemas)
+- [ ] SQL injection tests passed (parameterized queries only)
+- [ ] XSS tests passed (all user input escaped)
+- [ ] Rate limiting on magic link endpoints
+- [ ] Secrets in AWS Secrets Manager (not in code)
+- [ ] TLS 1.3 enforced for all connections
+- [ ] Database encryption at rest (AES-256)
+
+## Cost Optimization
+
+**Target Costs:**
+- Single tenant: $35-55/month
+- 10 tenants: $130-170/month (~$13-17 per tenant at scale)
+
+**Optimization Strategy:**
+- Start with RDS db.t3.micro (not Aurora Serverless)
+- Add RDS Proxy only when needed (metrics-driven)
+- Use AWS Free Tier for first 12 months
+- Monitor costs weekly with AWS Budgets
+
+**Consider Aurora Serverless v2 if:**
+- Workload is sporadic (< 8 hours active per day)
+- Fewer than 5 tenants
+- Database connection limits become an issue
+
+## Phase Status Tracking
+
+Track progress in `IMPLEMENTATION_PLAN.md`:
+- `[ ]` - Not started
+- `[~]` - In progress
+- `[x]` - Completed
+
+Update "Current Progress" section weekly.
+
+## References
+
+When implementing features, refer to:
+- **PRD** - What to build (features, user stories, requirements)
+- **TDD** - How to build (architecture, database, APIs, algorithms)
+- **Test Plan** - How to test (test scenarios, coverage targets)
+- **Implementation Plan** - When to build (phased schedule, dependencies)
+
+All 4 documents are authoritative and must be followed exactly.

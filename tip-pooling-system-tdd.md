@@ -286,6 +286,7 @@ Every table includes a `tenant_id` column. All queries are scoped by tenant ID e
 │ manager_id (FK->users)  │
 │ starting_drawer         │
 │ closing_drawer          │
+│ cash_sales              │
 │ cash_tips (computed)    │
 │ electronic_tips         │
 │ total_tips (computed)   │
@@ -332,6 +333,11 @@ Every table includes a `tenant_id` column. All queries are scoped by tenant ID e
 └─────────────────────────┘
 ```
 
+**ERD Updates:**
+- Added `user_id` column to employees table (links to users table)
+- Added `magic_link_tokens` table for passwordless employee authentication
+- See schema details in sections 3.2.3 and 3.2.11 below
+
 ### 3.2 Database Schema
 
 #### 3.2.1 Tenants Table
@@ -376,6 +382,7 @@ CREATE TYPE employee_role AS ENUM ('SERVER', 'BUSSER', 'EXPEDITOR');
 CREATE TABLE employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     role employee_role NOT NULL,
@@ -388,7 +395,14 @@ CREATE TABLE employees (
 
 CREATE INDEX idx_employees_tenant ON employees(tenant_id);
 CREATE INDEX idx_employees_active ON employees(tenant_id, is_active);
+CREATE INDEX idx_employees_user ON employees(user_id);
+CREATE INDEX idx_employees_email ON employees(email);
 ```
+
+**Notes:**
+- `user_id` links employees to users table (nullable, populated when employee first logs in via magic link)
+- When employee uses magic link, a temporary user record is created in the users table with role='EMPLOYEE'
+- This allows unified session management and audit logging
 
 #### 3.2.4 Employee Rate History Table
 ```sql
@@ -441,20 +455,40 @@ CREATE TABLE tip_entries (
     manager_id UUID NOT NULL REFERENCES users(id),
     starting_drawer DECIMAL(10, 2) NOT NULL,
     closing_drawer DECIMAL(10, 2) NOT NULL,
-    cash_tips DECIMAL(10, 2) GENERATED ALWAYS AS (closing_drawer - starting_drawer) STORED,
+    cash_sales DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    cash_tips DECIMAL(10, 2) GENERATED ALWAYS AS (closing_drawer - starting_drawer - cash_sales) STORED,
     electronic_tips DECIMAL(10, 2) NOT NULL,
-    total_tips DECIMAL(10, 2) GENERATED ALWAYS AS ((closing_drawer - starting_drawer) + electronic_tips) STORED,
+    total_tips DECIMAL(10, 2) GENERATED ALWAYS AS ((closing_drawer - starting_drawer - cash_sales) + electronic_tips) STORED,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     replaced_by_id UUID REFERENCES tip_entries(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP,
-    UNIQUE(tenant_id, entry_date, is_deleted) DEFERRABLE INITIALLY DEFERRED
+    deleted_at TIMESTAMP
 );
 
+-- Partial unique index to prevent duplicate active entries (allows multiple deleted entries for same date)
+CREATE UNIQUE INDEX idx_tip_entries_unique_active ON tip_entries(tenant_id, entry_date) WHERE is_deleted = FALSE;
 CREATE INDEX idx_tip_entries_tenant_date ON tip_entries(tenant_id, entry_date DESC);
 CREATE INDEX idx_tip_entries_active ON tip_entries(tenant_id, is_deleted) WHERE is_deleted = FALSE;
 ```
+
+**Cash Tips Calculation Explained:**
+
+The formula `cash_tips = closing_drawer - starting_drawer - cash_sales` accounts for:
+- **Starting drawer**: Initial cash float (e.g., $500 for making change)
+- **Closing drawer**: Total cash at end of day (float + cash sales + cash tips)
+- **Cash sales**: Total cash received for food/drinks (from POS system)
+- **Cash tips**: What remains after subtracting starting float and cash sales
+
+**Example:**
+- Starting drawer: $500 (float)
+- During the day:
+  - Cash sales (food/drinks): $1,000 (from POS)
+  - Cash tips: $300 (actual tips)
+- Closing drawer: $500 + $1,000 + $300 = $1,800
+- **Calculation**: $1,800 - $500 - $1,000 = **$300 cash tips** ✓
+
+**Note:** If restaurant doesn't accept cash payments (credit card only), `cash_sales = 0` and formula simplifies to `closing_drawer - starting_drawer`.
 
 #### 3.2.8 Tip Calculations Table
 ```sql
@@ -512,6 +546,33 @@ CREATE INDEX idx_audit_tenant_date ON audit_logs(tenant_id, created_at DESC);
 CREATE INDEX idx_audit_user ON audit_logs(user_id, created_at DESC);
 CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
 ```
+
+#### 3.2.11 Magic Link Tokens Table
+```sql
+CREATE TABLE magic_link_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
+    ip_address INET,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    used_at TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_magic_token ON magic_link_tokens(token);
+CREATE INDEX idx_magic_employee ON magic_link_tokens(employee_id, created_at DESC);
+CREATE INDEX idx_magic_email_created ON magic_link_tokens(email, created_at DESC);
+CREATE INDEX idx_magic_ip_created ON magic_link_tokens(ip_address, created_at DESC);
+CREATE INDEX idx_magic_expires ON magic_link_tokens(expires_at) WHERE is_used = FALSE;
+```
+
+**Notes:**
+- Tokens expire after 15 minutes (expires_at)
+- Tokens are single-use (is_used flag)
+- Email and IP indexes support rate limiting queries
+- Automatic cleanup via scheduled job (delete tokens older than 24 hours)
 
 ### 3.3 Data Access Patterns
 
@@ -605,8 +666,11 @@ GET    /api/v1/tips/entries/:id
 PATCH  /api/v1/tips/entries/:id (edit - creates new record)
 DELETE /api/v1/tips/entries/:id (soft delete)
 GET    /api/v1/tips/entries/:id/calculations
-POST   /api/v1/tips/calculate (preview calculation before saving)
+POST   /api/v1/tips/preview (live preview calculation - does NOT save to database)
+POST   /api/v1/tips/calculate (deprecated - use /preview instead)
 ```
+
+**Note:** `/api/v1/tips/preview` is used by frontend for live calculation preview as user enters data. It performs the full calculation but does not persist any data.
 
 #### 4.1.8 Employee Self-Service
 
@@ -645,6 +709,7 @@ Content-Type: application/json
   "entryDate": "2025-11-09",
   "startingDrawer": 500.00,
   "closingDrawer": 1250.75,
+  "cashSales": 500.00,
   "electronicTips": 450.25,
   "employees": [
     {
@@ -663,6 +728,10 @@ Content-Type: application/json
 }
 ```
 
+**Note:**
+- `cashSales` = Total cash received for food/drinks (from POS system)
+- Cash tips will be calculated as: $1250.75 - $500.00 - $500.00 = $250.75
+
 **Response:**
 ```json
 {
@@ -673,9 +742,10 @@ Content-Type: application/json
       "entryDate": "2025-11-09",
       "startingDrawer": 500.00,
       "closingDrawer": 1250.75,
-      "cashTips": 750.75,
+      "cashSales": 500.00,
+      "cashTips": 250.75,
       "electronicTips": 450.25,
-      "totalTips": 1201.00,
+      "totalTips": 701.00,
       "managerId": "uuid-manager",
       "createdAt": "2025-11-09T18:30:00Z"
     },
@@ -763,86 +833,154 @@ function calculateTips(
   employees: Employee[],
   supportStaffConfig: SupportStaffConfig[]
 ): TipCalculation[] {
-  
-  // Step 1: Separate servers from support staff
+
+  // Step 1: Validate inputs
+  if (totalTipPool < 0) {
+    throw new Error('Total tip pool cannot be negative');
+  }
+
+  if (employees.length === 0) {
+    throw new Error('At least one employee is required');
+  }
+
+  // Step 2: Separate servers from support staff
   const servers = employees.filter(e => e.roleOnDay === 'SERVER');
   const supportStaff = employees.filter(e => e.roleOnDay !== 'SERVER');
-  
-  // Step 2: Calculate total server hours
+
+  // Step 3: Validate at least one server exists
+  if (servers.length === 0) {
+    throw new Error('At least one server is required to distribute tips');
+  }
+
+  // Step 4: Calculate total server hours
   const totalServerHours = servers.reduce((sum, s) => sum + s.hoursWorked, 0);
-  
-  // Step 3: Prorate tips to servers based on hours
+
+  // Additional validation
+  if (totalServerHours === 0) {
+    throw new Error('Total server hours must be greater than zero');
+  }
+
+  // Step 5: Prorate tips to servers based on hours worked
+  // All tips are pooled across all shifts - servers earn based on total hours regardless of which shifts
   const serverCalculations = servers.map(server => {
     const baseTips = (server.hoursWorked / totalServerHours) * totalTipPool;
-    
+
     return {
       employeeId: server.id,
       roleOnDay: server.roleOnDay,
       shifts: server.shifts,
       hoursWorked: server.hoursWorked,
-      baseTips,
+      baseTips: Number(baseTips.toFixed(2)),
       supportTipsGiven: 0, // calculated later
-      finalTips: baseTips, // adjusted later
+      finalTips: Number(baseTips.toFixed(2)), // adjusted later
     };
   });
-  
-  // Step 4: Calculate support staff tips
+
+  // Step 6: Calculate support staff tips from servers who worked same shifts
   const supportCalculations = supportStaff.map(support => {
     const config = supportStaffConfig.find(c => c.role === support.roleOnDay);
     const percentage = config ? config.percentage / 100 : 0;
-    
+
     let supportTips = 0;
-    
-    // Find servers who worked the same shift(s)
-    servers.forEach((server, idx) => {
+
+    // Find servers who worked the same shift(s) and calculate tips from each
+    servers.forEach(server => {
       const sharedShifts = server.shifts.filter(s => support.shifts.includes(s));
-      
+
       if (sharedShifts.length > 0) {
-        // Calculate server's tips for shared shifts
-        // If server worked multiple shifts, prorate their tips by shift
+        // Find the calculation for this server
+        const serverCalc = serverCalculations.find(c => c.employeeId === server.id);
+        if (!serverCalc) return;
+
+        // Calculate proportion of server's tips that come from shared shifts
+        // If server worked multiple shifts, assume tips are evenly distributed across their shifts
         const serverTotalShifts = server.shifts.length;
-        const serverTipsPerShift = serverCalculations[idx].baseTips / serverTotalShifts;
-        const tipsFromSharedShifts = serverTipsPerShift * sharedShifts.length;
-        
+        const proportionFromSharedShifts = sharedShifts.length / serverTotalShifts;
+        const serverTipsFromSharedShifts = serverCalc.baseTips * proportionFromSharedShifts;
+
         // Support staff gets percentage of server's shared shift tips
-        const tipsFromThisServer = tipsFromSharedShifts * percentage;
+        const tipsFromThisServer = serverTipsFromSharedShifts * percentage;
         supportTips += tipsFromThisServer;
-        
+
         // Deduct from server's tips
-        serverCalculations[idx].supportTipsGiven += tipsFromThisServer;
-        serverCalculations[idx].finalTips -= tipsFromThisServer;
+        serverCalc.supportTipsGiven += tipsFromThisServer;
+        serverCalc.finalTips -= tipsFromThisServer;
       }
     });
-    
-    // Step 5: Apply cap - support staff cannot exceed highest server on their shift
-    const serversOnSameShift = servers.filter(s => 
+
+    // Step 7: Apply cap - support staff cannot exceed highest earning server on their shift(s)
+    const serversOnSameShift = servers.filter(s =>
       s.shifts.some(shift => support.shifts.includes(shift))
     );
-    const highestServerTip = Math.max(
-      ...serversOnSameShift.map((_, idx) => serverCalculations[idx].finalTips)
-    );
-    
-    if (supportTips > highestServerTip) {
-      supportTips = highestServerTip;
+
+    if (serversOnSameShift.length > 0) {
+      const serverFinalTips = serversOnSameShift.map(server => {
+        const calc = serverCalculations.find(c => c.employeeId === server.id);
+        return calc ? calc.finalTips : 0;
+      });
+
+      const highestServerTip = Math.max(...serverFinalTips);
+
+      if (supportTips > highestServerTip) {
+        // Cap applied - adjust to match highest server
+        const excessTips = supportTips - highestServerTip;
+        supportTips = highestServerTip;
+
+        // Return excess tips to servers proportionally
+        const totalSupportGiven = serverCalculations.reduce((sum, c) => sum + c.supportTipsGiven, 0);
+        if (totalSupportGiven > 0) {
+          serverCalculations.forEach(calc => {
+            const proportion = calc.supportTipsGiven / totalSupportGiven;
+            const refund = excessTips * proportion;
+            calc.supportTipsGiven -= refund;
+            calc.finalTips += refund;
+          });
+        }
+      }
     }
-    
+
     return {
       employeeId: support.id,
       roleOnDay: support.roleOnDay,
       shifts: support.shifts,
       hoursWorked: support.hoursWorked,
-      supportTipsReceived: supportTips,
-      finalTips: supportTips,
+      supportTipsReceived: Number(supportTips.toFixed(2)),
+      finalTips: Number(supportTips.toFixed(2)),
     };
   });
-  
-  // Step 6: Calculate total compensation
+
+  // Step 8: Round all server calculations to 2 decimal places
+  serverCalculations.forEach(calc => {
+    calc.baseTips = Number(calc.baseTips.toFixed(2));
+    calc.supportTipsGiven = Number(calc.supportTipsGiven.toFixed(2));
+    calc.finalTips = Number(calc.finalTips.toFixed(2));
+  });
+
+  // Step 9: Handle rounding remainders - add any difference to highest earner
+  const totalDistributed = [...serverCalculations, ...supportCalculations]
+    .reduce((sum, c) => sum + c.finalTips, 0);
+  const roundingDifference = Number((totalTipPool - totalDistributed).toFixed(2));
+
+  if (Math.abs(roundingDifference) > 0.01) {
+    // Find highest earner and add remainder
+    const allCalcs = [...serverCalculations, ...supportCalculations];
+    const highestEarner = allCalcs.reduce((max, calc) =>
+      calc.finalTips > max.finalTips ? calc : max
+    );
+    highestEarner.finalTips = Number((highestEarner.finalTips + roundingDifference).toFixed(2));
+  }
+
+  // Step 10: Calculate total compensation
   const allCalculations = [...serverCalculations, ...supportCalculations].map(calc => {
     const employee = employees.find(e => e.id === calc.employeeId);
-    const hourlyPay = employee.hoursWorked * employee.hourlyRate;
-    const totalPay = hourlyPay + calc.finalTips;
-    const effectiveHourlyRate = totalPay / employee.hoursWorked;
-    
+    if (!employee) {
+      throw new Error(`Employee ${calc.employeeId} not found`);
+    }
+
+    const hourlyPay = Number((employee.hoursWorked * employee.hourlyRate).toFixed(2));
+    const totalPay = Number((hourlyPay + calc.finalTips).toFixed(2));
+    const effectiveHourlyRate = Number((totalPay / employee.hoursWorked).toFixed(2));
+
     return {
       ...calc,
       hourlyPay,
@@ -850,7 +988,7 @@ function calculateTips(
       effectiveHourlyRate,
     };
   });
-  
+
   return allCalculations;
 }
 ```
@@ -1025,8 +1163,40 @@ CREATE INDEX idx_tip_calc_entry_employee ON tip_calculations(tip_entry_id, emplo
 **Query Optimization:**
 - Use Prisma's `include` for eager loading (avoid N+1 queries)
 - Pagination for large datasets (limit 50 records per page)
-- RDS connection pooling using RDS Proxy (max 100 connections)
 - Lambda connection management (reuse connections across invocations)
+
+**Connection Pooling Strategy:**
+
+**Without RDS Proxy (Recommended for start):**
+- Configure Prisma connection pool in Lambda:
+  ```typescript
+  // prisma/schema.prisma
+  datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+    // Connection pool settings for serverless
+    connection_limit = 5  // Low limit per Lambda instance
+  }
+  ```
+- Each Lambda instance maintains small pool (5 connections)
+- Sufficient for 10-20 tenants with moderate usage
+- Cost: $0/month (no additional service)
+- Monitor RDS connections in CloudWatch
+
+**With RDS Proxy (Use when scaling):**
+- Deploy when Lambda concurrent executions exceed 50
+- Or when database connection count consistently > 80% of max_connections
+- Or when seeing "too many connections" errors
+- RDS Proxy configuration:
+  - Max connections per proxy: 100
+  - Connection borrow timeout: 30 seconds
+  - Idle client connection timeout: 1800 seconds (30 min)
+- Benefits:
+  - Pools and shares connections across all Lambdas
+  - Reduces connection overhead
+  - Maintains connections during Lambda scaling
+- Cost: ~$15/month (2 vCPUs)
+- **Start without RDS Proxy, add only when metrics show it's needed**
 
 **Caching Strategy:**
 - Amazon ElastiCache (Redis) for frequently accessed data
@@ -1285,10 +1455,58 @@ terraform/
 ### 10.1 Unit Tests
 
 **Backend (Jest):**
-- Test tip calculation algorithm
-- Test support staff cap logic
-- Test audit trail creation
-- Test validation schemas (Zod)
+
+**Critical Test Scenarios for Tip Calculation Algorithm:**
+
+1. **Basic Server Tip Distribution:**
+   - [ ] Single server works 8 hours → receives 100% of tips
+   - [ ] Two servers work equal hours (8 hrs each) → each receives 50% of tips
+   - [ ] Two servers work unequal hours (8 hrs, 4 hrs) → 66.67% and 33.33% split
+
+2. **Multi-Shift Scenarios:**
+   - [ ] Server works multiple shifts (lunch + dinner), other server works only dinner
+   - [ ] Verify tips prorated by total hours, not by shift
+   - [ ] Server works 2 shifts (4 hrs each), other server works 1 shift (8 hrs) → equal tips
+
+3. **Support Staff Calculation:**
+   - [ ] Busser works same shift as server → receives configured percentage from that server
+   - [ ] Busser works shift with multiple servers → receives percentage from all servers on that shift
+   - [ ] Expeditor works different shift than busser → each calculates independently
+
+4. **Support Staff Cap Enforcement:**
+   - [ ] Support staff tips exceed highest server on their shift → cap applied
+   - [ ] Support staff tips below highest server → no cap needed
+   - [ ] Multiple support staff on same shift → each capped independently
+   - [ ] Cap applied correctly when server worked multiple shifts
+
+5. **Edge Cases and Error Handling:**
+   - [ ] Zero servers provided → throws error "At least one server is required"
+   - [ ] Zero total server hours → throws error "Total server hours must be greater than zero"
+   - [ ] Negative tip pool amount → throws error "Total tip pool cannot be negative"
+   - [ ] Negative drawer balance (closing < starting) → validation error
+   - [ ] Employee works 0 hours → validation error
+   - [ ] Employee works > 16 hours → validation error
+   - [ ] Same employee listed twice with different roles → validation error
+   - [ ] Empty employee list → validation error
+
+6. **Rounding and Precision:**
+   - [ ] $10.00 split 3 ways → $3.33, $3.33, $3.34 (remainder to highest earner)
+   - [ ] Verify sum of all distributed tips equals total tip pool (within $0.01)
+   - [ ] All monetary values rounded to 2 decimal places
+   - [ ] Intermediate calculations maintain precision (no premature rounding)
+
+7. **Data Integrity:**
+   - [ ] Duplicate tip entry for same date → validation error or override confirmation
+   - [ ] Concurrent edits of same tip entry → last write wins or optimistic locking
+   - [ ] Orphaned calculations after entry deletion → cascade delete or soft delete
+   - [ ] Employee deleted while in active tip entry → referential integrity maintained
+
+**Other Backend Tests:**
+- Test audit trail creation (all CRUD operations logged)
+- Test validation schemas (Zod) for all API inputs
+- Test multi-tenant isolation (cannot access other tenant's data)
+- Test magic link token generation and validation
+- Test rate limiting logic (email and IP limits)
 - Target: 80% code coverage
 
 **Frontend (Jest + React Testing Library):**
@@ -1582,7 +1800,43 @@ terraform/
 
 **Per-Tenant Cost at Scale:** $13-17/month per tenant
 
-### 12.3 Cost Optimization Strategies
+### 12.3 Database Options Comparison
+
+**Option 1: RDS PostgreSQL (Recommended for predictable workloads)**
+- db.t3.micro: ~$15/month (single-AZ), ~$35/month (Multi-AZ)
+- Pros: Predictable cost, simple setup, good for constant usage
+- Cons: Pays for 24/7 even during low usage hours
+- Best for: 5+ tenants with daily tip entries
+
+**Option 2: Aurora Serverless v2 PostgreSQL (Best for variable workloads)**
+- Minimum ACUs: 0.5 (~$43/month if running 24/7)
+- Auto-scales from 0.5 to 1 ACU based on load
+- Pros:
+  - Auto-scales to zero during inactivity (saves cost)
+  - Pay per second of usage
+  - Better for sporadic workload (e.g., tips entered once per day)
+  - No connection management issues (built-in pooling)
+- Cons: Slightly higher cost if running 24/7, cold start delay (< 1 second)
+- Best for: 1-5 tenants with sporadic usage
+- **Cost savings example:** If database is active 4 hours/day (16% uptime):
+  - Aurora Serverless v2: ~$7-10/month
+  - RDS t3.micro: ~$15/month (always on)
+  - **Savings: 30-50% for low-usage scenarios**
+
+**Option 3: Aurora Serverless v1 (Not recommended)**
+- Being phased out in favor of v2
+- Higher cold start latency (up to 30 seconds)
+- Skip this option
+
+**Recommendation:**
+- **Start with RDS t3.micro** for simplicity and predictable cost
+- **Switch to Aurora Serverless v2** if:
+  - Workload is sporadic (< 8 hours active per day)
+  - Need better auto-scaling
+  - Have fewer than 5 tenants
+  - RDS connection limits become an issue
+
+### 12.4 Cost Optimization Strategies
 
 **Immediate Optimizations:**
 - Use AWS Free Tier for first 12 months (saves ~$50-100/month)
@@ -1612,7 +1866,7 @@ terraform/
 - Review AWS Trusted Advisor recommendations monthly
 - Tag all resources by environment and tenant for cost tracking
 
-### 12.4 Cost Comparison: AWS vs Competitors
+### 12.5 Cost Comparison: AWS vs Competitors
 
 | Component | AWS | Google Cloud | Azure |
 |-----------|-----|--------------|-------|

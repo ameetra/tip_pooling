@@ -70,6 +70,13 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] Employee can only view their own data
 - [ ] Employee can view tips for past 30 days
 - [ ] Employee session timeout after 15 minutes of inactivity
+- [ ] **Magic Link Security:**
+  - [ ] System rate limits magic link requests to 3 per email address per hour
+  - [ ] System rate limits to 10 requests per IP address per hour (prevents abuse)
+  - [ ] After 5 failed/invalid magic link attempts from same IP, system requires CAPTCHA
+  - [ ] System logs suspicious activity (many requests for different emails from same IP)
+  - [ ] Magic links expire after 15 minutes
+  - [ ] Magic links are single-use only (cannot be reused after first click)
 
 ### 3.2 Employee Management
 
@@ -116,14 +123,34 @@ A cloud-based tip pooling management system that automates the calculation and d
 ### 3.4 Daily Tip Entry & Calculation
 
 #### 3.4.1 Tip Entry Form
+- [ ] **Timezone Handling:**
+  - [ ] System displays current date in tenant's configured timezone
+  - [ ] Entry date defaults to current date in tenant's timezone
+  - [ ] Manager can select past dates (up to 30 days back)
+  - [ ] Manager can select future dates (up to 2 days ahead for pre-entry)
+  - [ ] All dates stored in database as DATE type (timezone-agnostic)
+  - [ ] All timestamps (created_at, updated_at) stored in UTC
+  - [ ] All display dates/times converted to tenant's timezone
 - [ ] Manager selects date for tip entry
+- [ ] System checks if tip entry already exists for selected date
+- [ ] If entry exists, system displays warning and prompts manager to edit existing entry
+- [ ] Manager can override warning with explicit confirmation (for correction scenarios)
 - [ ] Manager enters starting drawer balance
 - [ ] Manager enters closing drawer balance
-- [ ] System calculates cash tips (closing - starting balance)
+- [ ] Manager enters cash sales (from POS system or daily report)
+- [ ] System calculates cash tips: `Cash Tips = Closing Drawer - Starting Drawer - Cash Sales`
+- [ ] System validates closing drawer is greater than or equal to (starting drawer + cash sales)
+- [ ] System shows calculated cash tips to manager for verification
 - [ ] Manager enters electronic tips from POS system
-- [ ] System calculates total tip pool (cash + electronic)
+- [ ] System calculates total tip pool (cash tips + electronic tips)
 - [ ] System automatically records manager name (logged-in user)
-- [ ] System timestamps entry creation
+- [ ] System timestamps entry creation (UTC, displayed in tenant timezone)
+
+**Cash Tips Calculation Notes:**
+- **Why cash sales?** The cash drawer contains starting float + cash sales + cash tips. To isolate tips, we subtract both starting float and cash sales.
+- **Example:** Starting drawer $500, closing drawer $1,800, cash sales $1,000 → Cash tips = $1,800 - $500 - $1,000 = $300
+- **Credit card only?** If restaurant doesn't accept cash payments, enter $0 for cash sales. Formula becomes: Closing - Starting = Cash Tips
+- **Separate tip jar?** If tips are collected separately (not in register), enter starting = $0, closing = total tips collected, cash sales = $0
 
 #### 3.4.2 Employee Shift Entry
 - [ ] Manager adds employees to the daily entry
@@ -137,12 +164,16 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] System validates at least one Server per shift
 
 #### 3.4.3 Tip Calculation Logic - Server Tips
-- [ ] System pools all tips for the day
+- [ ] System pools all tips for the day (single pool across all shifts)
 - [ ] System calculates total server hours across all shifts
 - [ ] System prorates tip pool to each server based on hours worked
   - Formula: `Server Tip = (Server Hours / Total Server Hours) × Total Tip Pool`
 - [ ] System assigns calculated tip amount to each server
-- [ ] System breaks down server tips by shift if server worked multiple shifts
+- [ ] **Multi-Shift Proration:** Tips are pooled across ALL shifts for the day
+  - Servers earn tips based on total hours worked, regardless of which shifts
+  - Example: Total tips $1000, Server A works 4 hrs lunch + 4 hrs dinner (8 hrs total), Server B works 8 hrs dinner only (8 hrs total) → Both earn $500 (equal hours = equal tips)
+  - System does NOT calculate separate tip pools per shift
+  - For display purposes only, if server worked multiple shifts, tips are divided evenly across their shifts
 
 #### 3.4.4 Tip Calculation Logic - Support Staff Tips
 - [ ] For each support staff member (Busser/Expeditor):
@@ -160,15 +191,41 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] System calculates total pay: `Total Pay = Hourly Pay + Tips`
 - [ ] System calculates effective hourly rate: `Effective Rate = Total Pay / Hours Worked`
 - [ ] All calculations displayed to 2 decimal places
+- [ ] **Rounding Rules:**
+  - [ ] All monetary calculations use standard rounding (round half up)
+  - [ ] Rounding performed at final step (not intermediate calculations)
+  - [ ] Example: $10.125 rounds to $10.13, $10.124 rounds to $10.12
+  - [ ] Rounding remainders from tip distribution added to highest earner
+  - [ ] Example: $10.00 ÷ 3 = $3.33, $3.33, $3.34 (highest earner gets extra penny)
+  - [ ] System ensures total distributed equals exact tip pool amount (no money lost/created)
+  - [ ] Validation: Sum of all final tips must equal total tip pool (within $0.01 tolerance)
 
-#### 3.4.6 Calculation Results Display
-- [ ] System displays summary of calculations after submission
+#### 3.4.6 Live Calculation Preview
+- [ ] System shows live preview of tip calculations as manager enters data
+- [ ] Preview updates in real-time when:
+  - [ ] Drawer balances change
+  - [ ] Electronic tips amount changes
+  - [ ] Employees are added/removed
+  - [ ] Employee hours change
+  - [ ] Employee shifts change
+- [ ] Preview displays:
+  - [ ] Total tip pool (cash + electronic)
+  - [ ] Number of employees by role (servers, bussers, expeditors)
+  - [ ] Total hours worked
+  - [ ] Preview breakdown for each employee (name, role, estimated tips)
+- [ ] Preview clearly marked as "PREVIEW - Not Saved" to avoid confusion
+- [ ] Preview helps manager catch errors before submission
+
+#### 3.4.7 Calculation Results Display & Confirmation
+- [ ] System displays final summary of calculations after submission
 - [ ] Summary includes: Total tips distributed, total hours, server count, support staff count
 - [ ] System displays individual breakdown for each employee:
   - [ ] Name, Role, Shifts worked, Hours
   - [ ] Hourly pay, Tips earned, Total pay, Effective hourly rate
-- [ ] Manager can review before final confirmation
-- [ ] System saves calculations to database upon confirmation
+- [ ] Manager reviews calculations and confirms accuracy
+- [ ] Manager can go back to edit if errors found
+- [ ] System saves calculations to database only upon explicit confirmation
+- [ ] System displays success message with entry ID and timestamp
 
 ### 3.5 Data Management & History
 
@@ -201,10 +258,16 @@ A cloud-based tip pooling management system that automates the calculation and d
 
 #### 3.6.1 Employee Login
 - [ ] Employee enters email address
+- [ ] System validates email against employee database
+- [ ] System checks rate limits (3 requests per email per hour, 10 per IP per hour)
+- [ ] If rate limit exceeded, system displays error message with retry time
 - [ ] System sends magic link to employee email
 - [ ] Link valid for 15 minutes
+- [ ] Link is single-use only
 - [ ] Employee clicks link to access their dashboard
-- [ ] System creates temporary session
+- [ ] System validates link (not expired, not used, exists in database)
+- [ ] System marks link as used
+- [ ] System creates temporary session (15-minute expiry)
 
 #### 3.6.2 Employee Dashboard
 - [ ] Employee sees their tip history for past 30 days
