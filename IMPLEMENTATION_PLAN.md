@@ -1,8 +1,19 @@
 # Tip Pooling System - Implementation Plan
 
 **Created:** December 29, 2025
-**Last Updated:** December 29, 2025
-**Status:** Not Started
+**Last Updated:** April 12, 2026
+**Status:** In Progress
+
+## Current Progress
+
+### Milestone 1: Tip Calculation Service (Local Development) - COMPLETE
+- [x] Initialize backend project (Node.js + TypeScript + Jest)
+- [x] Define types/interfaces (`backend/src/types/tip-calculation.types.ts`)
+- [x] Implement tip calculation service (`backend/src/services/tip-calculation.service.ts`)
+- [x] Write all 20 test cases (TC-CALC-001 through TC-CALC-020) + 3 cash tips tests
+- [x] All 23 tests passing, 100% statement/line/function coverage, 94.44% branch coverage
+
+---
 
 This plan tracks all implementation steps for the tip pooling management system based on the revised PRD and TDD. Update this file as you complete each step.
 

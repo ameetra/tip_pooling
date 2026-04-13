@@ -201,7 +201,367 @@ External AWS Services:
 └────────────────────────────────────┘
 ```
 
-### 2.2 Multi-Tenant Architecture
+### 2.2 Frontend Hosting Architecture (S3 + CloudFront)
+
+#### 2.2.1 Overview
+
+The React single-page application (SPA) is hosted using AWS's recommended static website hosting pattern:
+- **Amazon S3** for storage of compiled static files
+- **Amazon CloudFront** for global content delivery and HTTPS/SSL
+- **AWS Certificate Manager (ACM)** for free SSL certificates
+- **Route 53** for custom domain DNS (optional)
+
+#### 2.2.2 S3 Bucket Configuration
+
+**Bucket Structure:**
+```
+tip-pooling-app-frontend-prod/
+├── index.html (main entry point)
+├── favicon.ico
+├── manifest.json
+├── robots.txt
+├── static/
+│   ├── css/
+│   │   └── main.[hash].css
+│   ├── js/
+│   │   ├── main.[hash].js
+│   │   ├── [chunk].[hash].js
+│   │   └── runtime-main.[hash].js
+│   └── media/
+│       └── [images, fonts, etc.]
+└── asset-manifest.json
+```
+
+**S3 Bucket Settings:**
+- **Bucket name:** `tip-pooling-app-frontend-{environment}` (e.g., prod, staging, dev)
+- **Region:** us-east-1 (required for CloudFront with ACM certificates)
+- **Versioning:** Enabled (allows rollback to previous deployments)
+- **Public access:** Blocked (CloudFront Origin Access Identity handles access)
+- **Static website hosting:** Disabled (CloudFront serves as entry point)
+- **Encryption:** AES-256 (S3-managed keys)
+- **Object lifecycle:** Delete old versions after 30 days
+
+**S3 Bucket Policy (CloudFront OAI access only):**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFrontOAIAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity XXXXXX"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::tip-pooling-app-frontend-prod/*"
+    }
+  ]
+}
+```
+
+#### 2.2.3 CloudFront Distribution Configuration
+
+**Distribution Settings:**
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| **Origin Domain** | tip-pooling-app-frontend-prod.s3.amazonaws.com | S3 bucket |
+| **Origin Access** | Origin Access Identity (OAI) | Secure S3 access, no public bucket |
+| **Viewer Protocol** | Redirect HTTP to HTTPS | Force encryption |
+| **Allowed HTTP Methods** | GET, HEAD, OPTIONS | Read-only for static site |
+| **Cache Policy** | CachingOptimized | Maximize cache hits |
+| **Compress Objects** | Yes | Gzip/Brotli compression |
+| **Price Class** | Use All Edge Locations | Global performance |
+| **Alternate Domain Names (CNAMEs)** | app.tippooling.com | Custom domain |
+| **SSL Certificate** | ACM certificate | Free SSL from ACM |
+| **Default Root Object** | index.html | SPA entry point |
+| **Custom Error Responses** | 403, 404 → /index.html (200) | SPA routing support |
+
+**Cache Behaviors:**
+
+```
+1. Path Pattern: /static/*
+   - TTL: 1 year (31536000 seconds)
+   - Cache-Control: max-age=31536000, immutable
+   - Reason: Hashed filenames never change
+
+2. Path Pattern: /index.html
+   - TTL: 0 seconds (no cache)
+   - Cache-Control: no-cache, no-store, must-revalidate
+   - Reason: Always fetch latest version
+
+3. Path Pattern: /manifest.json, /favicon.ico, /robots.txt
+   - TTL: 1 day (86400 seconds)
+   - Cache-Control: max-age=86400
+   - Reason: Rarely change but should update eventually
+```
+
+**Custom Error Responses (SPA Routing Support):**
+```
+Error Code 403 → Response Page: /index.html, Response Code: 200
+Error Code 404 → Response Page: /index.html, Response Code: 200
+```
+*This ensures React Router handles all routes client-side*
+
+**Security Headers (via Lambda@Edge or CloudFront Functions):**
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.tippooling.com https://cognito-idp.us-east-1.amazonaws.com
+```
+
+#### 2.2.4 Custom Domain Setup (Optional but Recommended)
+
+**DNS Configuration (Route 53):**
+
+1. **Create Hosted Zone:**
+   - Domain: `tippooling.com`
+   - Type: Public Hosted Zone
+
+2. **Create A Record (Alias):**
+   - Name: `app.tippooling.com`
+   - Type: A - IPv4 address
+   - Alias: Yes
+   - Alias Target: CloudFront distribution
+   - Routing Policy: Simple
+
+3. **Create AAAA Record (Alias for IPv6):**
+   - Name: `app.tippooling.com`
+   - Type: AAAA - IPv6 address
+   - Alias: Yes
+   - Alias Target: CloudFront distribution
+   - Routing Policy: Simple
+
+**SSL Certificate (ACM):**
+
+1. **Request Certificate:**
+   - Region: us-east-1 (required for CloudFront)
+   - Domain names: `app.tippooling.com`, `*.tippooling.com` (wildcard optional)
+   - Validation: DNS validation (automatic with Route 53)
+
+2. **Certificate Auto-Renewal:**
+   - ACM automatically renews certificates before expiration
+   - No manual intervention required
+
+#### 2.2.5 CORS Configuration
+
+**API Gateway CORS Settings:**
+```
+Access-Control-Allow-Origin: https://app.tippooling.com
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
+Access-Control-Allow-Credentials: true
+Access-Control-Max-Age: 86400
+```
+
+**Environment-Specific Origins:**
+- Development: `http://localhost:3000`
+- Staging: `https://staging.tippooling.com`
+- Production: `https://app.tippooling.com`
+
+#### 2.2.6 Deployment Workflow
+
+**Automated CI/CD Deployment:**
+
+```bash
+# 1. Build React app
+npm run build
+
+# 2. Sync to S3 (delete removed files)
+aws s3 sync build/ s3://tip-pooling-app-frontend-prod \
+  --delete \
+  --cache-control "public, max-age=31536000, immutable" \
+  --exclude "index.html" \
+  --exclude "manifest.json" \
+  --exclude "robots.txt"
+
+# 3. Upload index.html with no-cache header
+aws s3 cp build/index.html s3://tip-pooling-app-frontend-prod/index.html \
+  --cache-control "no-cache, no-store, must-revalidate"
+
+# 4. Invalidate CloudFront cache
+aws cloudfront create-invalidation \
+  --distribution-id E1234ABCD5678 \
+  --paths "/*"
+
+# 5. Wait for invalidation to complete (optional)
+aws cloudfront wait invalidation-completed \
+  --distribution-id E1234ABCD5678 \
+  --id I1234ABCD5678
+```
+
+**GitHub Actions Workflow Example:**
+```yaml
+name: Deploy Frontend to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: cd frontend && npm ci
+      
+      - name: Run tests
+        run: cd frontend && npm test
+      
+      - name: Build production bundle
+        run: cd frontend && npm run build
+        env:
+          REACT_APP_API_URL: https://api.tippooling.com
+          REACT_APP_ENV: production
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/build/ s3://tip-pooling-app-frontend-prod \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html"
+          aws s3 cp frontend/build/index.html s3://tip-pooling-app-frontend-prod/index.html \
+            --cache-control "no-cache, no-store, must-revalidate"
+      
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+      
+      - name: Notify deployment
+        run: echo "Frontend deployed successfully!"
+```
+
+#### 2.2.7 Performance Optimization
+
+**Build Optimization:**
+- Code splitting (React.lazy, dynamic imports)
+- Tree shaking (remove unused code)
+- Minification (UglifyJS, Terser)
+- Image optimization (WebP format, lazy loading)
+- Bundle size analysis (webpack-bundle-analyzer)
+
+**CloudFront Optimization:**
+- Gzip/Brotli compression enabled
+- HTTP/2 and HTTP/3 support
+- Edge locations worldwide (low latency)
+- Query string forwarding disabled (better cache hit ratio)
+- Cookie forwarding disabled for static assets
+
+**Caching Strategy:**
+- Static assets (hashed): 1 year cache
+- index.html: No cache (always fresh)
+- API calls: No CloudFront cache (dynamic data)
+
+**Performance Targets:**
+- First Contentful Paint (FCP): < 1.5s
+- Largest Contentful Paint (LCP): < 2.5s
+- Time to Interactive (TTI): < 3.5s
+- Total Blocking Time (TBT): < 300ms
+- Cumulative Layout Shift (CLS): < 0.1
+
+#### 2.2.8 Monitoring & Logging
+
+**CloudFront Metrics (CloudWatch):**
+- Requests (total count)
+- Bytes downloaded/uploaded
+- Error rate (4xx, 5xx)
+- Cache hit ratio
+- Origin latency
+
+**S3 Metrics:**
+- Bucket size
+- Number of objects
+- Request count
+- Error rate
+
+**Access Logging:**
+- CloudFront access logs → S3 bucket (log-bucket)
+- Log format: Standard CloudFront log format
+- Retention: 90 days (lifecycle policy)
+- Analysis: Amazon Athena for querying logs
+
+**Alarms:**
+- CloudFront 5xx error rate > 1% → SNS notification
+- Cache hit ratio < 80% → SNS notification (optimization needed)
+- Origin latency > 2 seconds → SNS notification
+
+#### 2.2.9 Cost Breakdown (S3 + CloudFront)
+
+**Monthly Cost Estimate (single tenant):**
+
+| Service | Usage | Cost |
+|---------|-------|------|
+| **S3 Storage** | 500 MB | $0.01/month |
+| **S3 Requests** | 10,000 GET | $0.004/month |
+| **CloudFront Data Transfer** | 50 GB/month | $4.25/month |
+| **CloudFront Requests** | 1M HTTPS | $0.10/month |
+| **Route 53 Hosted Zone** | 1 zone | $0.50/month |
+| **ACM Certificate** | 1 certificate | FREE |
+| **Total** | | **$4.86/month** |
+
+**With AWS Free Tier (first 12 months):**
+- CloudFront: 1 TB data transfer + 10M HTTPS requests FREE
+- S3: 5 GB storage + 20,000 GET requests FREE
+- **Effective cost: $0.50/month (Route 53 only)**
+
+#### 2.2.10 Disaster Recovery & Rollback
+
+**Versioning Strategy:**
+- S3 versioning enabled (keep last 30 versions)
+- Quick rollback by copying previous version to current
+- CloudFront invalidation to clear cache
+
+**Rollback Procedure:**
+```bash
+# 1. List object versions
+aws s3api list-object-versions \
+  --bucket tip-pooling-app-frontend-prod \
+  --prefix index.html
+
+# 2. Copy previous version to current
+aws s3api copy-object \
+  --bucket tip-pooling-app-frontend-prod \
+  --copy-source tip-pooling-app-frontend-prod/index.html?versionId=VERSION_ID \
+  --key index.html
+
+# 3. Invalidate CloudFront
+aws cloudfront create-invalidation \
+  --distribution-id E1234ABCD5678 \
+  --paths "/*"
+```
+
+**Backup Strategy:**
+- S3 versioning: 30-day retention
+- Cross-region replication (optional for critical data)
+- Regular exports to separate backup bucket
+
+---
+
+### 2.3 Multi-Tenant Architecture
 
 **Tenant Isolation Strategy: Shared Database with Tenant ID Column**
 
@@ -286,7 +646,6 @@ Every table includes a `tenant_id` column. All queries are scoped by tenant ID e
 │ manager_id (FK->users)  │
 │ starting_drawer         │
 │ closing_drawer          │
-│ cash_sales              │
 │ cash_tips (computed)    │
 │ electronic_tips         │
 │ total_tips (computed)   │
@@ -333,11 +692,6 @@ Every table includes a `tenant_id` column. All queries are scoped by tenant ID e
 └─────────────────────────┘
 ```
 
-**ERD Updates:**
-- Added `user_id` column to employees table (links to users table)
-- Added `magic_link_tokens` table for passwordless employee authentication
-- See schema details in sections 3.2.3 and 3.2.11 below
-
 ### 3.2 Database Schema
 
 #### 3.2.1 Tenants Table
@@ -382,7 +736,6 @@ CREATE TYPE employee_role AS ENUM ('SERVER', 'BUSSER', 'EXPEDITOR');
 CREATE TABLE employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     role employee_role NOT NULL,
@@ -395,14 +748,7 @@ CREATE TABLE employees (
 
 CREATE INDEX idx_employees_tenant ON employees(tenant_id);
 CREATE INDEX idx_employees_active ON employees(tenant_id, is_active);
-CREATE INDEX idx_employees_user ON employees(user_id);
-CREATE INDEX idx_employees_email ON employees(email);
 ```
-
-**Notes:**
-- `user_id` links employees to users table (nullable, populated when employee first logs in via magic link)
-- When employee uses magic link, a temporary user record is created in the users table with role='EMPLOYEE'
-- This allows unified session management and audit logging
 
 #### 3.2.4 Employee Rate History Table
 ```sql
@@ -455,40 +801,20 @@ CREATE TABLE tip_entries (
     manager_id UUID NOT NULL REFERENCES users(id),
     starting_drawer DECIMAL(10, 2) NOT NULL,
     closing_drawer DECIMAL(10, 2) NOT NULL,
-    cash_sales DECIMAL(10, 2) NOT NULL DEFAULT 0,
-    cash_tips DECIMAL(10, 2) GENERATED ALWAYS AS (closing_drawer - starting_drawer - cash_sales) STORED,
+    cash_tips DECIMAL(10, 2) GENERATED ALWAYS AS (closing_drawer - starting_drawer) STORED,
     electronic_tips DECIMAL(10, 2) NOT NULL,
-    total_tips DECIMAL(10, 2) GENERATED ALWAYS AS ((closing_drawer - starting_drawer - cash_sales) + electronic_tips) STORED,
+    total_tips DECIMAL(10, 2) GENERATED ALWAYS AS ((closing_drawer - starting_drawer) + electronic_tips) STORED,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     replaced_by_id UUID REFERENCES tip_entries(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP
+    deleted_at TIMESTAMP,
+    UNIQUE(tenant_id, entry_date, is_deleted) DEFERRABLE INITIALLY DEFERRED
 );
 
--- Partial unique index to prevent duplicate active entries (allows multiple deleted entries for same date)
-CREATE UNIQUE INDEX idx_tip_entries_unique_active ON tip_entries(tenant_id, entry_date) WHERE is_deleted = FALSE;
 CREATE INDEX idx_tip_entries_tenant_date ON tip_entries(tenant_id, entry_date DESC);
 CREATE INDEX idx_tip_entries_active ON tip_entries(tenant_id, is_deleted) WHERE is_deleted = FALSE;
 ```
-
-**Cash Tips Calculation Explained:**
-
-The formula `cash_tips = closing_drawer - starting_drawer - cash_sales` accounts for:
-- **Starting drawer**: Initial cash float (e.g., $500 for making change)
-- **Closing drawer**: Total cash at end of day (float + cash sales + cash tips)
-- **Cash sales**: Total cash received for food/drinks (from POS system)
-- **Cash tips**: What remains after subtracting starting float and cash sales
-
-**Example:**
-- Starting drawer: $500 (float)
-- During the day:
-  - Cash sales (food/drinks): $1,000 (from POS)
-  - Cash tips: $300 (actual tips)
-- Closing drawer: $500 + $1,000 + $300 = $1,800
-- **Calculation**: $1,800 - $500 - $1,000 = **$300 cash tips** ✓
-
-**Note:** If restaurant doesn't accept cash payments (credit card only), `cash_sales = 0` and formula simplifies to `closing_drawer - starting_drawer`.
 
 #### 3.2.8 Tip Calculations Table
 ```sql
@@ -546,33 +872,6 @@ CREATE INDEX idx_audit_tenant_date ON audit_logs(tenant_id, created_at DESC);
 CREATE INDEX idx_audit_user ON audit_logs(user_id, created_at DESC);
 CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
 ```
-
-#### 3.2.11 Magic Link Tokens Table
-```sql
-CREATE TABLE magic_link_tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-    token VARCHAR(255) NOT NULL UNIQUE,
-    email VARCHAR(255) NOT NULL,
-    ip_address INET,
-    is_used BOOLEAN NOT NULL DEFAULT FALSE,
-    used_at TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_magic_token ON magic_link_tokens(token);
-CREATE INDEX idx_magic_employee ON magic_link_tokens(employee_id, created_at DESC);
-CREATE INDEX idx_magic_email_created ON magic_link_tokens(email, created_at DESC);
-CREATE INDEX idx_magic_ip_created ON magic_link_tokens(ip_address, created_at DESC);
-CREATE INDEX idx_magic_expires ON magic_link_tokens(expires_at) WHERE is_used = FALSE;
-```
-
-**Notes:**
-- Tokens expire after 15 minutes (expires_at)
-- Tokens are single-use (is_used flag)
-- Email and IP indexes support rate limiting queries
-- Automatic cleanup via scheduled job (delete tokens older than 24 hours)
 
 ### 3.3 Data Access Patterns
 
@@ -666,11 +965,8 @@ GET    /api/v1/tips/entries/:id
 PATCH  /api/v1/tips/entries/:id (edit - creates new record)
 DELETE /api/v1/tips/entries/:id (soft delete)
 GET    /api/v1/tips/entries/:id/calculations
-POST   /api/v1/tips/preview (live preview calculation - does NOT save to database)
-POST   /api/v1/tips/calculate (deprecated - use /preview instead)
+POST   /api/v1/tips/calculate (preview calculation before saving)
 ```
-
-**Note:** `/api/v1/tips/preview` is used by frontend for live calculation preview as user enters data. It performs the full calculation but does not persist any data.
 
 #### 4.1.8 Employee Self-Service
 
@@ -709,7 +1005,6 @@ Content-Type: application/json
   "entryDate": "2025-11-09",
   "startingDrawer": 500.00,
   "closingDrawer": 1250.75,
-  "cashSales": 500.00,
   "electronicTips": 450.25,
   "employees": [
     {
@@ -728,10 +1023,6 @@ Content-Type: application/json
 }
 ```
 
-**Note:**
-- `cashSales` = Total cash received for food/drinks (from POS system)
-- Cash tips will be calculated as: $1250.75 - $500.00 - $500.00 = $250.75
-
 **Response:**
 ```json
 {
@@ -742,10 +1033,9 @@ Content-Type: application/json
       "entryDate": "2025-11-09",
       "startingDrawer": 500.00,
       "closingDrawer": 1250.75,
-      "cashSales": 500.00,
-      "cashTips": 250.75,
+      "cashTips": 750.75,
       "electronicTips": 450.25,
-      "totalTips": 701.00,
+      "totalTips": 1201.00,
       "managerId": "uuid-manager",
       "createdAt": "2025-11-09T18:30:00Z"
     },
@@ -833,154 +1123,86 @@ function calculateTips(
   employees: Employee[],
   supportStaffConfig: SupportStaffConfig[]
 ): TipCalculation[] {
-
-  // Step 1: Validate inputs
-  if (totalTipPool < 0) {
-    throw new Error('Total tip pool cannot be negative');
-  }
-
-  if (employees.length === 0) {
-    throw new Error('At least one employee is required');
-  }
-
-  // Step 2: Separate servers from support staff
+  
+  // Step 1: Separate servers from support staff
   const servers = employees.filter(e => e.roleOnDay === 'SERVER');
   const supportStaff = employees.filter(e => e.roleOnDay !== 'SERVER');
-
-  // Step 3: Validate at least one server exists
-  if (servers.length === 0) {
-    throw new Error('At least one server is required to distribute tips');
-  }
-
-  // Step 4: Calculate total server hours
+  
+  // Step 2: Calculate total server hours
   const totalServerHours = servers.reduce((sum, s) => sum + s.hoursWorked, 0);
-
-  // Additional validation
-  if (totalServerHours === 0) {
-    throw new Error('Total server hours must be greater than zero');
-  }
-
-  // Step 5: Prorate tips to servers based on hours worked
-  // All tips are pooled across all shifts - servers earn based on total hours regardless of which shifts
+  
+  // Step 3: Prorate tips to servers based on hours
   const serverCalculations = servers.map(server => {
     const baseTips = (server.hoursWorked / totalServerHours) * totalTipPool;
-
+    
     return {
       employeeId: server.id,
       roleOnDay: server.roleOnDay,
       shifts: server.shifts,
       hoursWorked: server.hoursWorked,
-      baseTips: Number(baseTips.toFixed(2)),
+      baseTips,
       supportTipsGiven: 0, // calculated later
-      finalTips: Number(baseTips.toFixed(2)), // adjusted later
+      finalTips: baseTips, // adjusted later
     };
   });
-
-  // Step 6: Calculate support staff tips from servers who worked same shifts
+  
+  // Step 4: Calculate support staff tips
   const supportCalculations = supportStaff.map(support => {
     const config = supportStaffConfig.find(c => c.role === support.roleOnDay);
     const percentage = config ? config.percentage / 100 : 0;
-
+    
     let supportTips = 0;
-
-    // Find servers who worked the same shift(s) and calculate tips from each
-    servers.forEach(server => {
+    
+    // Find servers who worked the same shift(s)
+    servers.forEach((server, idx) => {
       const sharedShifts = server.shifts.filter(s => support.shifts.includes(s));
-
+      
       if (sharedShifts.length > 0) {
-        // Find the calculation for this server
-        const serverCalc = serverCalculations.find(c => c.employeeId === server.id);
-        if (!serverCalc) return;
-
-        // Calculate proportion of server's tips that come from shared shifts
-        // If server worked multiple shifts, assume tips are evenly distributed across their shifts
+        // Calculate server's tips for shared shifts
+        // If server worked multiple shifts, prorate their tips by shift
         const serverTotalShifts = server.shifts.length;
-        const proportionFromSharedShifts = sharedShifts.length / serverTotalShifts;
-        const serverTipsFromSharedShifts = serverCalc.baseTips * proportionFromSharedShifts;
-
+        const serverTipsPerShift = serverCalculations[idx].baseTips / serverTotalShifts;
+        const tipsFromSharedShifts = serverTipsPerShift * sharedShifts.length;
+        
         // Support staff gets percentage of server's shared shift tips
-        const tipsFromThisServer = serverTipsFromSharedShifts * percentage;
+        const tipsFromThisServer = tipsFromSharedShifts * percentage;
         supportTips += tipsFromThisServer;
-
+        
         // Deduct from server's tips
-        serverCalc.supportTipsGiven += tipsFromThisServer;
-        serverCalc.finalTips -= tipsFromThisServer;
+        serverCalculations[idx].supportTipsGiven += tipsFromThisServer;
+        serverCalculations[idx].finalTips -= tipsFromThisServer;
       }
     });
-
-    // Step 7: Apply cap - support staff cannot exceed highest earning server on their shift(s)
-    const serversOnSameShift = servers.filter(s =>
+    
+    // Step 5: Apply cap - support staff cannot exceed highest server on their shift
+    const serversOnSameShift = servers.filter(s => 
       s.shifts.some(shift => support.shifts.includes(shift))
     );
-
-    if (serversOnSameShift.length > 0) {
-      const serverFinalTips = serversOnSameShift.map(server => {
-        const calc = serverCalculations.find(c => c.employeeId === server.id);
-        return calc ? calc.finalTips : 0;
-      });
-
-      const highestServerTip = Math.max(...serverFinalTips);
-
-      if (supportTips > highestServerTip) {
-        // Cap applied - adjust to match highest server
-        const excessTips = supportTips - highestServerTip;
-        supportTips = highestServerTip;
-
-        // Return excess tips to servers proportionally
-        const totalSupportGiven = serverCalculations.reduce((sum, c) => sum + c.supportTipsGiven, 0);
-        if (totalSupportGiven > 0) {
-          serverCalculations.forEach(calc => {
-            const proportion = calc.supportTipsGiven / totalSupportGiven;
-            const refund = excessTips * proportion;
-            calc.supportTipsGiven -= refund;
-            calc.finalTips += refund;
-          });
-        }
-      }
+    const highestServerTip = Math.max(
+      ...serversOnSameShift.map((_, idx) => serverCalculations[idx].finalTips)
+    );
+    
+    if (supportTips > highestServerTip) {
+      supportTips = highestServerTip;
     }
-
+    
     return {
       employeeId: support.id,
       roleOnDay: support.roleOnDay,
       shifts: support.shifts,
       hoursWorked: support.hoursWorked,
-      supportTipsReceived: Number(supportTips.toFixed(2)),
-      finalTips: Number(supportTips.toFixed(2)),
+      supportTipsReceived: supportTips,
+      finalTips: supportTips,
     };
   });
-
-  // Step 8: Round all server calculations to 2 decimal places
-  serverCalculations.forEach(calc => {
-    calc.baseTips = Number(calc.baseTips.toFixed(2));
-    calc.supportTipsGiven = Number(calc.supportTipsGiven.toFixed(2));
-    calc.finalTips = Number(calc.finalTips.toFixed(2));
-  });
-
-  // Step 9: Handle rounding remainders - add any difference to highest earner
-  const totalDistributed = [...serverCalculations, ...supportCalculations]
-    .reduce((sum, c) => sum + c.finalTips, 0);
-  const roundingDifference = Number((totalTipPool - totalDistributed).toFixed(2));
-
-  if (Math.abs(roundingDifference) > 0.01) {
-    // Find highest earner and add remainder
-    const allCalcs = [...serverCalculations, ...supportCalculations];
-    const highestEarner = allCalcs.reduce((max, calc) =>
-      calc.finalTips > max.finalTips ? calc : max
-    );
-    highestEarner.finalTips = Number((highestEarner.finalTips + roundingDifference).toFixed(2));
-  }
-
-  // Step 10: Calculate total compensation
+  
+  // Step 6: Calculate total compensation
   const allCalculations = [...serverCalculations, ...supportCalculations].map(calc => {
     const employee = employees.find(e => e.id === calc.employeeId);
-    if (!employee) {
-      throw new Error(`Employee ${calc.employeeId} not found`);
-    }
-
-    const hourlyPay = Number((employee.hoursWorked * employee.hourlyRate).toFixed(2));
-    const totalPay = Number((hourlyPay + calc.finalTips).toFixed(2));
-    const effectiveHourlyRate = Number((totalPay / employee.hoursWorked).toFixed(2));
-
+    const hourlyPay = employee.hoursWorked * employee.hourlyRate;
+    const totalPay = hourlyPay + calc.finalTips;
+    const effectiveHourlyRate = totalPay / employee.hoursWorked;
+    
     return {
       ...calc,
       hourlyPay,
@@ -988,7 +1210,7 @@ function calculateTips(
       effectiveHourlyRate,
     };
   });
-
+  
   return allCalculations;
 }
 ```
@@ -1163,40 +1385,8 @@ CREATE INDEX idx_tip_calc_entry_employee ON tip_calculations(tip_entry_id, emplo
 **Query Optimization:**
 - Use Prisma's `include` for eager loading (avoid N+1 queries)
 - Pagination for large datasets (limit 50 records per page)
+- RDS connection pooling using RDS Proxy (max 100 connections)
 - Lambda connection management (reuse connections across invocations)
-
-**Connection Pooling Strategy:**
-
-**Without RDS Proxy (Recommended for start):**
-- Configure Prisma connection pool in Lambda:
-  ```typescript
-  // prisma/schema.prisma
-  datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-    // Connection pool settings for serverless
-    connection_limit = 5  // Low limit per Lambda instance
-  }
-  ```
-- Each Lambda instance maintains small pool (5 connections)
-- Sufficient for 10-20 tenants with moderate usage
-- Cost: $0/month (no additional service)
-- Monitor RDS connections in CloudWatch
-
-**With RDS Proxy (Use when scaling):**
-- Deploy when Lambda concurrent executions exceed 50
-- Or when database connection count consistently > 80% of max_connections
-- Or when seeing "too many connections" errors
-- RDS Proxy configuration:
-  - Max connections per proxy: 100
-  - Connection borrow timeout: 30 seconds
-  - Idle client connection timeout: 1800 seconds (30 min)
-- Benefits:
-  - Pools and shares connections across all Lambdas
-  - Reduces connection overhead
-  - Maintains connections during Lambda scaling
-- Cost: ~$15/month (2 vCPUs)
-- **Start without RDS Proxy, add only when metrics show it's needed**
 
 **Caching Strategy:**
 - Amazon ElastiCache (Redis) for frequently accessed data
@@ -1455,58 +1645,10 @@ terraform/
 ### 10.1 Unit Tests
 
 **Backend (Jest):**
-
-**Critical Test Scenarios for Tip Calculation Algorithm:**
-
-1. **Basic Server Tip Distribution:**
-   - [ ] Single server works 8 hours → receives 100% of tips
-   - [ ] Two servers work equal hours (8 hrs each) → each receives 50% of tips
-   - [ ] Two servers work unequal hours (8 hrs, 4 hrs) → 66.67% and 33.33% split
-
-2. **Multi-Shift Scenarios:**
-   - [ ] Server works multiple shifts (lunch + dinner), other server works only dinner
-   - [ ] Verify tips prorated by total hours, not by shift
-   - [ ] Server works 2 shifts (4 hrs each), other server works 1 shift (8 hrs) → equal tips
-
-3. **Support Staff Calculation:**
-   - [ ] Busser works same shift as server → receives configured percentage from that server
-   - [ ] Busser works shift with multiple servers → receives percentage from all servers on that shift
-   - [ ] Expeditor works different shift than busser → each calculates independently
-
-4. **Support Staff Cap Enforcement:**
-   - [ ] Support staff tips exceed highest server on their shift → cap applied
-   - [ ] Support staff tips below highest server → no cap needed
-   - [ ] Multiple support staff on same shift → each capped independently
-   - [ ] Cap applied correctly when server worked multiple shifts
-
-5. **Edge Cases and Error Handling:**
-   - [ ] Zero servers provided → throws error "At least one server is required"
-   - [ ] Zero total server hours → throws error "Total server hours must be greater than zero"
-   - [ ] Negative tip pool amount → throws error "Total tip pool cannot be negative"
-   - [ ] Negative drawer balance (closing < starting) → validation error
-   - [ ] Employee works 0 hours → validation error
-   - [ ] Employee works > 16 hours → validation error
-   - [ ] Same employee listed twice with different roles → validation error
-   - [ ] Empty employee list → validation error
-
-6. **Rounding and Precision:**
-   - [ ] $10.00 split 3 ways → $3.33, $3.33, $3.34 (remainder to highest earner)
-   - [ ] Verify sum of all distributed tips equals total tip pool (within $0.01)
-   - [ ] All monetary values rounded to 2 decimal places
-   - [ ] Intermediate calculations maintain precision (no premature rounding)
-
-7. **Data Integrity:**
-   - [ ] Duplicate tip entry for same date → validation error or override confirmation
-   - [ ] Concurrent edits of same tip entry → last write wins or optimistic locking
-   - [ ] Orphaned calculations after entry deletion → cascade delete or soft delete
-   - [ ] Employee deleted while in active tip entry → referential integrity maintained
-
-**Other Backend Tests:**
-- Test audit trail creation (all CRUD operations logged)
-- Test validation schemas (Zod) for all API inputs
-- Test multi-tenant isolation (cannot access other tenant's data)
-- Test magic link token generation and validation
-- Test rate limiting logic (email and IP limits)
+- Test tip calculation algorithm
+- Test support staff cap logic
+- Test audit trail creation
+- Test validation schemas (Zod)
 - Target: 80% code coverage
 
 **Frontend (Jest + React Testing Library):**
@@ -1800,43 +1942,7 @@ terraform/
 
 **Per-Tenant Cost at Scale:** $13-17/month per tenant
 
-### 12.3 Database Options Comparison
-
-**Option 1: RDS PostgreSQL (Recommended for predictable workloads)**
-- db.t3.micro: ~$15/month (single-AZ), ~$35/month (Multi-AZ)
-- Pros: Predictable cost, simple setup, good for constant usage
-- Cons: Pays for 24/7 even during low usage hours
-- Best for: 5+ tenants with daily tip entries
-
-**Option 2: Aurora Serverless v2 PostgreSQL (Best for variable workloads)**
-- Minimum ACUs: 0.5 (~$43/month if running 24/7)
-- Auto-scales from 0.5 to 1 ACU based on load
-- Pros:
-  - Auto-scales to zero during inactivity (saves cost)
-  - Pay per second of usage
-  - Better for sporadic workload (e.g., tips entered once per day)
-  - No connection management issues (built-in pooling)
-- Cons: Slightly higher cost if running 24/7, cold start delay (< 1 second)
-- Best for: 1-5 tenants with sporadic usage
-- **Cost savings example:** If database is active 4 hours/day (16% uptime):
-  - Aurora Serverless v2: ~$7-10/month
-  - RDS t3.micro: ~$15/month (always on)
-  - **Savings: 30-50% for low-usage scenarios**
-
-**Option 3: Aurora Serverless v1 (Not recommended)**
-- Being phased out in favor of v2
-- Higher cold start latency (up to 30 seconds)
-- Skip this option
-
-**Recommendation:**
-- **Start with RDS t3.micro** for simplicity and predictable cost
-- **Switch to Aurora Serverless v2** if:
-  - Workload is sporadic (< 8 hours active per day)
-  - Need better auto-scaling
-  - Have fewer than 5 tenants
-  - RDS connection limits become an issue
-
-### 12.4 Cost Optimization Strategies
+### 12.3 Cost Optimization Strategies
 
 **Immediate Optimizations:**
 - Use AWS Free Tier for first 12 months (saves ~$50-100/month)
@@ -1866,7 +1972,7 @@ terraform/
 - Review AWS Trusted Advisor recommendations monthly
 - Tag all resources by environment and tenant for cost tracking
 
-### 12.5 Cost Comparison: AWS vs Competitors
+### 12.4 Cost Comparison: AWS vs Competitors
 
 | Component | AWS | Google Cloud | Azure |
 |-----------|-----|--------------|-------|
