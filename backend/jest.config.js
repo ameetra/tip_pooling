@@ -4,7 +4,14 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/__tests__/**', '!src/types/**'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/__tests__/**',
+    '!src/types/**',
+    '!src/generated/**',
+    '!src/database/seed.ts',
+    '!src/index.ts',
+  ],
   coverageThreshold: {
     'src/services/tip-calculation.service.ts': {
       branches: 90,
@@ -13,4 +20,5 @@ module.exports = {
       statements: 90,
     },
   },
+  modulePathIgnorePatterns: ['<rootDir>/src/generated/'],
 };
