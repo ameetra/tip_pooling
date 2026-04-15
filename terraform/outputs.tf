@@ -24,9 +24,19 @@ output "rds_database_name" {
   value       = module.rds.db_name
 }
 
+output "rds_secret_arn" {
+  description = "RDS master password secret ARN"
+  value       = module.rds.db_secret_arn
+}
+
 output "lambda_execution_role_arn" {
   description = "Lambda execution role ARN"
   value       = module.iam.lambda_execution_role_arn
+}
+
+output "lambda_function_name" {
+  description = "Lambda API function name"
+  value       = module.lambda.api_function_name
 }
 
 output "api_gateway_url" {
@@ -37,6 +47,11 @@ output "api_gateway_url" {
 output "cloudfront_distribution_domain" {
   description = "CloudFront distribution domain"
   value       = module.cloudfront.distribution_domain
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID"
+  value       = module.cloudfront.distribution_id
 }
 
 output "s3_frontend_bucket" {

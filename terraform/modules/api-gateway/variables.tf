@@ -6,8 +6,12 @@ variable "environment" {
   type = string
 }
 
-variable "lambda_functions" {
-  type = map(string)
+variable "api_lambda_invoke_arn" {
+  type = string
+}
+
+variable "api_lambda_function_name" {
+  type = string
 }
 
 variable "tags" {
