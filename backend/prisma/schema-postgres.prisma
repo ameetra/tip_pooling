@@ -1,0 +1,160 @@
+generator client {
+  provider      = "prisma-client"
+  output        = "../src/generated/prisma-pg"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  timezone  String   @default("America/Los_Angeles")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees          Employee[]
+  shifts             Shift[]
+  supportStaffConfig SupportStaffConfig[]
+  tipEntries         TipEntry[]
+
+  @@map("tenants")
+}
+
+model Employee {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  email      String
+  role       String
+  hourlyRate Float
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id])
+  tipCalculations TipCalculation[]
+  rateHistory     EmployeeRateHistory[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, isActive])
+  @@map("employees")
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  shiftAssignments ShiftAssignment[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("shifts")
+}
+
+model SupportStaffConfig {
+  id            String   @id @default(cuid())
+  tenantId      String
+  role          String
+  percentage    Float
+  effectiveDate DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, role])
+  @@map("support_staff_config")
+}
+
+model TipEntry {
+  id              String    @id @default(cuid())
+  tenantId        String
+  entryDate       String
+  startingDrawer  Float
+  closingDrawer   Float
+  cashSales       Float     @default(0)
+  electronicTips  Float     @default(0)
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  replacedById    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  tipCalculations TipCalculation[]
+
+  @@index([tenantId, entryDate, isDeleted])
+  @@map("tip_entries")
+}
+
+model TipCalculation {
+  id                    String @id @default(cuid())
+  tipEntryId            String
+  employeeId            String
+  roleOnDay             String
+  totalHours            Float
+  hourlyPay             Float
+  baseTips              Float
+  supportTipsGiven      Float  @default(0)
+  supportTipsReceived   Float  @default(0)
+  finalTips             Float
+  totalPay              Float
+  effectiveHourlyRate   Float
+  snapshotHourlyRate    Float  @default(0)
+  snapshotSupportPct    Float  @default(0)
+
+  tipEntry         TipEntry          @relation(fields: [tipEntryId], references: [id])
+  employee         Employee          @relation(fields: [employeeId], references: [id])
+  shiftAssignments ShiftAssignment[]
+
+  @@index([tipEntryId])
+  @@map("tip_calculations")
+}
+
+model ShiftAssignment {
+  id               String @id @default(cuid())
+  tipCalculationId String
+  shiftId          String
+
+  tipCalculation TipCalculation @relation(fields: [tipCalculationId], references: [id])
+  shift          Shift          @relation(fields: [shiftId], references: [id])
+
+  @@unique([tipCalculationId, shiftId])
+  @@map("shift_assignments")
+}
+
+model EmployeeRateHistory {
+  id            String   @id @default(cuid())
+  employeeId    String
+  hourlyRate    Float
+  effectiveDate String
+  createdAt     DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@map("employee_rate_history")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  entityType String
+  entityId   String
+  action     String
+  oldValues  String?
+  newValues  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, entityType])
+  @@index([entityId])
+  @@map("audit_logs")
+}
