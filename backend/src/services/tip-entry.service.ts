@@ -1,13 +1,13 @@
 import prisma from '../database/client';
 import { calculateTips, calculateCashTips, TipCalculationError } from './tip-calculation.service';
-import { TipPreviewInput, CreateTipEntryInput } from '../validation/tip.schema';
+import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery } from '../validation/tip.schema';
 import { Employee, SupportStaffConfig, TipCalculationResult } from '../types/tip-calculation.types';
+import { auditService } from './audit.service';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const cashTips = calculateCashTips(input.closingDrawer, input.startingDrawer, input.cashSales);
   const totalTipPool = cashTips + input.electronicTips;
 
-  // Fetch employee details and shift names
   const employeeIds = input.employees.map((e) => e.employeeId);
   const dbEmployees = await prisma.employee.findMany({
     where: { id: { in: employeeIds }, tenantId },
@@ -32,7 +32,6 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
     };
   });
 
-  // Get support staff config
   const supportConfigs = await prisma.supportStaffConfig.findMany({
     where: { tenantId },
     orderBy: { effectiveDate: 'desc' },
@@ -45,7 +44,47 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
     supportStaffConfig.push({ role: c.role as SupportStaffConfig['role'], percentage: c.percentage });
   }
 
-  return { totalTipPool, employees, supportStaffConfig, cashTips };
+  const empRateMap = new Map(employees.map((e) => [e.id, e.hourlyRate]));
+  const supportPctMap = new Map(supportStaffConfig.map((c) => [c.role, c.percentage]));
+
+  return { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap };
+}
+
+async function saveCalculations(
+  tx: any,
+  entryId: string,
+  results: TipCalculationResult[],
+  empRateMap: Map<string, number>,
+  supportPctMap: Map<string, number>,
+  empShiftMap: Map<string, string[]>,
+) {
+  for (const result of results) {
+    const supportPct = result.roleOnDay === 'SERVER' ? 0 : (supportPctMap.get(result.roleOnDay as 'BUSSER' | 'EXPEDITOR') || 0);
+    const calc = await tx.tipCalculation.create({
+      data: {
+        tipEntryId: entryId,
+        employeeId: result.employeeId,
+        roleOnDay: result.roleOnDay,
+        totalHours: result.hoursWorked,
+        hourlyPay: result.hourlyPay,
+        baseTips: result.baseTips,
+        supportTipsGiven: result.supportTipsGiven,
+        supportTipsReceived: result.supportTipsReceived,
+        finalTips: result.finalTips,
+        totalPay: result.totalPay,
+        effectiveHourlyRate: result.effectiveHourlyRate,
+        snapshotHourlyRate: empRateMap.get(result.employeeId) || 0,
+        snapshotSupportPct: supportPct,
+      },
+    });
+
+    const shiftIds = empShiftMap.get(result.employeeId) || [];
+    for (const shiftId of shiftIds) {
+      await tx.shiftAssignment.create({
+        data: { tipCalculationId: calc.id, shiftId },
+      });
+    }
+  }
 }
 
 export const tipEntryService = {
@@ -55,25 +94,23 @@ export const tipEntryService = {
     return { entryDate: input.entryDate, cashTips, electronicTips: input.electronicTips, totalTipPool, results };
   },
 
-  async create(tenantId: string, input: CreateTipEntryInput) {
-    // Check for duplicate active entry on same date
-    const existing = await prisma.tipEntry.findFirst({
-      where: { tenantId, entryDate: input.entryDate, isDeleted: false },
-    });
-    if (existing) {
-      throw new TipCalculationError(
-        `An active tip entry already exists for ${input.entryDate}`,
-        'DUPLICATE_ENTRY',
-      );
+  async create(tenantId: string, input: CreateTipEntryInput, force = false) {
+    if (!force) {
+      const existing = await prisma.tipEntry.findFirst({
+        where: { tenantId, entryDate: input.entryDate, isDeleted: false },
+      });
+      if (existing) {
+        throw new TipCalculationError(
+          `An active tip entry already exists for ${input.entryDate}`,
+          'DUPLICATE_ENTRY',
+        );
+      }
     }
 
-    const { totalTipPool, employees, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, input);
+    const { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap } = await buildCalcInput(tenantId, input);
     const results = calculateTips({ totalTipPool, employees, supportStaffConfig });
-
-    // Build shift ID lookup from input
     const empShiftMap = new Map(input.employees.map((e) => [e.employeeId, e.shiftIds]));
 
-    // Save everything in a transaction
     const tipEntry = await prisma.$transaction(async (tx) => {
       const entry = await tx.tipEntry.create({
         data: {
@@ -86,42 +123,89 @@ export const tipEntryService = {
         },
       });
 
-      for (const result of results) {
-        const calc = await tx.tipCalculation.create({
-          data: {
-            tipEntryId: entry.id,
-            employeeId: result.employeeId,
-            roleOnDay: result.roleOnDay,
-            totalHours: result.hoursWorked,
-            hourlyPay: result.hourlyPay,
-            baseTips: result.baseTips,
-            supportTipsGiven: result.supportTipsGiven,
-            supportTipsReceived: result.supportTipsReceived,
-            finalTips: result.finalTips,
-            totalPay: result.totalPay,
-            effectiveHourlyRate: result.effectiveHourlyRate,
-          },
-        });
+      await saveCalculations(tx, entry.id, results, empRateMap, supportPctMap, empShiftMap);
+      return entry;
+    });
 
-        const shiftIds = empShiftMap.get(result.employeeId) || [];
-        for (const shiftId of shiftIds) {
-          await tx.shiftAssignment.create({
-            data: { tipCalculationId: calc.id, shiftId },
-          });
-        }
-      }
+    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', newValues: { entryDate: input.entryDate, totalTipPool } });
+    return { ...tipEntry, cashTips, totalTipPool, results };
+  },
+
+  async edit(tenantId: string, id: string, input: EditTipEntryInput) {
+    const existing = await prisma.tipEntry.findFirst({
+      where: { id, tenantId, isDeleted: false },
+    });
+    if (!existing) return null;
+
+    // Merge existing values with partial updates
+    const merged: CreateTipEntryInput = {
+      entryDate: existing.entryDate,
+      startingDrawer: input.startingDrawer ?? existing.startingDrawer,
+      closingDrawer: input.closingDrawer ?? existing.closingDrawer,
+      cashSales: input.cashSales ?? existing.cashSales,
+      electronicTips: input.electronicTips ?? existing.electronicTips,
+      employees: input.employees,
+    };
+
+    const { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap } = await buildCalcInput(tenantId, merged);
+    const results = calculateTips({ totalTipPool, employees, supportStaffConfig });
+    const empShiftMap = new Map(input.employees.map((e) => [e.employeeId, e.shiftIds]));
+
+    const newEntry = await prisma.$transaction(async (tx) => {
+      // Create new entry
+      const entry = await tx.tipEntry.create({
+        data: {
+          tenantId,
+          entryDate: existing.entryDate,
+          startingDrawer: merged.startingDrawer,
+          closingDrawer: merged.closingDrawer,
+          cashSales: merged.cashSales,
+          electronicTips: merged.electronicTips,
+        },
+      });
+
+      await saveCalculations(tx, entry.id, results, empRateMap, supportPctMap, empShiftMap);
+
+      // Soft-delete old entry and link to new one
+      await tx.tipEntry.updateMany({
+        where: { id: existing.id },
+        data: { isDeleted: true, deletedAt: new Date(), replacedById: entry.id },
+      });
 
       return entry;
     });
 
-    return { ...tipEntry, cashTips, totalTipPool, results };
+    await auditService.log({
+      tenantId, entityType: 'TIP_ENTRY', entityId: newEntry.id, action: 'UPDATE',
+      oldValues: { id: existing.id, entryDate: existing.entryDate },
+      newValues: { id: newEntry.id, replacedOldId: existing.id },
+    });
+    return { ...newEntry, cashTips, totalTipPool, results };
   },
 
-  findAll(tenantId: string) {
-    return prisma.tipEntry.findMany({
-      where: { tenantId, isDeleted: false },
-      orderBy: { entryDate: 'desc' },
-    });
+  async findAll(tenantId: string, query?: TipEntryQuery) {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const where: any = { tenantId, isDeleted: false };
+    if (query?.start_date || query?.end_date) {
+      where.entryDate = {};
+      if (query.start_date) where.entryDate.gte = query.start_date;
+      if (query.end_date) where.entryDate.lte = query.end_date;
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.tipEntry.findMany({
+        where,
+        orderBy: { entryDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.tipEntry.count({ where }),
+    ]);
+
+    return { data, pagination: { page, limit, total } };
   },
 
   findById(tenantId: string, id: string) {
@@ -143,6 +227,9 @@ export const tipEntryService = {
       where: { id, tenantId, isDeleted: false },
       data: { isDeleted: true, deletedAt: new Date() },
     });
+    if (result.count > 0) {
+      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE' });
+    }
     return result.count > 0;
   },
 };

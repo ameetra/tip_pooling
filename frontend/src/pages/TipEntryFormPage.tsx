@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, IconButton, MenuItem, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography, Alert, Chip, CircularProgress, Stack,
   Autocomplete, Checkbox,
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useEmployees } from '../api/employees';
@@ -70,13 +71,10 @@ export default function TipEntryFormPage() {
     };
   }, [entryDate, startingDrawer, closingDrawer, cashSales, electronicTips, rows]);
 
-  // Debounced preview
-  useEffect(() => {
+  const handlePreview = () => {
     const input = buildInput();
-    if (!input) return;
-    const timer = setTimeout(() => preview.mutate(input), 500);
-    return () => clearTimeout(timer);
-  }, [buildInput]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (input) preview.mutate(input);
+  };
 
   const handleSubmit = async () => {
     const input = buildInput();
@@ -147,14 +145,19 @@ export default function TipEntryFormPage() {
       </Paper>
 
       {/* Preview */}
-      {preview.data && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Preview {preview.isPending && <CircularProgress size={16} sx={{ ml: 1 }} />}
-          </Typography>
-          <PreviewTable results={preview.data.results} />
-        </Paper>
-      )}
+      <Box sx={{ mb: 3 }}>
+        <Button variant="outlined" startIcon={<VisibilityIcon />} onClick={handlePreview} disabled={preview.isPending || !buildInput()} sx={{ mb: 2 }}>
+          {preview.isPending ? 'Calculating...' : 'Preview Tips'}
+        </Button>
+        {preview.data && (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              Preview {preview.isPending && <CircularProgress size={16} sx={{ ml: 1 }} />}
+            </Typography>
+            <PreviewTable results={preview.data.results} />
+          </Paper>
+        )}
+      </Box>
 
       <Button variant="contained" size="large" onClick={handleSubmit} disabled={createEntry.isPending || !buildInput()}>
         {createEntry.isPending ? 'Saving...' : 'Save Tip Entry'}

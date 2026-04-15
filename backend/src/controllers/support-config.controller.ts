@@ -9,6 +9,13 @@ export const supportConfigController = {
     } catch (err) { next(err); }
   },
 
+  async getHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const history = await supportConfigService.getHistory(req.tenantId);
+      res.json({ success: true, data: history });
+    } catch (err) { next(err); }
+  },
+
   async setConfig(req: Request, res: Response, next: NextFunction) {
     try {
       const configs = await supportConfigService.setConfig(req.tenantId, req.body);

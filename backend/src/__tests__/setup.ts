@@ -106,6 +106,8 @@ beforeAll(async () => {
       finalTips REAL NOT NULL,
       totalPay REAL NOT NULL,
       effectiveHourlyRate REAL NOT NULL,
+      snapshotHourlyRate REAL NOT NULL DEFAULT 0,
+      snapshotSupportPct REAL NOT NULL DEFAULT 0,
       FOREIGN KEY (tipEntryId) REFERENCES tip_entries(id),
       FOREIGN KEY (employeeId) REFERENCES employees(id)
     )
@@ -122,6 +124,33 @@ beforeAll(async () => {
     )
   `);
 
+  await testPrisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS employee_rate_history (
+      id TEXT PRIMARY KEY,
+      employeeId TEXT NOT NULL,
+      hourlyRate REAL NOT NULL,
+      effectiveDate TEXT NOT NULL,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employeeId) REFERENCES employees(id)
+    )
+  `);
+  await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_rate_history_employee ON employee_rate_history(employeeId)`);
+
+  await testPrisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      tenantId TEXT NOT NULL,
+      entityType TEXT NOT NULL,
+      entityId TEXT NOT NULL,
+      action TEXT NOT NULL,
+      oldValues TEXT,
+      newValues TEXT,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_audit_tenant_entity ON audit_logs(tenantId, entityType)`);
+  await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_audit_entity_id ON audit_logs(entityId)`);
+
   // Create indexes
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_employees_tenant_active ON employees(tenantId, isActive)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_shifts_tenant_active ON shifts(tenantId, isActive)`);
@@ -133,10 +162,12 @@ beforeAll(async () => {
 // Seed test tenant before each test file
 beforeEach(async () => {
   // Clean all tables in reverse dependency order
+  await testPrisma.$executeRawUnsafe('DELETE FROM audit_logs');
   await testPrisma.$executeRawUnsafe('DELETE FROM shift_assignments');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_calculations');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_entries');
   await testPrisma.$executeRawUnsafe('DELETE FROM support_staff_config');
+  await testPrisma.$executeRawUnsafe('DELETE FROM employee_rate_history');
   await testPrisma.$executeRawUnsafe('DELETE FROM employees');
   await testPrisma.$executeRawUnsafe('DELETE FROM shifts');
   await testPrisma.$executeRawUnsafe('DELETE FROM tenants');

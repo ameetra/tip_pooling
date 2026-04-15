@@ -69,6 +69,23 @@ describe('Tip Entry API - E2E Workflow', () => {
       expect(totalDistributed).toBeCloseTo(500, 1);
     });
 
+    it('should reject closing drawer less than starting + cash sales', async () => {
+      const res = await request(app)
+        .post('/api/v1/tips/preview')
+        .send({
+          entryDate: '2026-04-10',
+          startingDrawer: 500,
+          closingDrawer: 400,
+          cashSales: 100,
+          employees: [
+            { employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] },
+          ],
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
     it('should reject invalid date format', async () => {
       const res = await request(app)
         .post('/api/v1/tips/preview')
@@ -130,7 +147,7 @@ describe('Tip Entry API - E2E Workflow', () => {
   });
 
   describe('GET /api/v1/tips/entries', () => {
-    it('should list active entries', async () => {
+    it('should list active entries with pagination', async () => {
       await request(app).post('/api/v1/tips/entries').send({
         entryDate: '2026-04-10',
         startingDrawer: 500, closingDrawer: 800, cashSales: 0, electronicTips: 100,
@@ -141,6 +158,7 @@ describe('Tip Entry API - E2E Workflow', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data).toHaveLength(1);
+      expect(res.body.pagination).toEqual({ page: 1, limit: 50, total: 1 });
     });
   });
 
@@ -179,7 +197,7 @@ describe('Tip Entry API - E2E Workflow', () => {
 
       // Should not appear in list
       const list = await request(app).get('/api/v1/tips/entries');
-      expect(list.body.data).toHaveLength(0);
+      expect(list.body.pagination.total).toBe(0);
 
       // Should allow new entry on same date after deletion
       const newEntry = await request(app).post('/api/v1/tips/entries').send({
@@ -190,6 +208,106 @@ describe('Tip Entry API - E2E Workflow', () => {
         ],
       });
       expect(newEntry.status).toBe(201);
+    });
+  });
+  describe('PATCH /api/v1/tips/entries/:id', () => {
+    it('should edit entry: create new, soft-delete old with replacedById', async () => {
+      const created = await request(app).post('/api/v1/tips/entries').send({
+        entryDate: '2026-04-10',
+        startingDrawer: 500, closingDrawer: 800, cashSales: 0, electronicTips: 100,
+        employees: [{ employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] }],
+      });
+      const oldId = created.body.data.id;
+
+      const res = await request(app)
+        .patch(`/api/v1/tips/entries/${oldId}`)
+        .send({
+          electronicTips: 200,
+          employees: [{ employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] }],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).not.toBe(oldId);
+      expect(res.body.data.totalTipPool).toBe(500); // 800-500-0=300 cash + 200 electronic
+
+      // Old entry should be soft-deleted with replacedById
+      const oldEntry = await testPrisma.tipEntry.findFirst({ where: { id: oldId } });
+      expect(oldEntry!.isDeleted).toBe(true);
+      expect(oldEntry!.replacedById).toBe(res.body.data.id);
+    });
+
+    it('should return 404 for nonexistent entry', async () => {
+      const res = await request(app)
+        .patch('/api/v1/tips/entries/nonexistent')
+        .send({
+          employees: [{ employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] }],
+        });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/v1/tips/entries?force=true', () => {
+    it('should allow duplicate entry with force flag', async () => {
+      const entry = {
+        entryDate: '2026-04-10',
+        startingDrawer: 500, closingDrawer: 800, cashSales: 0, electronicTips: 100,
+        employees: [{ employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] }],
+      };
+
+      await request(app).post('/api/v1/tips/entries').send(entry);
+
+      // Without force → fails
+      const fail = await request(app).post('/api/v1/tips/entries').send(entry);
+      expect(fail.status).toBe(400);
+
+      // With force → succeeds
+      const res = await request(app).post('/api/v1/tips/entries?force=true').send(entry);
+      expect(res.status).toBe(201);
+    });
+  });
+
+  describe('GET /api/v1/tips/entries - pagination & date filtering', () => {
+    beforeEach(async () => {
+      const makeEntry = (date: string) => ({
+        entryDate: date,
+        startingDrawer: 500, closingDrawer: 800, cashSales: 0, electronicTips: 100,
+        employees: [{ employeeId: aliceId, roleOnDay: 'SERVER', hoursWorked: 8, shiftIds: [morningId] }],
+      });
+
+      await request(app).post('/api/v1/tips/entries').send(makeEntry('2026-04-08'));
+      await request(app).post('/api/v1/tips/entries').send(makeEntry('2026-04-09'));
+      await request(app).post('/api/v1/tips/entries').send(makeEntry('2026-04-10'));
+    });
+
+    it('should paginate results', async () => {
+      const res = await request(app).get('/api/v1/tips/entries?page=1&limit=2');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.pagination).toEqual({ page: 1, limit: 2, total: 3 });
+    });
+
+    it('should return second page', async () => {
+      const res = await request(app).get('/api/v1/tips/entries?page=2&limit=2');
+
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.pagination.page).toBe(2);
+    });
+
+    it('should filter by date range', async () => {
+      const res = await request(app)
+        .get('/api/v1/tips/entries?start_date=2026-04-09&end_date=2026-04-10');
+
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.pagination.total).toBe(2);
+    });
+
+    it('should filter by start_date only', async () => {
+      const res = await request(app)
+        .get('/api/v1/tips/entries?start_date=2026-04-10');
+
+      expect(res.body.data).toHaveLength(1);
     });
   });
 });

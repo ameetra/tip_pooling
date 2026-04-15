@@ -11,7 +11,8 @@ export const employeeController = {
 
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const employees = await employeeService.findAll(req.tenantId);
+      const search = req.query.search as string | undefined;
+      const employees = await employeeService.findAll(req.tenantId, search);
       res.json({ success: true, data: employees });
     } catch (err) { next(err); }
   },
@@ -31,6 +32,23 @@ export const employeeController = {
       const employee = await employeeService.update(req.tenantId, id, req.body);
       if (!employee) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Employee not found' } }); return; }
       res.json({ success: true, data: employee });
+    } catch (err) { next(err); }
+  },
+
+  async updateRate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const employee = await employeeService.updateRate(req.tenantId, id, req.body);
+      if (!employee) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Employee not found' } }); return; }
+      res.json({ success: true, data: employee });
+    } catch (err) { next(err); }
+  },
+
+  async getRateHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const history = await employeeService.getRateHistory(req.tenantId, id);
+      res.json({ success: true, data: history });
     } catch (err) { next(err); }
   },
 

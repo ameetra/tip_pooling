@@ -1,5 +1,12 @@
 export type EmployeeRole = 'SERVER' | 'BUSSER' | 'EXPEDITOR';
 
+export interface EmployeeRateHistory {
+  id: string;
+  hourlyRate: number;
+  effectiveDate: string;
+  createdAt: string;
+}
+
 export interface Employee {
   id: string;
   tenantId: string;
@@ -10,6 +17,7 @@ export interface Employee {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  rateHistory?: EmployeeRateHistory[];
 }
 
 export interface CreateEmployeeInput {
@@ -23,8 +31,12 @@ export interface UpdateEmployeeInput {
   name?: string;
   email?: string;
   role?: EmployeeRole;
-  hourlyRate?: number;
   isActive?: boolean;
+}
+
+export interface UpdateRateInput {
+  hourlyRate: number;
+  effectiveDate?: string;
 }
 
 export interface Shift {
