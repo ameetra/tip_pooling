@@ -15,26 +15,19 @@ const createSchema = z.object({
   hourlyRate: z.number().positive('Must be positive').max(999),
 });
 
-const editSchema = z.object({
-  name: z.string().min(1, 'Required').max(100),
-  email: z.string().email('Invalid email').max(255),
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
-});
-
-type CreateFormData = z.infer<typeof createSchema>;
-type EditFormData = z.infer<typeof editSchema>;
+type FormData = z.infer<typeof createSchema>;
 
 interface Props {
   open: boolean;
   employee?: Employee | null;
-  onSubmit: (data: CreateFormData | EditFormData) => void;
+  onSubmit: (data: FormData) => void;
   onClose: () => void;
 }
 
 export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Props) {
   const isEdit = !!employee;
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateFormData>({
-    resolver: zodResolver(isEdit ? editSchema : createSchema),
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(createSchema),
     defaultValues: { name: '', email: '', role: 'SERVER', hourlyRate: 15 },
   });
 
@@ -48,7 +41,7 @@ export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Pr
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit((data) => onSubmit(data))}>
         <DialogTitle>{isEdit ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
           <Controller name="name" control={control} render={({ field }) => (

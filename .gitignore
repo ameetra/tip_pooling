@@ -15,6 +15,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.staging
+.env.production
 
 # Build outputs
 dist/
@@ -64,6 +65,10 @@ override.tf.json
 
 # Prisma
 .prisma/
+**/generated/prisma-pg/
+
+# Lambda build artifacts
+lambda-package/
 
 # Testing
 .vitest/
