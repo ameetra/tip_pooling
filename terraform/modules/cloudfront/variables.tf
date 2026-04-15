@@ -14,7 +14,15 @@ variable "frontend_bucket_arn" {
   type = string
 }
 
+variable "frontend_bucket_regional_domain_name" {
+  type = string
+}
+
 variable "api_gateway_url" {
+  type = string
+}
+
+variable "api_gateway_id" {
   type = string
 }
 
