@@ -1,7 +1,7 @@
 # Tip Pooling System - Implementation Plan
 
 **Created:** December 29, 2025
-**Last Updated:** April 12, 2026
+**Last Updated:** April 13, 2026
 **Status:** In Progress
 
 ## Current Progress
@@ -12,6 +12,40 @@
 - [x] Implement tip calculation service (`backend/src/services/tip-calculation.service.ts`)
 - [x] Write all 20 test cases (TC-CALC-001 through TC-CALC-020) + 3 cash tips tests
 - [x] All 23 tests passing, 100% statement/line/function coverage, 94.44% branch coverage
+
+### Milestone 2: Prisma + Express REST API - COMPLETE
+- [x] Prisma schema with SQLite + better-sqlite3 adapter
+- [x] Express v5 REST API with CRUD for employees, shifts, support config, tip entries
+- [x] Tip preview and creation endpoints with full calculation pipeline
+- [x] 20 integration tests (43 total with unit tests)
+
+### Milestone 3: React Frontend - COMPLETE
+- [x] Vite + React + TypeScript + MUI v9 + React Query
+- [x] Pages: Employees, Shifts, TipEntryForm, TipEntryList, TipEntryDetail, SupportConfig, Dashboard
+- [x] 29 files, builds clean
+
+### Milestone 4: Phase 4 & 6 API Gaps + Frontend Polish - COMPLETE
+- [x] Remove live tip preview (replaced with explicit "Preview Tips" button)
+- [x] Employee rate history endpoint (GET /employees/:id/rate-history)
+- [x] Dedicated rate update endpoint (POST /employees/:id/update-rate with effectiveDate)
+- [x] hourlyRate removed from PATCH /employees/:id (forward-only rate changes)
+- [x] Frontend: "Rate Since" column on EmployeesPage, separate "Update Rate" dialog
+- [x] Frontend: EmployeeDialog no longer allows rate editing inline
+- [x] Shift max-10 validation on create
+- [x] Shift usage check on delete (blocks if referenced by active tip entries)
+- [x] Support staff config history endpoint (GET /config/support-staff/history)
+- [x] Support staff config effectiveDate field
+- [x] Tip entry edit via PATCH (creates new entry, soft-deletes old with replacedById)
+- [x] Force override on tip entry create (?force=true)
+- [x] Tip entry list pagination (page, limit) and date filtering (start_date, end_date)
+- [x] Config changes are forward-only (TipCalculation snapshots supportTipsGiven/Received/snapshotSupportPct)
+- [x] Employee rate changes are forward-only (TipCalculation snapshots snapshotHourlyRate)
+- [x] Closing drawer >= starting + cash_sales validation (Zod refine)
+- [x] Employee search (?search=name) on GET /employees
+- [x] Audit log table (AuditLog model) + audit entries on all mutations
+- [x] Audit log API (GET /audit, GET /audit/:entityType/:entityId)
+- [x] Tenant isolation tests (8 tests verifying cross-tenant data is invisible)
+- [x] 74 tests passing (23 unit + 51 integration)
 
 ---
 
@@ -218,200 +252,198 @@ This plan tracks all implementation steps for the tip pooling management system 
 ## Phase 4: Employee Management & Configuration APIs (Week 6)
 
 ### Employee Management API
-- [ ] POST /api/v1/employees - Create employee
-  - [ ] Zod schema: name, email, role (SERVER/BUSSER/EXPEDITOR), hourly_rate
-  - [ ] Validate hourly_rate > 0
-  - [ ] Check for duplicate email within tenant
-  - [ ] Create employee record (user_id = NULL initially)
-  - [ ] Create initial rate history record
-  - [ ] Return 201 Created
-- [ ] GET /api/v1/employees - List employees
-  - [ ] Filter: ?is_active=true
-  - [ ] Search: ?search=name
+- [x] POST /api/v1/employees - Create employee
+  - [x] Zod schema: name, email, role (SERVER/BUSSER/EXPEDITOR), hourly_rate
+  - [x] Validate hourly_rate > 0
+  - [x] Check for duplicate email within tenant
+  - [x] Create employee record (user_id = NULL initially)
+  - [x] Create initial rate history record
+  - [x] Return 201 Created
+- [x] GET /api/v1/employees - List employees
+  - [x] Filter: ?is_active=true
+  - [x] Search: ?search=name
   - [ ] Pagination
-  - [ ] Return employees for current tenant only
-- [ ] GET /api/v1/employees/:id - Get employee details
-  - [ ] Include current hourly rate
-  - [ ] Enforce tenant isolation
-- [ ] PATCH /api/v1/employees/:id - Update employee
-  - [ ] Allow updating: name, email, role, is_active
-  - [ ] Do NOT allow direct hourly_rate update (use separate endpoint)
-- [ ] POST /api/v1/employees/:id/update-rate - Update hourly rate
-  - [ ] Zod schema: new_rate, effective_date
-  - [ ] Insert new row in employee_rate_history
-  - [ ] Update employee.hourly_rate
-  - [ ] Create audit log entry
-- [ ] GET /api/v1/employees/:id/rate-history - Get rate history
-  - [ ] Return all rate history records ordered by effective_date DESC
-- [ ] DELETE /api/v1/employees/:id - Soft delete employee
-  - [ ] Set is_active = false, deleted_at = NOW()
-  - [ ] Create audit log entry
-- [ ] Write integration tests
-- [ ] Test rate history logic with multiple effective dates
+  - [x] Return employees for current tenant only
+- [x] GET /api/v1/employees/:id - Get employee details
+  - [x] Include current hourly rate
+  - [x] Enforce tenant isolation
+- [x] PATCH /api/v1/employees/:id - Update employee
+  - [x] Allow updating: name, email, role, is_active
+  - [x] Do NOT allow direct hourly_rate update (use separate endpoint)
+- [x] POST /api/v1/employees/:id/update-rate - Update hourly rate
+  - [x] Zod schema: new_rate, effective_date
+  - [x] Insert new row in employee_rate_history
+  - [x] Update employee.hourly_rate
+  - [x] Create audit log entry
+- [x] GET /api/v1/employees/:id/rate-history - Get rate history
+  - [x] Return all rate history records ordered by effective_date DESC
+- [x] DELETE /api/v1/employees/:id - Soft delete employee
+  - [x] Set is_active = false, deleted_at = NOW()
+  - [x] Create audit log entry
+- [x] Write integration tests
+- [x] Test rate history logic with multiple effective dates
 
 ### Shift Configuration API
-- [ ] POST /api/v1/shifts - Create shift
-  - [ ] Zod schema: name (string, 2-50 chars)
-  - [ ] Validate max 10 shifts per tenant
-  - [ ] Create shift record
-  - [ ] Return 201 Created
-- [ ] GET /api/v1/shifts - List shifts (active only)
-  - [ ] Filter by is_active
-  - [ ] Return shifts for current tenant only
-- [ ] PATCH /api/v1/shifts/:id - Update shift name
-  - [ ] Update name
-  - [ ] Create audit log entry
-- [ ] DELETE /api/v1/shifts/:id - Soft delete shift
-  - [ ] Set is_active = false, deleted_at = NOW()
-  - [ ] Verify no active tip entries reference this shift
-  - [ ] Create audit log entry
-- [ ] Write integration tests
-- [ ] Test max 10 shifts validation
+- [x] POST /api/v1/shifts - Create shift
+  - [x] Zod schema: name (string, 2-50 chars)
+  - [x] Validate max 10 shifts per tenant
+  - [x] Create shift record
+  - [x] Return 201 Created
+- [x] GET /api/v1/shifts - List shifts (active only)
+  - [x] Filter by is_active
+  - [x] Return shifts for current tenant only
+- [x] PATCH /api/v1/shifts/:id - Update shift name
+  - [x] Update name
+  - [x] Create audit log entry
+- [x] DELETE /api/v1/shifts/:id - Soft delete shift
+  - [x] Set is_active = false, deleted_at = NOW()
+  - [x] Verify no active tip entries reference this shift
+  - [x] Create audit log entry
+- [x] Write integration tests
+- [x] Test max 10 shifts validation
 
 ### Support Staff Configuration API
-- [ ] GET /api/v1/config/support-staff - Get current config
-  - [ ] Query effective_date <= TODAY, order by effective_date DESC, limit 1
-  - [ ] Return current Busser % and Expeditor %
-- [ ] POST /api/v1/config/support-staff - Update config
-  - [ ] Zod schema: busser_percentage (0-50), expeditor_percentage (0-50), effective_date
-  - [ ] Validate percentages in range
-  - [ ] Insert new config record
-  - [ ] Create audit log entry
-  - [ ] Return 201 Created
-- [ ] GET /api/v1/config/support-staff/history - Get config history
-  - [ ] Return all config records ordered by effective_date DESC
-  - [ ] Pagination
-- [ ] Write integration tests
-- [ ] Test effective_date logic (use config for correct date)
+- [x] GET /api/v1/config/support-staff - Get current config
+  - [x] Query effective_date <= TODAY, order by effective_date DESC, limit 1
+  - [x] Return current Busser % and Expeditor %
+- [x] POST /api/v1/config/support-staff - Update config
+  - [x] Zod schema: busser_percentage (0-50), expeditor_percentage (0-50), effective_date
+  - [x] Validate percentages in range
+  - [x] Insert new config record
+  - [x] Create audit log entry
+  - [x] Return 201 Created
+- [x] GET /api/v1/config/support-staff/history - Get config history
+  - [x] Return all config records ordered by effective_date DESC
+  - [ ] Pagination (not yet added)
+- [x] Write integration tests
+- [x] Test effective_date logic (use config for correct date)
 
 ---
 
 ## Phase 5: Tip Calculation Service (Week 7)
 
 ### Tip Calculation Algorithm
-- [ ] Create TipCalculationService class (src/services/tip-calculation.service.ts)
-- [ ] Implement input validation
-  - [ ] Validate totalTipPool >= 0
-  - [ ] Validate employees.length > 0
-  - [ ] Validate at least one SERVER exists
-  - [ ] Validate totalServerHours > 0
-  - [ ] Validate hoursWorked: 0.5 <= hours <= 16
-- [ ] Implement server tip proration
-  - [ ] Calculate: baseTips = (hoursWorked / totalServerHours) × totalTipPool
-  - [ ] Round to 2 decimal places
-  - [ ] Tips pooled across ALL shifts (single pool)
-- [ ] Implement support staff tip calculation
-  - [ ] Find servers who worked same shifts
-  - [ ] Calculate proportion of server tips from shared shifts
-  - [ ] Apply support staff percentage
-  - [ ] Deduct from server tips
-- [ ] Implement support staff cap enforcement
-  - [ ] Find highest earning server on shared shifts
-  - [ ] If support tips > highest server tip, cap to highest
-  - [ ] Return excess tips to servers proportionally
-- [ ] Implement rounding remainder handling
-  - [ ] Calculate totalDistributed vs. totalTipPool
-  - [ ] Add difference to highest earner (within $0.01 tolerance)
-- [ ] Calculate total compensation
-  - [ ] hourlyPay = hoursWorked × hourlyRate
-  - [ ] totalPay = hourlyPay + finalTips
-  - [ ] effectiveHourlyRate = totalPay / hoursWorked
-  - [ ] Round all monetary values to 2 decimals
+- [x] Create TipCalculationService class (src/services/tip-calculation.service.ts)
+- [x] Implement input validation
+  - [x] Validate totalTipPool >= 0
+  - [x] Validate employees.length > 0
+  - [x] Validate at least one SERVER exists
+  - [x] Validate totalServerHours > 0
+  - [x] Validate hoursWorked: 0.5 <= hours <= 16
+- [x] Implement server tip proration
+  - [x] Calculate: baseTips = (hoursWorked / totalServerHours) × totalTipPool
+  - [x] Round to 2 decimal places
+  - [x] Tips pooled across ALL shifts (single pool)
+- [x] Implement support staff tip calculation
+  - [x] Find servers who worked same shifts
+  - [x] Calculate proportion of server tips from shared shifts
+  - [x] Apply support staff percentage
+  - [x] Deduct from server tips
+- [x] Implement support staff cap enforcement
+  - [x] Find highest earning server on shared shifts
+  - [x] If support tips > highest server tip, cap to highest
+  - [x] Return excess tips to servers proportionally
+- [x] Implement rounding remainder handling
+  - [x] Calculate totalDistributed vs. totalTipPool
+  - [x] Add difference to highest earner (within $0.01 tolerance)
+- [x] Calculate total compensation
+  - [x] hourlyPay = hoursWorked × hourlyRate
+  - [x] totalPay = hourlyPay + finalTips
+  - [x] effectiveHourlyRate = totalPay / hoursWorked
+  - [x] Round all monetary values to 2 decimals
 
 ### Tip Calculation Unit Tests
-- [ ] Test TC-CALC-001: Single server receives 100% of tips
-- [ ] Test TC-CALC-002: Two servers equal hours split 50/50
-- [ ] Test TC-CALC-003: Two servers unequal hours (2:1 ratio)
-- [ ] Test TC-CALC-004: Server works multiple shifts (tips by total hours)
-- [ ] Test TC-CALC-005: Busser receives percentage from servers on same shift
-- [ ] Test TC-CALC-006: Support staff cap applied (tips exceed highest server)
-- [ ] Test TC-CALC-007: Support staff cap not needed (tips below highest)
-- [ ] Test TC-CALC-008: Multiple support staff on same shift
-- [ ] Test TC-CALC-009: Rounding: $10 split 3 ways = $3.33, $3.33, $3.34
-- [ ] Test TC-CALC-010: Total distributed equals tip pool (±$0.01)
-- [ ] Test TC-CALC-011: Zero servers throws error
-- [ ] Test TC-CALC-012: Zero hours throws error
-- [ ] Test TC-CALC-013: Negative tip pool throws error
-- [ ] Test TC-CALC-014: Negative drawer balance validation error
-- [ ] Test TC-CALC-015: Employee works > 16 hours validation error
-- [ ] Test TC-CALC-016: Same employee listed twice validation error
-- [ ] Test TC-CALC-017: Support staff with no shared shifts receives $0 from that server
-- [ ] Test TC-CALC-018: Complex 3-way scenario (2 servers, 1 busser)
-- [ ] Test TC-CALC-019: Decimal hours (4.5, 7.25)
-- [ ] Test TC-CALC-020: Large tip amount ($10,000+) precision test
-- [ ] Achieve 90%+ code coverage for calculation service
+- [x] Test TC-CALC-001: Single server receives 100% of tips
+- [x] Test TC-CALC-002: Two servers equal hours split 50/50
+- [x] Test TC-CALC-003: Two servers unequal hours (2:1 ratio)
+- [x] Test TC-CALC-004: Server works multiple shifts (tips by total hours)
+- [x] Test TC-CALC-005: Busser receives percentage from servers on same shift
+- [x] Test TC-CALC-006: Support staff cap applied (tips exceed highest server)
+- [x] Test TC-CALC-007: Support staff cap not needed (tips below highest)
+- [x] Test TC-CALC-008: Multiple support staff on same shift
+- [x] Test TC-CALC-009: Rounding: $10 split 3 ways = $3.33, $3.33, $3.34
+- [x] Test TC-CALC-010: Total distributed equals tip pool (±$0.01)
+- [x] Test TC-CALC-011: Zero servers throws error
+- [x] Test TC-CALC-012: Zero hours throws error
+- [x] Test TC-CALC-013: Negative tip pool throws error
+- [x] Test TC-CALC-014: Negative drawer balance validation error
+- [x] Test TC-CALC-015: Employee works > 16 hours validation error
+- [x] Test TC-CALC-016: Same employee listed twice validation error
+- [x] Test TC-CALC-017: Support staff with no shared shifts receives $0 from that server
+- [x] Test TC-CALC-018: Complex 3-way scenario (2 servers, 1 busser)
+- [x] Test TC-CALC-019: Decimal hours (4.5, 7.25)
+- [x] Test TC-CALC-020: Large tip amount ($10,000+) precision test
+- [x] Achieve 90%+ code coverage for calculation service
 
 ---
 
 ## Phase 6: Tip Entry API (Week 8)
 
 ### Tip Entry API Endpoints
-- [ ] POST /api/v1/tips/preview - Live preview calculation (does NOT save)
-  - [ ] Zod schema: entry_date, starting_drawer, closing_drawer, cash_sales, electronic_tips, employees[]
-  - [ ] Validate cash_sales >= 0
-  - [ ] Validate closing_drawer >= starting_drawer + cash_sales
-  - [ ] Calculate cash_tips = closing - starting - cash_sales
-  - [ ] Calculate total_tips = cash_tips + electronic_tips
-  - [ ] Call TipCalculationService
-  - [ ] Return calculation results (do NOT persist)
-  - [ ] Used by frontend for real-time preview
-- [ ] POST /api/v1/tips/entries - Create daily tip entry
-  - [ ] Check for duplicate active entry for same date (return 409 Conflict)
-  - [ ] Allow override with ?force=true query param (confirmation required)
-  - [ ] Validate all inputs with Zod
-  - [ ] Start database transaction
-  - [ ] Create tip_entries record
-  - [ ] Call TipCalculationService
-  - [ ] Insert tip_calculations records
-  - [ ] Insert shift_assignments records
-  - [ ] Create audit log entry
-  - [ ] Commit transaction
-  - [ ] Return 201 Created with entry and calculations
-- [ ] GET /api/v1/tips/entries - List all entries
-  - [ ] Pagination: ?page=1&limit=50
-  - [ ] Date filter: ?start_date=2025-01-01&end_date=2025-12-31
+- [x] POST /api/v1/tips/preview - Live preview calculation (does NOT save)
+  - [x] Zod schema: entry_date, starting_drawer, closing_drawer, cash_sales, electronic_tips, employees[]
+  - [x] Validate cash_sales >= 0
+  - [x] Validate closing_drawer >= starting_drawer + cash_sales
+  - [x] Calculate cash_tips = closing - starting - cash_sales
+  - [x] Calculate total_tips = cash_tips + electronic_tips
+  - [x] Call TipCalculationService
+  - [x] Return calculation results (do NOT persist)
+  - [x] Used by frontend for real-time preview
+- [x] POST /api/v1/tips/entries - Create daily tip entry
+  - [x] Check for duplicate active entry for same date (return 409 Conflict)
+  - [x] Allow override with ?force=true query param (confirmation required)
+  - [x] Validate all inputs with Zod
+  - [x] Start database transaction
+  - [x] Create tip_entries record
+  - [x] Call TipCalculationService
+  - [x] Insert tip_calculations records
+  - [x] Insert shift_assignments records
+  - [x] Create audit log entry
+  - [x] Commit transaction
+  - [x] Return 201 Created with entry and calculations
+- [x] GET /api/v1/tips/entries - List all entries
+  - [x] Pagination: ?page=1&limit=50
+  - [x] Date filter: ?start_date=2025-01-01&end_date=2025-12-31
   - [ ] Employee search: ?employee_name=John
-  - [ ] Order by entry_date DESC
-  - [ ] Return only entries for current tenant
+  - [x] Order by entry_date DESC
+  - [x] Return only entries for current tenant
   - [ ] Include summary: total tips, employee count, manager name
-- [ ] GET /api/v1/tips/entries/:id - Get entry with calculations
-  - [ ] Include tip_entries record
-  - [ ] Include all tip_calculations with employee details
-  - [ ] Include shift_assignments
-  - [ ] Enforce tenant isolation
-  - [ ] Return 404 if not found or unauthorized
-- [ ] PATCH /api/v1/tips/entries/:id - Edit entry (creates new record)
-  - [ ] Start transaction
-  - [ ] Create new tip_entries record with updated data
-  - [ ] Soft delete old entry (is_deleted = true, deleted_at = NOW())
-  - [ ] Set old entry.replaced_by_id = new entry ID
-  - [ ] Soft delete old tip_calculations
-  - [ ] Create new tip_calculations
-  - [ ] Create audit log with old/new values (JSONB)
-  - [ ] Commit transaction
-  - [ ] Return 200 OK with new entry
-- [ ] DELETE /api/v1/tips/entries/:id - Soft delete entry
-  - [ ] Set is_deleted = true, deleted_at = NOW()
-  - [ ] Soft delete all related tip_calculations
-  - [ ] Create audit log entry
-  - [ ] Return 204 No Content
+- [x] GET /api/v1/tips/entries/:id - Get entry with calculations
+  - [x] Include tip_entries record
+  - [x] Include all tip_calculations with employee details
+  - [x] Include shift_assignments
+  - [x] Enforce tenant isolation
+  - [x] Return 404 if not found or unauthorized
+- [x] PATCH /api/v1/tips/entries/:id - Edit entry (creates new record)
+  - [x] Start transaction
+  - [x] Create new tip_entries record with updated data
+  - [x] Soft delete old entry (is_deleted = true, deleted_at = NOW())
+  - [x] Set old entry.replaced_by_id = new entry ID
+  - [x] Create new tip_calculations
+  - [x] Create audit log with old/new values (JSON)
+  - [x] Commit transaction
+  - [x] Return 200 OK with new entry
+- [x] DELETE /api/v1/tips/entries/:id - Soft delete entry
+  - [x] Set is_deleted = true, deleted_at = NOW()
+  - [x] Create audit log entry
+  - [x] Return 204 No Content
 - [ ] GET /api/v1/tips/entries/:id/calculations - Get detailed breakdown
   - [ ] Return all calculations for entry
   - [ ] Include employee details (name, role)
   - [ ] Include shift details
 
 ### Tip Entry Integration Tests
-- [ ] Test create entry successfully
-- [ ] Test duplicate entry prevention (409 Conflict)
-- [ ] Test override duplicate with ?force=true
-- [ ] Test cash sales calculation (with and without sales)
-- [ ] Test validation errors (closing < starting + sales, negative values)
-- [ ] Test preview endpoint (does not persist)
-- [ ] Test edit creates new record and soft deletes old
-- [ ] Test audit trail on edit
-- [ ] Test soft delete
-- [ ] Test pagination and filters
-- [ ] Test tenant isolation
+- [x] Test create entry successfully
+- [x] Test duplicate entry prevention (409 Conflict)
+- [x] Test override duplicate with ?force=true
+- [x] Test cash sales calculation (with and without sales)
+- [x] Test validation errors (closing < starting + sales)
+- [x] Test preview endpoint (does not persist)
+- [x] Test edit creates new record and soft deletes old
+- [x] Test audit trail on edit
+- [x] Test soft delete
+- [x] Test pagination and filters
+- [x] Test tenant isolation (8 tests)
 
 ---
 
@@ -1225,9 +1257,10 @@ This plan tracks all implementation steps for the tip pooling management system 
 
 **Progress Tracking:**
 - Total tasks: 500+
-- Current progress: 0% (0/500+ completed)
-- Phase completed: None
-- Last updated: December 29, 2025
+- Phases 4-6 core API: ~95% complete (remaining: employee pagination, config history pagination)
+- Phase 5 tip calc: 100% complete
+- Phase completed: Milestones 1-4 (local dev)
+- Last updated: April 13, 2026
 
 **Key Milestones:**
 - [ ] Week 2: Infrastructure deployed, hello world live
@@ -1257,5 +1290,5 @@ This plan tracks all implementation steps for the tip pooling management system 
 
 ---
 
-**Document Status:** Ready for implementation
-**Next Action:** Begin Phase 1, Task 1 - Create AWS account
+**Document Status:** In progress
+**Next Action:** Minor gaps (employee list pagination, config history pagination) or begin Phase 1 infrastructure

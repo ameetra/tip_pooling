@@ -34,8 +34,9 @@ model Employee {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  tenant         Tenant               @relation(fields: [tenantId], references: [id])
   tipCalculations TipCalculation[]
+  rateHistory    EmployeeRateHistory[]
 
   @@unique([tenantId, email])
   @@index([tenantId, isActive])
@@ -106,6 +107,8 @@ model TipCalculation {
   finalTips             Float
   totalPay              Float
   effectiveHourlyRate   Float
+  snapshotHourlyRate    Float  @default(0)
+  snapshotSupportPct    Float  @default(0)
 
   tipEntry         TipEntry          @relation(fields: [tipEntryId], references: [id])
   employee         Employee          @relation(fields: [employeeId], references: [id])
@@ -125,4 +128,32 @@ model ShiftAssignment {
 
   @@unique([tipCalculationId, shiftId])
   @@map("shift_assignments")
+}
+
+model EmployeeRateHistory {
+  id            String   @id @default(cuid())
+  employeeId    String
+  hourlyRate    Float
+  effectiveDate String   // YYYY-MM-DD
+  createdAt     DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@map("employee_rate_history")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  entityType String   // EMPLOYEE, SHIFT, SUPPORT_CONFIG, TIP_ENTRY
+  entityId   String
+  action     String   // CREATE, UPDATE, DELETE, UPDATE_RATE
+  oldValues  String?  // JSON string (SQLite has no JSONB)
+  newValues  String?  // JSON string
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, entityType])
+  @@index([entityId])
+  @@map("audit_logs")
 }
