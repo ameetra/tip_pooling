@@ -158,3 +158,18 @@ model AuditLog {
   @@index([entityId])
   @@map("audit_logs")
 }
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([ipAddress])
+  @@map("magic_link_tokens")
+}
