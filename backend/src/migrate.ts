@@ -112,6 +112,19 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS audit_logs_tenantId_entityType_idx ON audit_logs("tenantId", "entityType");
 CREATE INDEX IF NOT EXISTS audit_logs_entityId_idx ON audit_logs("entityId");
+
+CREATE TABLE IF NOT EXISTS magic_link_tokens (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "isUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+  "usedAt" TIMESTAMPTZ,
+  "ipAddress" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS magic_link_tokens_email_idx ON magic_link_tokens(email);
+CREATE INDEX IF NOT EXISTS magic_link_tokens_ipAddress_idx ON magic_link_tokens("ipAddress");
 `;
 
 export const handler = async (event: any) => {

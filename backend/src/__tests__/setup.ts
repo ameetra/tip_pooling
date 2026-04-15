@@ -1,5 +1,6 @@
 // Set test tenant before any imports that read env
 process.env.DEFAULT_TENANT_ID = 'test-tenant';
+process.env.NODE_ENV = 'test';
 
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaClient } from '../generated/prisma/client';
@@ -151,6 +152,19 @@ beforeAll(async () => {
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_audit_tenant_entity ON audit_logs(tenantId, entityType)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_audit_entity_id ON audit_logs(entityId)`);
 
+  await testPrisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS magic_link_tokens (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expiresAt DATETIME NOT NULL,
+      isUsed INTEGER NOT NULL DEFAULT 0,
+      usedAt DATETIME,
+      ipAddress TEXT,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Create indexes
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_employees_tenant_active ON employees(tenantId, isActive)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_shifts_tenant_active ON shifts(tenantId, isActive)`);
@@ -163,6 +177,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   // Clean all tables in reverse dependency order
   await testPrisma.$executeRawUnsafe('DELETE FROM audit_logs');
+  await testPrisma.$executeRawUnsafe('DELETE FROM magic_link_tokens');
   await testPrisma.$executeRawUnsafe('DELETE FROM shift_assignments');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_calculations');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_entries');
