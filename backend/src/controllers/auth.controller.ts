@@ -1,8 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { requestMagicLink, verifyMagicLink } from '../services/auth.service';
+import { loginUser, requestMagicLink, verifyMagicLink } from '../services/auth.service';
 
+const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const magicLinkSchema = z.object({ email: z.string().email() });
+
+export async function handleLogin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email, password } = loginSchema.parse(req.body);
+    const tenantId = process.env.DEFAULT_TENANT_ID!;
+    const result = await loginUser(email, password, tenantId);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function handleRequestMagicLink(req: Request, res: Response, next: NextFunction) {
   try {
