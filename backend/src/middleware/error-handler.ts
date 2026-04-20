@@ -25,6 +25,13 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  // Auth errors
+  if ((err as any).code === 'INVALID_CREDENTIALS') {
+    response.error = { code: 'INVALID_CREDENTIALS', message: err.message };
+    res.status(401).json(response);
+    return;
+  }
+
   // Prisma unique constraint violation
   if (err.constructor?.name === 'PrismaClientKnownRequestError' && (err as any).code === 'P2002') {
     response.error = { code: 'DUPLICATE_ENTRY', message: 'A record with this value already exists' };

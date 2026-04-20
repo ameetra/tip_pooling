@@ -1,6 +1,6 @@
 import express from 'express';
 import { tenantContext } from './middleware/tenant-context';
-import { verifyJWT } from './middleware/auth';
+import { verifyJWT, requireRole } from './middleware/auth';
 import { errorHandler } from './middleware/error-handler';
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
@@ -23,12 +23,13 @@ export function createApp() {
   // Auth routes (public — no JWT required)
   app.use('/api/v1/auth', authRoutes);
 
-  // Protected routes — verifyJWT sets req.tenantId + req.user from JWT in prod
-  app.use('/api/v1/employees', verifyJWT, employeeRoutes);
-  app.use('/api/v1/shifts', verifyJWT, shiftRoutes);
-  app.use('/api/v1/config/support-staff', verifyJWT, supportConfigRoutes);
-  app.use('/api/v1/tips', verifyJWT, tipRoutes);
-  app.use('/api/v1/audit', verifyJWT, auditRoutes);
+  // Protected routes — require Admin or Manager role
+  const adminOrManager = [verifyJWT, requireRole('ADMIN', 'MANAGER')];
+  app.use('/api/v1/employees', ...adminOrManager, employeeRoutes);
+  app.use('/api/v1/shifts', ...adminOrManager, shiftRoutes);
+  app.use('/api/v1/config/support-staff', ...adminOrManager, supportConfigRoutes);
+  app.use('/api/v1/tips', ...adminOrManager, tipRoutes);
+  app.use('/api/v1/audit', ...adminOrManager, auditRoutes);
 
   app.use(errorHandler);
 

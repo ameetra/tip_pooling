@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import api from '../api/client';
 
 interface JwtPayload {
-  employeeId: string;
+  sub: string;
   tenantId: string;
   role: string;
   email: string;

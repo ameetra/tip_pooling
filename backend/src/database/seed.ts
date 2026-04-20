@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import bcrypt from 'bcrypt';
 import prisma from './client';
 
 async function seed() {
@@ -55,9 +56,28 @@ async function seed() {
     }),
   ]);
 
+  const [adminHash, managerHash] = await Promise.all([
+    bcrypt.hash('admin123', 10),
+    bcrypt.hash('manager123', 10),
+  ]);
+
+  await Promise.all([
+    (prisma as any).user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email: 'admin@demo.com' } },
+      update: {},
+      create: { tenantId: tenant.id, email: 'admin@demo.com', passwordHash: adminHash, role: 'ADMIN' },
+    }),
+    (prisma as any).user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email: 'manager@demo.com' } },
+      update: {},
+      create: { tenantId: tenant.id, email: 'manager@demo.com', passwordHash: managerHash, role: 'MANAGER' },
+    }),
+  ]);
+
   console.log('Seed complete:', {
     tenant: tenant.name,
     shifts: [morning.name, evening.name],
+    users: ['admin@demo.com (admin123)', 'manager@demo.com (manager123)'],
   });
 
   await prisma.$disconnect();

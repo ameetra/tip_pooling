@@ -29,7 +29,14 @@ export default function Layout() {
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <Typography variant="h6" noWrap>Tip Pooling</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {user && <Typography variant="body2" sx={{ opacity: 0.8 }}>{user.email}</Typography>}
+            {user && (
+              <>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>{user.email}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.6, textTransform: 'capitalize', bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.25, borderRadius: 1 }}>
+                  {user.role.toLowerCase()}
+                </Typography>
+              </>
+            )}
             <Tooltip title="Sign out">
               <IconButton color="inherit" onClick={() => { logout(); navigate('/login'); }}>
                 <LogoutIcon fontSize="small" />
