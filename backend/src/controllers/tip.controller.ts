@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { TipEntryQuerySchema } from '../validation/tip.schema';
 
@@ -41,6 +42,40 @@ export const tipController = {
       const entry = await tipEntryService.findById(req.tenantId, id);
       if (!entry) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.json({ success: true, data: entry });
+    } catch (err) { next(err); }
+  },
+
+  async myHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const employeeId = req.user!.sub;
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const sinceStr = since.toISOString().slice(0, 10);
+
+      const calcs = await (prisma as any).tipCalculation.findMany({
+        where: {
+          employeeId,
+          tipEntry: { tenantId: req.tenantId, isDeleted: false, entryDate: { gte: sinceStr } },
+        },
+        include: {
+          tipEntry: { select: { entryDate: true } },
+          shiftAssignments: { include: { shift: { select: { name: true } } } },
+        },
+        orderBy: { tipEntry: { entryDate: 'desc' } },
+      });
+
+      const data = calcs.map((c: any) => ({
+        date: c.tipEntry.entryDate,
+        role: c.roleOnDay,
+        shifts: c.shiftAssignments.map((sa: any) => sa.shift.name),
+        hours: c.totalHours,
+        hourlyPay: c.hourlyPay,
+        tips: c.finalTips,
+        totalPay: c.totalPay,
+        effectiveHourlyRate: c.effectiveHourlyRate,
+      }));
+
+      res.json({ success: true, data });
     } catch (err) { next(err); }
   },
 
