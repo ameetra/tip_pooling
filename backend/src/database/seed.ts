@@ -38,7 +38,7 @@ async function seed() {
     }),
   ]);
 
-  await Promise.all([
+  const [alice, bob, charlie] = await Promise.all([
     prisma.employee.upsert({
       where: { tenantId_email: { tenantId: tenant.id, email: 'alice@demo.com' } },
       update: {},
@@ -55,6 +55,19 @@ async function seed() {
       create: { tenantId: tenant.id, name: 'Charlie', email: 'charlie@demo.com', role: 'BUSSER', hourlyRate: 12.0 },
     }),
   ]);
+
+  const existingHistory = await prisma.employeeRateHistory.count({
+    where: { employeeId: { in: [alice.id, bob.id, charlie.id] } },
+  });
+  if (existingHistory === 0) {
+    await prisma.employeeRateHistory.createMany({
+      data: [
+        { employeeId: alice.id, hourlyRate: 15.0, effectiveDate: '2026-01-01' },
+        { employeeId: bob.id, hourlyRate: 15.0, effectiveDate: '2026-01-01' },
+        { employeeId: charlie.id, hourlyRate: 12.0, effectiveDate: '2026-01-01' },
+      ],
+    });
+  }
 
   const [adminHash, managerHash] = await Promise.all([
     bcrypt.hash('admin123', 10),

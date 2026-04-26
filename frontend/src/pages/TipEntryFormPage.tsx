@@ -115,7 +115,7 @@ export default function TipEntryFormPage() {
           <Button startIcon={<AddIcon />} onClick={addRow} disabled={availableEmployees.length === 0}>Add Employee</Button>
         </Box>
         {rows.map((row, i) => (
-          <Stack key={i} direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
+          <Stack key={i} direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
             <TextField select label="Employee" value={row.employeeId} onChange={(e) => updateRow(i, 'employeeId', e.target.value)} sx={{ minWidth: 180 }}>
               {employees.filter((e) => e.id === row.employeeId || !usedIds.has(e.id) || e.id === row.employeeId).map((e) => (
                 <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>

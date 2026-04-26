@@ -95,7 +95,7 @@ export default function EmployeesPage() {
                 <TableCell>{emp.email}</TableCell>
                 <TableCell>{emp.role}</TableCell>
                 <TableCell>${emp.hourlyRate.toFixed(2)}</TableCell>
-                <TableCell>{emp.rateHistory?.[0]?.effectiveDate || '—'}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{emp.rateHistory?.[0]?.effectiveDate || '—'}</TableCell>
                 <TableCell align="right">
                   <IconButton size="small" onClick={() => openRateDialog(emp)} title="Update Rate"><AttachMoneyIcon /></IconButton>
                   <IconButton size="small" onClick={() => handleEdit(emp)} title="Edit"><EditIcon /></IconButton>
