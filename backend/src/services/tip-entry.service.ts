@@ -3,6 +3,7 @@ import { calculateTips, calculateCashTips, TipCalculationError } from './tip-cal
 import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery } from '../validation/tip.schema';
 import { Employee, SupportStaffConfig, TipCalculationResult } from '../types/tip-calculation.types';
 import { auditService } from './audit.service';
+import { sendTipEmail } from './email.service';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const cashTips = calculateCashTips(input.closingDrawer, input.startingDrawer, input.cashSales);
@@ -131,11 +132,53 @@ export const tipEntryService = {
     return { ...tipEntry, cashTips, totalTipPool, results };
   },
 
+  async publish(tenantId: string, id: string, restaurantName: string) {
+    const entry = await prisma.tipEntry.findFirst({
+      where: { id, tenantId, isDeleted: false },
+      include: {
+        tipCalculations: {
+          include: {
+            employee: { select: { name: true, email: true } },
+            shiftAssignments: { include: { shift: { select: { name: true } } } },
+          },
+        },
+      },
+    });
+    if (!entry) return null;
+    if ((entry as any).publishedAt) throw new TipCalculationError('Entry is already published', 'ALREADY_PUBLISHED');
+
+    await prisma.tipEntry.update({ where: { id }, data: { publishedAt: new Date() } as any });
+
+    // Send emails — log failures but don't block the response
+    const emailResults = await Promise.allSettled(
+      entry.tipCalculations.map((calc) =>
+        sendTipEmail({
+          employeeName: calc.employee.name,
+          employeeEmail: calc.employee.email,
+          restaurantName,
+          entryDate: entry.entryDate,
+          shifts: calc.shiftAssignments.map((sa) => sa.shift.name),
+          hours: calc.totalHours,
+          finalTips: calc.finalTips,
+          totalPay: calc.totalPay,
+          effectiveHourlyRate: calc.effectiveHourlyRate,
+        }),
+      ),
+    );
+
+    const failed = emailResults.filter((r) => r.status === 'rejected');
+    if (failed.length) console.error(`[publish] ${failed.length} email(s) failed`, failed.map((r: any) => r.reason?.message));
+
+    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'PUBLISH', newValues: { emailsSent: emailResults.length - failed.length } });
+    return { emailsSent: emailResults.length - failed.length, emailsFailed: failed.length };
+  },
+
   async edit(tenantId: string, id: string, input: EditTipEntryInput) {
     const existing = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
     });
     if (!existing) return null;
+    if ((existing as any).publishedAt) throw new TipCalculationError('Cannot edit a published entry', 'ALREADY_PUBLISHED');
 
     // Merge existing values with partial updates
     const merged: CreateTipEntryInput = {

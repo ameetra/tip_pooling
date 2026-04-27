@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Button, IconButton, Paper, Table, TableBody, TableCell, TableContainer,
+  Box, Button, Chip, IconButton, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -39,6 +39,7 @@ export default function TipEntriesPage() {
               <TableCell>Closing Drawer</TableCell>
               <TableCell>Cash Sales</TableCell>
               <TableCell>Electronic Tips</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -50,6 +51,11 @@ export default function TipEntriesPage() {
                 <TableCell>${entry.closingDrawer.toFixed(2)}</TableCell>
                 <TableCell>${entry.cashSales.toFixed(2)}</TableCell>
                 <TableCell>${entry.electronicTips.toFixed(2)}</TableCell>
+                <TableCell>
+                  {entry.publishedAt
+                    ? <Chip label="Published" color="success" size="small" />
+                    : <Chip label="Draft" size="small" />}
+                </TableCell>
                 <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                   <IconButton size="small" onClick={() => navigate(`/tips/${entry.id}`)}><VisibilityIcon /></IconButton>
                   <IconButton size="small" onClick={() => setDeleteId(entry.id)}><DeleteIcon /></IconButton>
@@ -57,7 +63,7 @@ export default function TipEntriesPage() {
               </TableRow>
             ))}
             {entries.length === 0 && (
-              <TableRow><TableCell colSpan={6} align="center">No tip entries yet. Create your first one!</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} align="center">No tip entries yet. Create your first one!</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

@@ -58,6 +58,8 @@ async function runMigrations() {
         CONSTRAINT "users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE
       );
       CREATE UNIQUE INDEX IF NOT EXISTS "users_tenantId_email_key" ON "users"("tenantId", "email");
+
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {

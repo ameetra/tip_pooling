@@ -3,6 +3,8 @@ import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { TipEntryQuerySchema } from '../validation/tip.schema';
 
+const RESTAURANT_NAME = process.env.RESTAURANT_NAME || 'Demo Restaurant';
+
 export const tipController = {
   async preview(req: Request, res: Response, next: NextFunction) {
     try {
@@ -16,6 +18,15 @@ export const tipController = {
       const force = req.query.force === 'true' && (req as any).user?.role === 'ADMIN';
       const entry = await tipEntryService.create(req.tenantId, req.body, force);
       res.status(201).json({ success: true, data: entry });
+    } catch (err) { next(err); }
+  },
+
+  async publish(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const result = await tipEntryService.publish(req.tenantId, id, RESTAURANT_NAME);
+      if (!result) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
+      res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
 

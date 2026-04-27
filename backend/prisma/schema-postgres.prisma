@@ -107,6 +107,7 @@ model TipEntry {
   isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   replacedById    String?
+  publishedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
