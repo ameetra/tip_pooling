@@ -69,9 +69,14 @@ async function seed() {
     });
   }
 
-  const [adminHash, managerHash] = await Promise.all([
+  const supportEmail = process.env.SUPPORT_EMAIL || 'support@tippooling.app';
+  const supportPassword = process.env.SUPPORT_PASSWORD;
+  if (!supportPassword) throw new Error('SUPPORT_PASSWORD env var is required');
+
+  const [adminHash, managerHash, supportHash] = await Promise.all([
     bcrypt.hash('admin123', 10),
     bcrypt.hash('manager123', 10),
+    bcrypt.hash(supportPassword, 10),
   ]);
 
   await Promise.all([
@@ -85,12 +90,18 @@ async function seed() {
       update: {},
       create: { tenantId: tenant.id, email: 'manager@demo.com', passwordHash: managerHash, role: 'MANAGER' },
     }),
+    // Developer support account — password stored in AWS Secrets Manager (tip-pooling/support-account)
+    (prisma as any).user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email: supportEmail } },
+      update: {},
+      create: { tenantId: tenant.id, email: supportEmail, passwordHash: supportHash, role: 'ADMIN' },
+    }),
   ]);
 
   console.log('Seed complete:', {
     tenant: tenant.name,
     shifts: [morning.name, evening.name],
-    users: ['admin@demo.com (admin123)', 'manager@demo.com (manager123)'],
+    users: ['admin@demo.com', 'manager@demo.com', supportEmail],
   });
 
   await prisma.$disconnect();
