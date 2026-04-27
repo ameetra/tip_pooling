@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { loginUser, requestMagicLink, verifyMagicLink } from '../services/auth.service';
 
-const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const loginSchema = z.object({ email: z.string().email(), password: z.string().min(8).max(128) });
 const magicLinkSchema = z.object({ email: z.string().email() });
 
 export async function handleLogin(req: Request, res: Response, next: NextFunction) {

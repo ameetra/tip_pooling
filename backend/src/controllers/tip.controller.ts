@@ -13,7 +13,7 @@ export const tipController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const force = req.query.force === 'true';
+      const force = req.query.force === 'true' && (req as any).user?.role === 'ADMIN';
       const entry = await tipEntryService.create(req.tenantId, req.body, force);
       res.status(201).json({ success: true, data: entry });
     } catch (err) { next(err); }
