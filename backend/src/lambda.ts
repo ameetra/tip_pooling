@@ -13,8 +13,25 @@ export const handler = async (event: any, context: any) => {
   if (event.action === 'seed') {
     return runSeed();
   }
+  if (event.action === 'updatePasswordHash' && event.email && event.hash) {
+    return updatePasswordHash(event.email, event.hash);
+  }
   return httpHandler(event, context);
 };
+
+async function updatePasswordHash(email: string, hash: string) {
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  try {
+    const result = await pool.query(
+      `UPDATE "users" SET "passwordHash" = $1 WHERE email = $2 AND "tenantId" = 'default-tenant'`,
+      [hash, email]
+    );
+    return { success: true, updated: result.rowCount };
+  } finally {
+    await pool.end();
+  }
+}
 
 async function runMigrations() {
   const { Pool } = require('pg');
