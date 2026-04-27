@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../database/client';
 import { auditService } from './audit.service';
+import { sendMagicLinkEmail } from './email.service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
@@ -74,8 +75,7 @@ export async function requestMagicLink(email: string, ipAddress?: string) {
     data: { email: email.toLowerCase(), token, expiresAt, ipAddress: ipAddress ?? null },
   });
 
-  // In production, SES would send the email. Log only that a link was issued (not the token).
-  console.log(`[MAGIC LINK] issued for ${email}`);
+  await sendMagicLinkEmail(employee.name, employee.email, token);
 }
 
 export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {

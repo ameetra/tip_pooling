@@ -72,6 +72,34 @@ function buildEmailBody(d: TipEmailData): string {
 </html>`;
 }
 
+export async function sendMagicLinkEmail(employeeName: string, employeeEmail: string, token: string): Promise<void> {
+  const link = `${APP_URL}/auth/verify?token=${token}`;
+  await ses.send(new SendEmailCommand({
+    Source: `${FROM_NAME} <${FROM_EMAIL}>`,
+    Destination: { ToAddresses: [employeeEmail] },
+    Message: {
+      Subject: { Data: 'Your sign-in link' },
+      Body: {
+        Html: { Data: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
+  <p>Hi ${employeeName},</p>
+  <p>Click the button below to sign in and view your tip history. This link expires in <strong>15 minutes</strong> and can only be used once.</p>
+  <div style="margin: 24px 0;">
+    <a href="${link}" style="background:#1976d2; color:#fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: bold;">
+      Sign in to view my tips
+    </a>
+  </div>
+  <p style="color:#888; font-size:12px;">If you didn't request this, you can ignore this email.</p>
+</body>
+</html>` },
+        Text: { Data: `Hi ${employeeName},\n\nUse this link to sign in (expires in 15 minutes):\n${link}\n\nIf you didn't request this, ignore this email.` },
+      },
+    },
+  }));
+}
+
 function buildPlainText(d: TipEmailData): string {
   return `${d.restaurantName} — Tip Summary for ${d.entryDate}
 
