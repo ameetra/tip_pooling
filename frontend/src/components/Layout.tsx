@@ -7,6 +7,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../context/AuthContext';
 
 const DRAWER_WIDTH = 220;
@@ -16,6 +17,10 @@ const navItems = [
   { label: 'Employees', path: '/employees', icon: <PeopleIcon /> },
   { label: 'Shifts', path: '/shifts', icon: <ScheduleIcon /> },
   { label: 'Config', path: '/config', icon: <SettingsIcon /> },
+];
+
+const adminNavItems = [
+  { label: 'Managers', path: '/users', icon: <AdminPanelSettingsIcon /> },
 ];
 
 export default function Layout() {
@@ -53,11 +58,13 @@ export default function Layout() {
         <Toolbar />
         <List>
           {navItems.map((item) => (
-            <ListItemButton
-              key={item.path}
-              selected={pathname.startsWith(item.path)}
-              onClick={() => navigate(item.path)}
-            >
+            <ListItemButton key={item.path} selected={pathname.startsWith(item.path)} onClick={() => navigate(item.path)}>
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+          {user?.role === 'ADMIN' && adminNavItems.map((item) => (
+            <ListItemButton key={item.path} selected={pathname.startsWith(item.path)} onClick={() => navigate(item.path)}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
             </ListItemButton>

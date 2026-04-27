@@ -11,6 +11,7 @@ import TipEntriesPage from './pages/TipEntriesPage';
 import TipEntryFormPage from './pages/TipEntryFormPage';
 import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
+import UsersPage from './pages/UsersPage';
 
 const MANAGEMENT_ROLES = ['ADMIN', 'MANAGER'];
 
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="tips" element={<TipEntriesPage />} />
         <Route path="tips/new" element={<TipEntryFormPage />} />
         <Route path="tips/:id" element={<TipEntryDetailPage />} />
+        <Route path="users" element={<UsersPage />} />
       </Route>
     </Routes>
   );

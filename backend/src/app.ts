@@ -11,6 +11,7 @@ import shiftRoutes from './routes/shift.routes';
 import supportConfigRoutes from './routes/support-config.routes';
 import tipRoutes from './routes/tip.routes';
 import auditRoutes from './routes/audit.routes';
+import userRoutes from './routes/user.routes';
 
 const FRONTEND_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 
@@ -46,6 +47,9 @@ export function createApp() {
   app.use('/api/v1/config/support-staff', ...adminOrManager, supportConfigRoutes);
   app.use('/api/v1/tips', ...adminOrManager, tipRoutes);
   app.use('/api/v1/audit', ...adminOrManager, auditRoutes);
+
+  // User management — ADMIN only
+  app.use('/api/v1/users', verifyJWT, requireRole('ADMIN'), userRoutes);
 
   app.use(errorHandler);
 
