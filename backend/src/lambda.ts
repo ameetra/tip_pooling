@@ -95,10 +95,20 @@ async function runSeed() {
       prisma.shift.upsert({ where: { tenantId_name: { tenantId: tenant.id, name: 'Evening' } }, update: {}, create: { tenantId: tenant.id, name: 'Evening' } }),
     ]);
 
-    const [adminHash, managerHash] = await Promise.all([bcrypt.hash('admin123', 10), bcrypt.hash('manager123', 10)]);
+    const supportEmail = process.env.SUPPORT_EMAIL || 'support@tippooling.app';
+    const supportPassword = process.env.SUPPORT_PASSWORD;
+    if (!supportPassword) return { success: false, error: 'SUPPORT_PASSWORD env var is required' };
+
+    const [adminHash, managerHash, supportHash] = await Promise.all([
+      bcrypt.hash('admin123', 10),
+      bcrypt.hash('manager123', 10),
+      bcrypt.hash(supportPassword, 10),
+    ]);
     await Promise.all([
       prisma.user.upsert({ where: { tenantId_email: { tenantId: tenant.id, email: 'admin@demo.com' } }, update: {}, create: { tenantId: tenant.id, email: 'admin@demo.com', passwordHash: adminHash, role: 'ADMIN' } }),
       prisma.user.upsert({ where: { tenantId_email: { tenantId: tenant.id, email: 'manager@demo.com' } }, update: {}, create: { tenantId: tenant.id, email: 'manager@demo.com', passwordHash: managerHash, role: 'MANAGER' } }),
+      // Developer support account — credentials in AWS Secrets Manager (tip-pooling/support-account)
+      prisma.user.upsert({ where: { tenantId_email: { tenantId: tenant.id, email: supportEmail } }, update: {}, create: { tenantId: tenant.id, email: supportEmail, passwordHash: supportHash, role: 'ADMIN' } }),
     ]);
 
     return { success: true, message: 'Seed complete', tenant: tenant.name };
