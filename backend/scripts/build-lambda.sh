@@ -28,7 +28,7 @@ cp package-lock.json lambda-package/
 # Install production dependencies
 echo "Installing production dependencies..."
 cd lambda-package
-npm ci --omit=dev 2>&1 | tail -3
+npm ci --omit=dev --ignore-scripts 2>&1 | tail -3
 
 # Generate Prisma PG client inside the package
 echo "Generating Prisma PostgreSQL client..."
@@ -52,31 +52,44 @@ if [ -d "src/generated/prisma-pg" ]; then
   cp -r src/generated/prisma-pg lambda-package/dist/generated/
 fi
 
+BACKEND_DIR="$(pwd)"
+PKG_DIR="$BACKEND_DIR/lambda-package"
+
 # Remove non-PostgreSQL Prisma WASM compilers to keep package small
 echo "Pruning Prisma bundle..."
-cd node_modules/@prisma/client/runtime 2>/dev/null && \
-  rm -f *cockroachdb* *mysql* *sqlite* *sqlserver* *index-browser* *wasm-compiler-edge* *.map *.mjs *.mts && \
-  cd ../.. && rm -rf studio-core dev engines fetch-engine get-platform query-plan-executor streams-local generator-build scripts || true
-cd "$OLDPWD"
+PRISMA_RUNTIME="$PKG_DIR/node_modules/@prisma/client/runtime"
+if [ -d "$PRISMA_RUNTIME" ]; then
+  rm -f "$PRISMA_RUNTIME"/*cockroachdb* "$PRISMA_RUNTIME"/*mysql* "$PRISMA_RUNTIME"/*sqlite* \
+    "$PRISMA_RUNTIME"/*sqlserver* "$PRISMA_RUNTIME"/*index-browser* \
+    "$PRISMA_RUNTIME"/*wasm-compiler-edge* "$PRISMA_RUNTIME"/*.map \
+    "$PRISMA_RUNTIME"/*.mjs "$PRISMA_RUNTIME"/*.mts 2>/dev/null || true
+  rm -rf "$PKG_DIR/node_modules/@prisma/client/studio-core" \
+    "$PKG_DIR/node_modules/@prisma/client/dev" \
+    "$PKG_DIR/node_modules/@prisma/client/engines" \
+    "$PKG_DIR/node_modules/@prisma/client/scripts" 2>/dev/null || true
+fi
 
 # Remove packages not needed at Lambda runtime
-rm -rf node_modules/prisma node_modules/typescript node_modules/better-sqlite3 \
-  node_modules/react-dom node_modules/chart.js node_modules/fast-check \
-  node_modules/@types node_modules/hono node_modules/valibot \
-  node_modules/effect node_modules/@electric-sql node_modules/remeda \
-  node_modules/csstype node_modules/jiti 2>/dev/null || true
-cd ..
+rm -rf "$PKG_DIR/node_modules/prisma" "$PKG_DIR/node_modules/typescript" \
+  "$PKG_DIR/node_modules/better-sqlite3" "$PKG_DIR/node_modules/@prisma/adapter-better-sqlite3" \
+  "$PKG_DIR/node_modules/react-dom" "$PKG_DIR/node_modules/chart.js" \
+  "$PKG_DIR/node_modules/fast-check" "$PKG_DIR/node_modules/@types" \
+  "$PKG_DIR/node_modules/hono" "$PKG_DIR/node_modules/valibot" \
+  "$PKG_DIR/node_modules/effect" "$PKG_DIR/node_modules/@electric-sql" \
+  "$PKG_DIR/node_modules/remeda" "$PKG_DIR/node_modules/csstype" \
+  "$PKG_DIR/node_modules/jiti" "$PKG_DIR/node_modules/mysql2" \
+  "$PKG_DIR/node_modules/ajv" "$PKG_DIR/node_modules/fast-xml-parser" 2>/dev/null || true
 
 # Create zip
 echo "Creating deployment ZIP..."
-cd lambda-package
+cd "$PKG_DIR"
 if command -v zip &>/dev/null; then
-  zip -r ../lambda-package.zip . -x "*.git*" -x "*.DS_Store" -q
+  zip -r "$BACKEND_DIR/lambda-package.zip" . -x "*.git*" -x "*.DS_Store" -q
 else
-  cd ..
+  cd "$BACKEND_DIR"
   powershell -Command "Compress-Archive -Path 'lambda-package\*' -DestinationPath 'lambda-package.zip' -Force"
 fi
-cd .. 2>/dev/null || true
+cd "$BACKEND_DIR"
 
 SIZE=$(ls -lh lambda-package.zip | awk '{print $5}')
 echo "=== Lambda package created: lambda-package.zip ($SIZE) ==="
