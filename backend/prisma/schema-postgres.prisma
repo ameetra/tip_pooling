@@ -19,7 +19,7 @@ model User {
   tenantId     String
   email        String
   passwordHash String
-  role         UserRole
+  role         String
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
