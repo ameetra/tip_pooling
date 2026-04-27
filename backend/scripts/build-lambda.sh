@@ -78,7 +78,7 @@ rm -rf "$PKG_DIR/node_modules/prisma" "$PKG_DIR/node_modules/typescript" \
   "$PKG_DIR/node_modules/effect" "$PKG_DIR/node_modules/@electric-sql" \
   "$PKG_DIR/node_modules/remeda" "$PKG_DIR/node_modules/csstype" \
   "$PKG_DIR/node_modules/jiti" "$PKG_DIR/node_modules/mysql2" \
-  "$PKG_DIR/node_modules/ajv" "$PKG_DIR/node_modules/fast-xml-parser" 2>/dev/null || true
+  "$PKG_DIR/node_modules/ajv" 2>/dev/null || true
 
 # Create zip
 echo "Creating deployment ZIP..."

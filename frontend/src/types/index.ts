@@ -67,6 +67,7 @@ export interface TipEntry {
   electronicTips: number;
   isDeleted: boolean;
   deletedAt: string | null;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

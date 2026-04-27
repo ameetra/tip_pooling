@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, del } from './client';
 import type { TipEntry, TipEntryDetail, TipEntryInput, TipPreviewResponse } from '../types';
 
+export interface PublishResult { emailsSent: number; emailsFailed: number; }
+
 export const useTipEntries = () =>
   useQuery({ queryKey: ['tipEntries'], queryFn: () => get<TipEntry[]>('/tips/entries') });
 
@@ -24,5 +26,13 @@ export const useDeleteTipEntry = () => {
   return useMutation({
     mutationFn: (id: string) => del(`/tips/entries/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tipEntries'] }),
+  });
+};
+
+export const usePublishTipEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => post<PublishResult>(`/tips/entries/${id}/publish`),
+    onSuccess: (_data, id) => qc.invalidateQueries({ queryKey: ['tipEntries', id] }),
   });
 };
