@@ -5,6 +5,11 @@ import { TipEntryQuerySchema } from '../validation/tip.schema';
 
 const RESTAURANT_NAME = process.env.RESTAURANT_NAME || 'Demo Restaurant';
 
+function performer(req: Request) {
+  const u = (req as any).user;
+  return u ? { userId: u.sub, email: u.email } : undefined;
+}
+
 export const tipController = {
   async preview(req: Request, res: Response, next: NextFunction) {
     try {
@@ -16,7 +21,7 @@ export const tipController = {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const force = req.query.force === 'true' && (req as any).user?.role === 'ADMIN';
-      const entry = await tipEntryService.create(req.tenantId, req.body, force);
+      const entry = await tipEntryService.create(req.tenantId, req.body, force, performer(req));
       res.status(201).json({ success: true, data: entry });
     } catch (err) { next(err); }
   },
@@ -24,7 +29,7 @@ export const tipController = {
   async publish(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const result = await tipEntryService.publish(req.tenantId, id, RESTAURANT_NAME);
+      const result = await tipEntryService.publish(req.tenantId, id, RESTAURANT_NAME, performer(req));
       if (!result) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
@@ -33,7 +38,7 @@ export const tipController = {
   async edit(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const entry = await tipEntryService.edit(req.tenantId, id, req.body);
+      const entry = await tipEntryService.edit(req.tenantId, id, req.body, performer(req));
       if (!entry) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.json({ success: true, data: entry });
     } catch (err) { next(err); }
@@ -93,7 +98,7 @@ export const tipController = {
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const deleted = await tipEntryService.softDelete(req.tenantId, id);
+      const deleted = await tipEntryService.softDelete(req.tenantId, id, performer(req));
       if (!deleted) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.status(204).send();
     } catch (err) { next(err); }
