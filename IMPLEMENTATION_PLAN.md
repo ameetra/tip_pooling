@@ -1,7 +1,7 @@
 # Tip Pooling System - Implementation Plan
 
 **Created:** December 29, 2025
-**Last Updated:** April 13, 2026
+**Last Updated:** April 26, 2026
 **Status:** In Progress
 
 ## Current Progress
@@ -46,6 +46,45 @@
 - [x] Audit log API (GET /audit, GET /audit/:entityType/:entityId)
 - [x] Tenant isolation tests (8 tests verifying cross-tenant data is invisible)
 - [x] 74 tests passing (23 unit + 51 integration)
+
+### Milestone 5: AWS Deployment - COMPLETE
+- [x] Backend deployed to Lambda (Node.js 20, serverless-http wrapping Express)
+- [x] PostgreSQL RDS (db.t3.micro, us-east-1) — schema-postgres.prisma with pg adapter
+- [x] Frontend deployed to S3 + CloudFront (https://d3vrbd8qbym3pv.cloudfront.net)
+- [x] API Gateway → Lambda wired via Terraform
+- [x] Lambda admin action handlers (migrate, seed, updatePasswordHash) gated by LAMBDA_ADMIN_SECRET
+- [x] DB migrations run via Lambda invocation (Prisma CLI unavailable in Lambda due to @prisma/engines)
+- [x] build-lambda.sh: prunes unused packages (SQLite, dev tools) → 43MB zip
+
+### Milestone 6: Security Hardening - COMPLETE (2026-04-26)
+- [x] helmet (security headers), CORS locked to CloudFront origin, 1MB body limit
+- [x] Login rate limiting: 10 req / 15 min per IP
+- [x] JWT_SECRET required at startup; token expiry 24h → 8h
+- [x] Password validation: min 8 / max 128 chars
+- [x] force-override flag restricted to ADMIN role only
+- [x] Stack traces truncated in error logs
+- [x] Magic link token removed from CloudWatch logs
+- [x] LAMBDA_ADMIN_SECRET required for all direct Lambda admin actions
+
+### Milestone 7: User Management + Support Account - COMPLETE (2026-04-26)
+- [x] GET/POST /api/v1/users — ADMIN-only manager CRUD
+- [x] DELETE /api/v1/users/:id — soft-deactivate (isActive=false)
+- [x] PATCH /api/v1/users/:id/password — admin resets manager password
+- [x] Frontend: Managers page (ADMIN-only nav item), add/remove/reset-password dialogs
+- [x] Developer support account (support@tippooling.app, ADMIN) seeded per tenant
+- [x] Support credentials stored in AWS Secrets Manager (tip-pooling/support-account)
+
+### Milestone 8: Tip Email Notifications - COMPLETE (2026-04-26)
+- [x] publishedAt field added to tip_entries (null=draft, set=published)
+- [x] POST /api/v1/tips/entries/:id/publish — marks published, sends SES emails
+- [x] Edits blocked on published entries
+- [x] email.service.ts: AWS SES with HTML + plain text templates
+- [x] FROM_EMAIL=ameet.rawal1@gmail.com (placeholder; SES verified), FROM_NAME, RESTAURANT_NAME env vars
+- [x] Frontend: Draft/Published badge on tip entries list
+- [x] Frontend: "Publish & Send Emails" button on detail page with confirm dialog
+- [x] Email failures logged but do not block publish response
+- [ ] SES production access not yet requested (sandbox: can only send to verified addresses)
+- [ ] Real domain + FROM_EMAIL to be configured per tenant at onboarding
 
 ---
 
