@@ -3,6 +3,7 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FROM_EMAIL = process.env.FROM_EMAIL || 'ameet.rawal1@gmail.com';
 const FROM_NAME = process.env.FROM_NAME || 'Tip Pooling';
+const APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 
 export interface TipEmailData {
   employeeName: string;
@@ -61,7 +62,12 @@ function buildEmailBody(d: TipEmailData): string {
       <td style="padding: 8px 12px; text-align:right;">$${d.effectiveHourlyRate.toFixed(2)}/hr</td>
     </tr>
   </table>
-  <p style="color:#888; font-size:12px;">This is an automated message from your tip management system.</p>
+  <div style="margin: 24px 0;">
+    <a href="${APP_URL}/login" style="background:#1976d2; color:#fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: bold;">
+      View My Tip History
+    </a>
+  </div>
+  <p style="color:#888; font-size:12px;">This is an automated message from your tip management system. Sign in with your work email to view your last 90 days of tips.</p>
 </body>
 </html>`;
 }
@@ -76,6 +82,8 @@ Hours worked: ${d.hours.toFixed(1)}
 Tips earned: $${d.finalTips.toFixed(2)}
 Total pay (wages + tips): $${d.totalPay.toFixed(2)}
 Effective hourly rate: $${d.effectiveHourlyRate.toFixed(2)}/hr
+
+View your tip history: ${APP_URL}/login
 
 This is an automated message from your tip management system.`;
 }

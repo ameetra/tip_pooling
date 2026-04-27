@@ -65,7 +65,7 @@ export const tipController = {
     try {
       const employeeId = req.user!.sub;
       const since = new Date();
-      since.setDate(since.getDate() - 30);
+      since.setDate(since.getDate() - 90);
       const sinceStr = since.toISOString().slice(0, 10);
 
       const calcs = await (prisma as any).tipCalculation.findMany({
