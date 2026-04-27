@@ -60,6 +60,8 @@ async function runMigrations() {
       CREATE UNIQUE INDEX IF NOT EXISTS "users_tenantId_email_key" ON "users"("tenantId", "email");
 
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP;
+
+      ALTER TABLE "users" ALTER COLUMN "role" TYPE TEXT;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
