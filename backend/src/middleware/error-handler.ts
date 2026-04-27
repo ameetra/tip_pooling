@@ -39,6 +39,6 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  console.error('Unhandled error:', err);
+  console.error('Unhandled error:', { message: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
   res.status(500).json(response);
 }

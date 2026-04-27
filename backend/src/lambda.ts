@@ -5,16 +5,20 @@ import prisma from './database/client';
 const app = createApp();
 const httpHandler = serverlessHttp(app);
 
+const ADMIN_SECRET = process.env.LAMBDA_ADMIN_SECRET;
+
 export const handler = async (event: any, context: any) => {
   // Handle admin actions invoked directly (not via API Gateway)
-  if (event.action === 'migrate') {
-    return runMigrations();
-  }
-  if (event.action === 'seed') {
-    return runSeed();
-  }
-  if (event.action === 'updatePasswordHash' && event.email && event.hash) {
-    return updatePasswordHash(event.email, event.hash);
+  // Require a secret to prevent unauthorized invocations
+  if (event.action) {
+    if (!ADMIN_SECRET || event.secret !== ADMIN_SECRET) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    if (event.action === 'migrate') return runMigrations();
+    if (event.action === 'seed') return runSeed();
+    if (event.action === 'updatePasswordHash' && event.email && event.hash) {
+      return updatePasswordHash(event.email, event.hash);
+    }
   }
   return httpHandler(event, context);
 };

@@ -3,7 +3,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../database/client';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
 const APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 
 export interface JwtPayload {
@@ -14,7 +15,7 @@ export interface JwtPayload {
 }
 
 function signJwt(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: '8h' });
 }
 
 export async function loginUser(email: string, password: string, tenantId: string): Promise<{ jwt: string }> {
@@ -63,8 +64,8 @@ export async function requestMagicLink(email: string, ipAddress?: string) {
     data: { email: email.toLowerCase(), token, expiresAt, ipAddress: ipAddress ?? null },
   });
 
-  const magicLink = `${APP_URL}/auth/verify?token=${token}`;
-  console.log(`[MAGIC LINK] ${email} → ${magicLink}`);
+  // In production, SES would send the email. Log only that a link was issued (not the token).
+  console.log(`[MAGIC LINK] issued for ${email}`);
 }
 
 export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
@@ -88,5 +89,5 @@ export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
 }
 
 export function verifyJwtToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, JWT_SECRET!) as JwtPayload;
 }
