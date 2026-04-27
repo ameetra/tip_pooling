@@ -8,6 +8,27 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
 model Tenant {
   id        String   @id @default(cuid())
   name      String
@@ -16,6 +37,7 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  users              User[]
   employees          Employee[]
   shifts             Shift[]
   supportStaffConfig SupportStaffConfig[]
