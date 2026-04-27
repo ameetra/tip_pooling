@@ -9,7 +9,8 @@ export async function handleLogin(req: Request, res: Response, next: NextFunctio
   try {
     const { email, password } = loginSchema.parse(req.body);
     const tenantId = process.env.DEFAULT_TENANT_ID!;
-    const result = await loginUser(email, password, tenantId);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress;
+    const result = await loginUser(email, password, tenantId, ip);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);

@@ -5,6 +5,7 @@ interface AuditEntry {
   entityType: string;
   entityId: string;
   action: string;
+  performedBy?: { userId: string; email: string } | null;
   oldValues?: Record<string, any> | null;
   newValues?: Record<string, any> | null;
 }
@@ -18,7 +19,7 @@ export const auditService = {
         entityId: entry.entityId,
         action: entry.action,
         oldValues: entry.oldValues ? JSON.stringify(entry.oldValues) : null,
-        newValues: entry.newValues ? JSON.stringify(entry.newValues) : null,
+        newValues: JSON.stringify({ ...entry.newValues, ...(entry.performedBy ? { performedBy: entry.performedBy } : {}) }) || null,
       },
     });
   },

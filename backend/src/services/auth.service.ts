@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../database/client';
+import { auditService } from './audit.service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
@@ -18,17 +19,26 @@ function signJwt(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET!, { expiresIn: '8h' });
 }
 
-export async function loginUser(email: string, password: string, tenantId: string): Promise<{ jwt: string }> {
+export async function loginUser(email: string, password: string, tenantId: string, ipAddress?: string): Promise<{ jwt: string }> {
   const user = await (prisma as any).user.findFirst({
     where: { email: email.toLowerCase(), tenantId, isActive: true },
   });
 
   // Same error message for missing user or wrong password (no user enumeration)
   const invalid = Object.assign(new Error('Invalid email or password.'), { code: 'INVALID_CREDENTIALS' });
-  if (!user) throw invalid;
+
+  if (!user) {
+    auditService.log({ tenantId, entityType: 'USER', entityId: email.toLowerCase(), action: 'LOGIN_FAILED', newValues: { email: email.toLowerCase(), ip: ipAddress, reason: 'user_not_found' } }).catch(() => {});
+    throw invalid;
+  }
 
   const match = await bcrypt.compare(password, user.passwordHash);
-  if (!match) throw invalid;
+  if (!match) {
+    auditService.log({ tenantId, entityType: 'USER', entityId: user.id, action: 'LOGIN_FAILED', newValues: { email: user.email, ip: ipAddress, reason: 'wrong_password' } }).catch(() => {});
+    throw invalid;
+  }
+
+  auditService.log({ tenantId, entityType: 'USER', entityId: user.id, action: 'LOGIN', newValues: { email: user.email, role: user.role, ip: ipAddress } }).catch(() => {});
 
   return { jwt: signJwt({ sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email }) };
 }

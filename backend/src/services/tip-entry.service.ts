@@ -95,7 +95,7 @@ export const tipEntryService = {
     return { entryDate: input.entryDate, cashTips, electronicTips: input.electronicTips, totalTipPool, results };
   },
 
-  async create(tenantId: string, input: CreateTipEntryInput, force = false) {
+  async create(tenantId: string, input: CreateTipEntryInput, force = false, performedBy?: { userId: string; email: string }) {
     if (!force) {
       const existing = await prisma.tipEntry.findFirst({
         where: { tenantId, entryDate: input.entryDate, isDeleted: false },
@@ -128,11 +128,11 @@ export const tipEntryService = {
       return entry;
     });
 
-    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', newValues: { entryDate: input.entryDate, totalTipPool } });
+    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', performedBy, newValues: { entryDate: input.entryDate, totalTipPool } });
     return { ...tipEntry, cashTips, totalTipPool, results };
   },
 
-  async publish(tenantId: string, id: string, restaurantName: string) {
+  async publish(tenantId: string, id: string, restaurantName: string, performedBy?: { userId: string; email: string }) {
     const entry = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
       include: {
@@ -167,13 +167,25 @@ export const tipEntryService = {
     );
 
     const failed = emailResults.filter((r) => r.status === 'rejected');
-    if (failed.length) console.error(`[publish] ${failed.length} email(s) failed`, failed.map((r: any) => r.reason?.message));
 
-    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'PUBLISH', newValues: { emailsSent: emailResults.length - failed.length } });
+    // Log per-employee email results
+    const emailDetails = entry.tipCalculations.map((calc, i) => ({
+      employeeId: calc.employeeId,
+      employeeName: calc.employee.name,
+      employeeEmail: calc.employee.email,
+      status: emailResults[i].status === 'fulfilled' ? 'sent' : 'failed',
+      error: emailResults[i].status === 'rejected' ? (emailResults[i] as PromiseRejectedResult).reason?.message : null,
+    }));
+
+    await auditService.log({
+      tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'PUBLISH',
+      performedBy,
+      newValues: { entryDate: entry.entryDate, emailsSent: emailResults.length - failed.length, emailsFailed: failed.length, emails: emailDetails },
+    });
     return { emailsSent: emailResults.length - failed.length, emailsFailed: failed.length };
   },
 
-  async edit(tenantId: string, id: string, input: EditTipEntryInput) {
+  async edit(tenantId: string, id: string, input: EditTipEntryInput, performedBy?: { userId: string; email: string }) {
     const existing = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
     });
@@ -220,6 +232,7 @@ export const tipEntryService = {
 
     await auditService.log({
       tenantId, entityType: 'TIP_ENTRY', entityId: newEntry.id, action: 'UPDATE',
+      performedBy,
       oldValues: { id: existing.id, entryDate: existing.entryDate },
       newValues: { id: newEntry.id, replacedOldId: existing.id },
     });
@@ -265,13 +278,13 @@ export const tipEntryService = {
     });
   },
 
-  async softDelete(tenantId: string, id: string) {
+  async softDelete(tenantId: string, id: string, performedBy?: { userId: string; email: string }) {
     const result = await prisma.tipEntry.updateMany({
       where: { id, tenantId, isDeleted: false },
       data: { isDeleted: true, deletedAt: new Date() },
     });
     if (result.count > 0) {
-      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE' });
+      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE', performedBy });
     }
     return result.count > 0;
   },
