@@ -86,6 +86,13 @@
 - [ ] SES production access not yet requested (sandbox: can only send to verified addresses)
 - [ ] Real domain + FROM_EMAIL to be configured per tenant at onboarding
 
+### Milestone 10: Employee Login Experience - COMPLETE (2026-04-27)
+- [x] Tip history window: 30 → 90 days
+- [x] Tip email includes "View My Tip History" button linking to app login page
+- [x] Login page split: Admin/Manager (email+password) and Employee (magic link) sections
+- [x] VerifyPage redirects by role: employees → /my-tips, admin/manager → /tips
+- [x] Deactivated employees blocked at both magic link request AND verify steps (isActive check)
+
 ---
 
 This plan tracks all implementation steps for the tip pooling management system based on the revised PRD and TDD. Update this file as you complete each step.
