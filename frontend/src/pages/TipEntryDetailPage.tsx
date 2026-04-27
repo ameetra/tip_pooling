@@ -112,6 +112,8 @@ export default function TipEntryDetailPage() {
         message={`This will send tip summary emails to all ${entry.tipCalculations.length} employee(s) for ${entry.entryDate}. This cannot be undone.`}
         onConfirm={handlePublish}
         onCancel={() => setConfirmPublish(false)}
+        confirmLabel="Publish & Send"
+        confirmColor="success"
       />
       <ConfirmDialog open={confirmDelete} title="Delete Tip Entry" message="This will soft-delete the entry." onConfirm={handleDelete} onCancel={() => setConfirmDelete(false)} />
     </Box>
