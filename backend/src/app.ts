@@ -12,6 +12,7 @@ import supportConfigRoutes from './routes/support-config.routes';
 import tipRoutes from './routes/tip.routes';
 import auditRoutes from './routes/audit.routes';
 import userRoutes from './routes/user.routes';
+import { tipController } from './controllers/tip.controller';
 
 const FRONTEND_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 
@@ -39,6 +40,9 @@ export function createApp() {
   // Auth routes — login has rate limiting
   app.use('/api/v1/auth/login', loginLimiter);
   app.use('/api/v1/auth', authRoutes);
+
+  // Employee tip history — any authenticated user can read their own
+  app.get('/api/v1/tips/my-history', verifyJWT, tipController.myHistory);
 
   // Protected routes — require Admin or Manager role
   const adminOrManager = [verifyJWT, requireRole('ADMIN', 'MANAGER')];

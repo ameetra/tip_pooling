@@ -43,7 +43,7 @@ export default function Layout() {
               </>
             )}
             <Tooltip title="Sign out">
-              <IconButton color="inherit" onClick={() => { logout(); navigate('/login'); }}>
+              <IconButton color="inherit" onClick={() => { logout(); navigate('/manager-login'); }}>
                 <LogoutIcon fontSize="small" />
               </IconButton>
             </Tooltip>

@@ -5,7 +5,6 @@ import { TipPreviewSchema, CreateTipEntrySchema, EditTipEntrySchema } from '../v
 
 const router = Router();
 
-router.get('/my-history', tipController.myHistory);
 router.post('/preview', validateBody(TipPreviewSchema), tipController.preview);
 router.post('/entries', validateBody(CreateTipEntrySchema), tipController.create);
 router.get('/entries', tipController.findAll);
