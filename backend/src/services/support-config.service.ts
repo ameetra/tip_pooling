@@ -1,5 +1,5 @@
 import prisma from '../database/client';
-import { SupportStaffConfigInput } from '../validation/tip.schema';
+import { PaginationQuery, SupportStaffConfigInput } from '../validation/tip.schema';
 import { auditService } from './audit.service';
 
 export const supportConfigService = {
@@ -16,11 +16,23 @@ export const supportConfigService = {
     });
   },
 
-  async getHistory(tenantId: string) {
-    return prisma.supportStaffConfig.findMany({
-      where: { tenantId },
-      orderBy: { effectiveDate: 'desc' },
-    });
+  async getHistory(tenantId: string, query?: PaginationQuery) {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 50;
+    const skip = (page - 1) * limit;
+    const where = { tenantId };
+
+    const [data, total] = await Promise.all([
+      prisma.supportStaffConfig.findMany({
+        where,
+        orderBy: { effectiveDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.supportStaffConfig.count({ where }),
+    ]);
+
+    return { data, pagination: { page, limit, total } };
   },
 
   async setConfig(tenantId: string, data: SupportStaffConfigInput) {

@@ -39,12 +39,17 @@ export const EditTipEntrySchema = z.object({
   employees: z.array(EmployeeShiftEntry).min(1),
 });
 
-export const TipEntryQuerySchema = z.object({
+export const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const TipEntryQuerySchema = PaginationSchema.extend({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
+
+export type PaginationQuery = z.infer<typeof PaginationSchema>;
 
 export type TipPreviewInput = z.infer<typeof TipPreviewSchema>;
 export type CreateTipEntryInput = z.infer<typeof CreateTipEntrySchema>;

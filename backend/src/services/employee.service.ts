@@ -1,5 +1,5 @@
 import prisma from '../database/client';
-import { CreateEmployeeInput, UpdateEmployeeInput, UpdateRateInput } from '../validation/employee.schema';
+import { CreateEmployeeInput, EmployeeQuery, UpdateEmployeeInput, UpdateRateInput } from '../validation/employee.schema';
 import { auditService } from './audit.service';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -14,14 +14,26 @@ export const employeeService = {
     return employee;
   },
 
-  findAll(tenantId: string, search?: string) {
+  async findAll(tenantId: string, query?: EmployeeQuery) {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
     const where: any = { tenantId, isActive: true };
-    if (search) where.name = { contains: search };
-    return prisma.employee.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }], take: 1 } },
-    });
+    if (query?.search) where.name = { contains: query.search };
+
+    const [data, total] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+        include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }], take: 1 } },
+      }),
+      prisma.employee.count({ where }),
+    ]);
+
+    return { data, pagination: { page, limit, total } };
   },
 
   findById(tenantId: string, id: string) {

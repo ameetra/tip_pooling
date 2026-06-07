@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supportConfigService } from '../services/support-config.service';
+import { PaginationSchema } from '../validation/tip.schema';
 
 export const supportConfigController = {
   async getCurrent(req: Request, res: Response, next: NextFunction) {
@@ -11,8 +12,9 @@ export const supportConfigController = {
 
   async getHistory(req: Request, res: Response, next: NextFunction) {
     try {
-      const history = await supportConfigService.getHistory(req.tenantId);
-      res.json({ success: true, data: history });
+      const query = PaginationSchema.parse(req.query);
+      const result = await supportConfigService.getHistory(req.tenantId, query);
+      res.json({ success: true, ...result });
     } catch (err) { next(err); }
   },
 

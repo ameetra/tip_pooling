@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { employeeService } from '../services/employee.service';
+import { EmployeeQuerySchema } from '../validation/employee.schema';
 
 export const employeeController = {
   async create(req: Request, res: Response, next: NextFunction) {
@@ -11,9 +12,9 @@ export const employeeController = {
 
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const search = req.query.search as string | undefined;
-      const employees = await employeeService.findAll(req.tenantId, search);
-      res.json({ success: true, data: employees });
+      const query = EmployeeQuerySchema.parse(req.query);
+      const result = await employeeService.findAll(req.tenantId, query);
+      res.json({ success: true, ...result });
     } catch (err) { next(err); }
   },
 

@@ -1,6 +1,7 @@
 // Set test tenant before any imports that read env
 process.env.DEFAULT_TENANT_ID = 'test-tenant';
 process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-do-not-use-in-prod';
 
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaClient } from '../generated/prisma/client';

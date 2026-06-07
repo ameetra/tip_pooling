@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import { PaginationSchema } from './tip.schema';
+
+export const EmployeeQuerySchema = PaginationSchema.extend({
+  search: z.string().optional(),
+});
+
+export type EmployeeQuery = z.infer<typeof EmployeeQuerySchema>;
 
 export const CreateEmployeeSchema = z.object({
   name: z.string().min(1).max(100),
