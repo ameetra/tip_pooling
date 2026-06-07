@@ -80,7 +80,7 @@ export const tipController = {
         orderBy: { tipEntry: { entryDate: 'desc' } },
       });
 
-      const data = calcs.map((c: any) => ({
+      const records = calcs.map((c: any) => ({
         date: c.tipEntry.entryDate,
         role: c.roleOnDay,
         shifts: c.shiftAssignments.map((sa: any) => sa.shift.name),
@@ -91,7 +91,7 @@ export const tipController = {
         effectiveHourlyRate: c.effectiveHourlyRate,
       }));
 
-      res.json({ success: true, data });
+      res.json({ success: true, data: { restaurantName: RESTAURANT_NAME, records } });
     } catch (err) { next(err); }
   },
 

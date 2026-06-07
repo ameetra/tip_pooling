@@ -1,11 +1,14 @@
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+// Renders both emails (tip notification + magic link) to HTML files for preview.
+import fs from 'fs';
+import path from 'path';
 
-const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const FROM_EMAIL = process.env.FROM_EMAIL || 'REDACTED-EMAIL';
-const FROM_NAME = process.env.FROM_NAME || 'Tip Pooling';
-const APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
+process.env.APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
+process.env.AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 
-export interface TipEmailData {
+// Re-implement the build functions (importing email.service.ts would try to init SES client)
+const APP_URL = process.env.APP_URL!;
+
+interface TipEmailData {
   employeeName: string;
   employeeEmail: string;
   restaurantName: string;
@@ -17,22 +20,7 @@ export interface TipEmailData {
   effectiveHourlyRate: number;
 }
 
-export async function sendTipEmail(data: TipEmailData): Promise<void> {
-  const subject = `Your tips for ${data.entryDate} — ${data.restaurantName}`;
-  const loginUrl = `${APP_URL}/login?email=${encodeURIComponent(data.employeeEmail)}`;
-  const body = buildEmailBody(data, loginUrl);
-
-  await ses.send(new SendEmailCommand({
-    Source: `${FROM_NAME} <${FROM_EMAIL}>`,
-    Destination: { ToAddresses: [data.employeeEmail] },
-    Message: {
-      Subject: { Data: subject },
-      Body: { Html: { Data: body }, Text: { Data: buildPlainText(data, loginUrl) } },
-    },
-  }));
-}
-
-function buildEmailBody(d: TipEmailData, loginUrl: string): string {
+function buildTipEmail(d: TipEmailData, loginUrl: string): string {
   const shifts = d.shifts.join(', ') || '—';
   return `
 <!DOCTYPE html>
@@ -73,15 +61,8 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
 </html>`;
 }
 
-export async function sendMagicLinkEmail(employeeName: string, employeeEmail: string, token: string): Promise<void> {
-  const link = `${APP_URL}/auth/verify?token=${token}`;
-  await ses.send(new SendEmailCommand({
-    Source: `${FROM_NAME} <${FROM_EMAIL}>`,
-    Destination: { ToAddresses: [employeeEmail] },
-    Message: {
-      Subject: { Data: 'Your sign-in link' },
-      Body: {
-        Html: { Data: `
+function buildMagicLinkEmail(employeeName: string, link: string): string {
+  return `
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
@@ -94,25 +75,34 @@ export async function sendMagicLinkEmail(employeeName: string, employeeEmail: st
   </div>
   <p style="color:#888; font-size:12px;">If you didn't request this, you can ignore this email.</p>
 </body>
-</html>` },
-        Text: { Data: `Hi ${employeeName},\n\nUse this link to sign in (expires in 15 minutes):\n${link}\n\nIf you didn't request this, ignore this email.` },
-      },
-    },
-  }));
+</html>`;
 }
 
-function buildPlainText(d: TipEmailData, loginUrl: string): string {
-  return `${d.restaurantName} — Tip Summary for ${d.entryDate}
+const sampleTip: TipEmailData = {
+  employeeName: 'Maria Lopez',
+  employeeEmail: 'maria.lopez@example.com',
+  restaurantName: 'Demo Restaurant',
+  entryDate: 'Fri, Jun 5',
+  shifts: ['Lunch', 'Dinner'],
+  hours: 7.5,
+  finalTips: 142.38,
+  totalPay: 254.88,
+  effectiveHourlyRate: 33.98,
+};
 
-Hi ${d.employeeName},
+const loginUrl = `${APP_URL}/login?email=${encodeURIComponent(sampleTip.employeeEmail)}`;
+const verifyUrl = `${APP_URL}/auth/verify?token=sample_token_a1b2c3d4e5f6`;
 
-Shift(s): ${d.shifts.join(', ') || '—'}
-Hours worked: ${d.hours.toFixed(1)}
-Tips earned: $${d.finalTips.toFixed(2)}
-Total pay (wages + tips): $${d.totalPay.toFixed(2)}
-Effective hourly rate: $${d.effectiveHourlyRate.toFixed(2)}/hr
+const outDir = path.resolve(__dirname, '../email-previews');
+fs.mkdirSync(outDir, { recursive: true });
 
-View your tip history: ${loginUrl}
+const tipPath = path.join(outDir, 'tip-email.html');
+const magicPath = path.join(outDir, 'magic-link-email.html');
 
-This is an automated message from your tip management system.`;
-}
+fs.writeFileSync(tipPath, buildTipEmail(sampleTip, loginUrl));
+fs.writeFileSync(magicPath, buildMagicLinkEmail(sampleTip.employeeName, verifyUrl));
+
+console.log('Wrote:');
+console.log('  ' + tipPath);
+console.log('  ' + magicPath);
+console.log('\nOpen them in your browser to preview.');

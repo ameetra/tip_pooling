@@ -5,3 +5,4 @@ node_modules
 dist/
 coverage/
 /src/generated/prisma
+email-previews/

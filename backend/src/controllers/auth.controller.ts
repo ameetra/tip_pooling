@@ -22,7 +22,7 @@ export async function handleRequestMagicLink(req: Request, res: Response, next: 
     const { email } = magicLinkSchema.parse(req.body);
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress;
     await requestMagicLink(email, ip);
-    res.json({ success: true, data: { message: 'Magic link logged to CloudWatch. Check Lambda logs.' } });
+    res.json({ success: true, data: { message: 'Sign-in link sent. Check your email.' } });
   } catch (err) {
     next(err);
   }
