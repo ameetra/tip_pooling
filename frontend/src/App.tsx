@@ -14,7 +14,7 @@ import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
 
-const MANAGEMENT_ROLES = ['ADMIN', 'MANAGER'];
+const STAFF_ROLES = ['ADMIN', 'MANAGER', 'SHIFT_LEAD'];
 
 function RequireAuth({ children, loginPath = '/login' }: { children: React.ReactNode; loginPath?: string }) {
   const { token } = useAuth();
@@ -24,9 +24,9 @@ function RequireAuth({ children, loginPath = '/login' }: { children: React.React
 function RoleRouter() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  return MANAGEMENT_ROLES.includes(user.role)
-    ? <Navigate to="/tips" replace />
-    : <Navigate to="/my-tips" replace />;
+  if (user.role === 'SHIFT_LEAD') return <Navigate to="/tips/new" replace />;
+  if (STAFF_ROLES.includes(user.role)) return <Navigate to="/tips" replace />;
+  return <Navigate to="/my-tips" replace />;
 }
 
 export default function App() {

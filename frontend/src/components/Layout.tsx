@@ -12,21 +12,23 @@ import { useAuth } from '../context/AuthContext';
 
 const DRAWER_WIDTH = 220;
 
-const navItems = [
+const managerNavItems = [
   { label: 'Tips', path: '/tips', icon: <ReceiptIcon /> },
   { label: 'Employees', path: '/employees', icon: <PeopleIcon /> },
   { label: 'Shifts', path: '/shifts', icon: <ScheduleIcon /> },
   { label: 'Config', path: '/config', icon: <SettingsIcon /> },
+  { label: 'Staff', path: '/users', icon: <AdminPanelSettingsIcon /> },
 ];
 
-const adminNavItems = [
-  { label: 'Managers', path: '/users', icon: <AdminPanelSettingsIcon /> },
+const shiftLeadNavItems = [
+  { label: 'New Tip Entry', path: '/tips/new', icon: <ReceiptIcon /> },
 ];
 
 export default function Layout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { logout, user } = useAuth();
+  const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : managerNavItems;
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -58,12 +60,6 @@ export default function Layout() {
         <Toolbar />
         <List>
           {navItems.map((item) => (
-            <ListItemButton key={item.path} selected={pathname.startsWith(item.path)} onClick={() => navigate(item.path)}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
-          {user?.role === 'ADMIN' && adminNavItems.map((item) => (
             <ListItemButton key={item.path} selected={pathname.startsWith(item.path)} onClick={() => navigate(item.path)}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />

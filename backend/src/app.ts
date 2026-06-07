@@ -13,6 +13,10 @@ import tipRoutes from './routes/tip.routes';
 import auditRoutes from './routes/audit.routes';
 import userRoutes from './routes/user.routes';
 import { tipController } from './controllers/tip.controller';
+import { employeeController } from './controllers/employee.controller';
+import { shiftController } from './controllers/shift.controller';
+import { validateBody } from './middleware/validate';
+import { TipPreviewSchema, CreateTipEntrySchema } from './validation/tip.schema';
 
 const FRONTEND_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 
@@ -44,6 +48,15 @@ export function createApp() {
   // Employee tip history — any authenticated user can read their own
   app.get('/api/v1/tips/my-history', verifyJWT, tipController.myHistory);
 
+  // Shift-lead-accessible routes: tip entry creation + read-only lookups
+  // for the form's dropdowns. Registered before the broad mounts so these
+  // specific paths bypass the adminOrManager gate.
+  const tipCreator = [verifyJWT, requireRole('ADMIN', 'MANAGER', 'SHIFT_LEAD')];
+  app.post('/api/v1/tips/preview', ...tipCreator, validateBody(TipPreviewSchema), tipController.preview);
+  app.post('/api/v1/tips/entries', ...tipCreator, validateBody(CreateTipEntrySchema), tipController.create);
+  app.get('/api/v1/employees', ...tipCreator, employeeController.findAll);
+  app.get('/api/v1/shifts', ...tipCreator, shiftController.findAll);
+
   // Protected routes — require Admin or Manager role
   const adminOrManager = [verifyJWT, requireRole('ADMIN', 'MANAGER')];
   app.use('/api/v1/employees', ...adminOrManager, employeeRoutes);
@@ -52,8 +65,8 @@ export function createApp() {
   app.use('/api/v1/tips', ...adminOrManager, tipRoutes);
   app.use('/api/v1/audit', ...adminOrManager, auditRoutes);
 
-  // User management — ADMIN only
-  app.use('/api/v1/users', verifyJWT, requireRole('ADMIN'), userRoutes);
+  // Staff management — ADMIN + MANAGER (controller enforces target-role rules)
+  app.use('/api/v1/users', verifyJWT, requireRole('ADMIN', 'MANAGER'), userRoutes);
 
   app.use(errorHandler);
 

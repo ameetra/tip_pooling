@@ -11,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useEmployees } from '../api/employees';
 import { useShifts } from '../api/shifts';
 import { useTipPreview, useCreateTipEntry } from '../api/tips';
+import { useAuth } from '../context/AuthContext';
 import type { EmployeeRole, TipEntryInput, TipCalculationResult, Shift } from '../types';
 
 interface EmployeeRow {
@@ -24,6 +25,8 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function TipEntryFormPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isShiftLead = user?.role === 'SHIFT_LEAD';
   const { data: employees = [] } = useEmployees();
   const { data: shifts = [] } = useShifts();
   const preview = useTipPreview();
@@ -36,6 +39,17 @@ export default function TipEntryFormPage() {
   const [electronicTips, setElectronicTips] = useState('');
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const resetForm = () => {
+    setEntryDate(today);
+    setStartingDrawer('');
+    setClosingDrawer('');
+    setCashSales('0');
+    setElectronicTips('');
+    setRows([]);
+    preview.reset();
+  };
 
   const cashTips = Math.max(0, Number(closingDrawer) - Number(startingDrawer) - Number(cashSales));
   const totalPool = cashTips + Number(electronicTips || 0);
@@ -81,7 +95,12 @@ export default function TipEntryFormPage() {
     if (!input) return;
     try {
       const result: any = await createEntry.mutateAsync(input);
-      navigate(`/tips/${result.id}`);
+      if (isShiftLead) {
+        resetForm();
+        setSuccess(`Entry saved for ${input.entryDate}.`);
+      } else {
+        navigate(`/tips/${result.id}`);
+      }
     } catch (e: any) { setError(e.message); }
   };
 
@@ -92,6 +111,7 @@ export default function TipEntryFormPage() {
     <Box>
       <Typography variant="h5" sx={{ mb: 2 }}>New Tip Entry</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       {/* Date + Drawer */}
       <Paper sx={{ p: 2, mb: 3 }}>

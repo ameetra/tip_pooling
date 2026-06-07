@@ -88,6 +88,7 @@ beforeAll(async () => {
       isDeleted INTEGER NOT NULL DEFAULT 0,
       deletedAt DATETIME,
       replacedById TEXT,
+      publishedAt DATETIME,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenantId) REFERENCES tenants(id)

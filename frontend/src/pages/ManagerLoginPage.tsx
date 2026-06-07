@@ -31,9 +31,9 @@ export default function ManagerLoginPage() {
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.50' }}>
       <Paper sx={{ p: 4, width: '100%', maxWidth: 420 }} elevation={2}>
-        <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Manager Sign In</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Staff Sign In</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          For restaurant admins and managers. Sign in with your email and password.
+          For restaurant admins, managers, and shift leads. Sign in with your email and password.
         </Typography>
 
         <form onSubmit={handleSubmit}>

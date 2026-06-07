@@ -58,7 +58,7 @@ export default function EmployeeLoginPage() {
         )}
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          Restaurant manager?{' '}
+          Manager or shift lead?{' '}
           <Link component={RouterLink} to="/manager-login" underline="hover">Sign in here</Link>
         </Typography>
       </Paper>
