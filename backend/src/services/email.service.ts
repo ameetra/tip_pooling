@@ -1,7 +1,7 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const FROM_EMAIL = process.env.FROM_EMAIL || 'REDACTED-EMAIL';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@usegratify.com';
 const FROM_NAME = process.env.FROM_NAME || 'Tip Pooling';
 const APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
 

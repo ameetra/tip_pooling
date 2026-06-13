@@ -78,9 +78,14 @@ lambda-package/
 tmp/
 temp/
 
-# Secrets — never commit
+# Secrets / local-only — never commit
 CREDENTIALS.local.md
 *.local.md
+.claude/settings.local.json
+
+# Operator docs — keep local (contain operational/sensitive info), not in the public repo
+SUPER_ADMIN_GUIDE.md
+RUNBOOK_ADD_TENANT.md
 
 # Tenant staging data may contain employee PII — keep logos (images), ignore data files
 tenants/**/*.csv

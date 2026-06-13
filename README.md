@@ -6,7 +6,7 @@ percentages. Each establishment runs as an isolated tenant under its own URL pat
 
 ## Live
 
-**Platform:** https://usegratify.com — each venue lives at `usegratify.com/<slug>` (e.g. `/pieces`).
+**Platform:** https://usegratify.com — each venue lives at `usegratify.com/<slug>`.
 Management sign-in at `/<slug>/manager-login`; employees use a magic-link at `/<slug>/login`.
 
 > Operator docs: see **SUPER_ADMIN_GUIDE.md** (running the platform) and **RUNBOOK_ADD_TENANT.md**
