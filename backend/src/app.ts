@@ -6,6 +6,7 @@ import { tenantContext } from './middleware/tenant-context';
 import { verifyJWT, requireRole } from './middleware/auth';
 import { errorHandler } from './middleware/error-handler';
 import authRoutes from './routes/auth.routes';
+import tenantRoutes from './routes/tenant.routes';
 import employeeRoutes from './routes/employee.routes';
 import shiftRoutes from './routes/shift.routes';
 import supportConfigRoutes from './routes/support-config.routes';
@@ -40,6 +41,9 @@ export function createApp() {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // Public tenant branding — login pages + root venue picker (no auth)
+  app.use('/api/v1/tenants', tenantRoutes);
 
   // Auth routes — login has rate limiting
   app.use('/api/v1/auth/login', loginLimiter);

@@ -16,6 +16,7 @@ export const handler = async (event: any, context: any) => {
     }
     if (event.action === 'migrate') return runMigrations();
     if (event.action === 'seed') return runSeed();
+    if (event.action === 'provision' && Array.isArray(event.venues)) return runProvision(event.venues);
     if (event.action === 'updatePasswordHash' && event.email && event.hash) {
       return updatePasswordHash(event.email, event.hash);
     }
@@ -64,11 +65,28 @@ async function runMigrations() {
       ALTER TABLE "users" ALTER COLUMN "role" TYPE TEXT;
 
       ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN NOT NULL DEFAULT false;
+
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "slug" TEXT;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS "tenants_slug_key" ON "tenants"("slug");
+      ALTER TABLE "magic_link_tokens" ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
     await pool.end();
   }
+}
+
+async function runProvision(venues: any[]) {
+  const { createTenant } = require('./services/tenant.service');
+  const results = [];
+  for (const v of venues) {
+    if (!v.slug || !v.name || !v.adminEmail || !v.adminPassword) {
+      return { success: false, error: `Each venue needs slug, name, adminEmail, adminPassword (got ${JSON.stringify(v)})` };
+    }
+    results.push(await createTenant(v));
+  }
+  return { success: true, provisioned: results };
 }
 
 async function runSeed() {

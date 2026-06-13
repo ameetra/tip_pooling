@@ -9,6 +9,8 @@ export interface TipEmailData {
   employeeName: string;
   employeeEmail: string;
   restaurantName: string;
+  slug?: string | null;
+  logoUrl?: string | null;
   entryDate: string;
   shifts: string[];
   hours: number;
@@ -19,7 +21,8 @@ export interface TipEmailData {
 
 export async function sendTipEmail(data: TipEmailData): Promise<void> {
   const subject = `Your tips for ${data.entryDate} — ${data.restaurantName}`;
-  const loginUrl = `${APP_URL}/login?email=${encodeURIComponent(data.employeeEmail)}`;
+  const loginPath = data.slug ? `/${data.slug}/login` : '/login';
+  const loginUrl = `${APP_URL}${loginPath}?email=${encodeURIComponent(data.employeeEmail)}`;
   const body = buildEmailBody(data, loginUrl);
 
   await ses.send(new SendEmailCommand({
@@ -38,7 +41,8 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
-  <h2 style="color: #1976d2;">${d.restaurantName}</h2>
+  ${d.logoUrl ? `<img src="${d.logoUrl}" alt="${d.restaurantName}" style="max-height:56px; margin-bottom:8px;" />` : ''}
+  <h2 style="color: #1976d2; margin-top:0;">${d.restaurantName}</h2>
   <p>Hi ${d.employeeName},</p>
   <p>Here's your tip summary for <strong>${d.entryDate}</strong>:</p>
   <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
@@ -69,22 +73,25 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
     </a>
   </div>
   <p style="color:#888; font-size:12px;">This is an automated message from your tip management system. Sign in with your work email to view your last 90 days of tips.</p>
+  <p style="color:#bbb; font-size:11px;">Powered by Gratify</p>
 </body>
 </html>`;
 }
 
-export async function sendMagicLinkEmail(employeeName: string, employeeEmail: string, token: string): Promise<void> {
-  const link = `${APP_URL}/auth/verify?token=${token}`;
+export async function sendMagicLinkEmail(employeeName: string, employeeEmail: string, token: string, slug?: string | null, venueName?: string, logoUrl?: string | null): Promise<void> {
+  const link = `${APP_URL}${slug ? `/${slug}` : ''}/auth/verify?token=${token}`;
   await ses.send(new SendEmailCommand({
     Source: `${FROM_NAME} <${FROM_EMAIL}>`,
     Destination: { ToAddresses: [employeeEmail] },
     Message: {
-      Subject: { Data: 'Your sign-in link' },
+      Subject: { Data: venueName ? `Your sign-in link — ${venueName}` : 'Your sign-in link' },
       Body: {
         Html: { Data: `
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
+  ${logoUrl ? `<img src="${logoUrl}" alt="${venueName ?? ''}" style="max-height:56px; margin-bottom:8px;" />` : ''}
+  ${venueName ? `<h2 style="color:#1976d2; margin-top:0;">${venueName}</h2>` : ''}
   <p>Hi ${employeeName},</p>
   <p>Click the button below to sign in and view your tip history. This link expires in <strong>15 minutes</strong> and can only be used once.</p>
   <div style="margin: 24px 0;">
@@ -93,6 +100,7 @@ export async function sendMagicLinkEmail(employeeName: string, employeeEmail: st
     </a>
   </div>
   <p style="color:#888; font-size:12px;">If you didn't request this, you can ignore this email.</p>
+  <p style="color:#bbb; font-size:11px;">Powered by Gratify</p>
 </body>
 </html>` },
         Text: { Data: `Hi ${employeeName},\n\nUse this link to sign in (expires in 15 minutes):\n${link}\n\nIf you didn't request this, ignore this email.` },

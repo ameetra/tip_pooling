@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 import api from '../api/client';
 
 export default function VerifyPage() {
   const [params] = useSearchParams();
   const { login } = useAuth();
+  const { slug } = useTenant();
   const navigate = useNavigate();
   const [error, setError] = useState('');
 
@@ -18,7 +20,7 @@ export default function VerifyPage() {
       .then((data: any) => {
         login(data.jwt);
         const payload = JSON.parse(atob(data.jwt.split('.')[1]));
-        const dest = ['ADMIN', 'MANAGER'].includes(payload?.role) ? '/tips' : '/my-tips';
+        const dest = ['ADMIN', 'MANAGER'].includes(payload?.role) ? `/${slug}/tips` : `/${slug}/my-tips`;
         navigate(dest, { replace: true });
       })
       .catch((err: any) => setError(err.message || 'Verification failed. The link may have expired.'));

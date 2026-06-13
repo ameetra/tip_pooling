@@ -8,9 +8,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useTipEntries, useDeleteTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useTenant } from '../context/TenantContext';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
+  const { slug } = useTenant();
   const { data: entries = [], isLoading } = useTipEntries();
   const deleteMut = useDeleteTipEntry();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function TipEntriesPage() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5">Tip Entries</Typography>
-        <Button variant="contained" onClick={() => navigate('/tips/new')}>New Tip Entry</Button>
+        <Button variant="contained" onClick={() => navigate(`/${slug}/tips/new`)}>New Tip Entry</Button>
       </Box>
 
       <TableContainer component={Paper}>
@@ -45,7 +47,7 @@ export default function TipEntriesPage() {
           </TableHead>
           <TableBody>
             {entries.map((entry) => (
-              <TableRow key={entry.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/tips/${entry.id}`)}>
+              <TableRow key={entry.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/${slug}/tips/${entry.id}`)}>
                 <TableCell>{entry.entryDate}</TableCell>
                 <TableCell>${entry.startingDrawer.toFixed(2)}</TableCell>
                 <TableCell>${entry.closingDrawer.toFixed(2)}</TableCell>
@@ -57,7 +59,7 @@ export default function TipEntriesPage() {
                     : <Chip label="Draft" size="small" />}
                 </TableCell>
                 <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                  <IconButton size="small" onClick={() => navigate(`/tips/${entry.id}`)}><VisibilityIcon /></IconButton>
+                  <IconButton size="small" onClick={() => navigate(`/${slug}/tips/${entry.id}`)}><VisibilityIcon /></IconButton>
                   <IconButton size="small" onClick={() => setDeleteId(entry.id)}><DeleteIcon /></IconButton>
                 </TableCell>
               </TableRow>

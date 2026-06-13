@@ -12,6 +12,7 @@ import { useEmployees } from '../api/employees';
 import { useShifts } from '../api/shifts';
 import { useTipPreview, useCreateTipEntry } from '../api/tips';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 import type { EmployeeRole, TipEntryInput, TipCalculationResult, Shift } from '../types';
 
 interface EmployeeRow {
@@ -26,6 +27,7 @@ const today = new Date().toISOString().slice(0, 10);
 export default function TipEntryFormPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { slug } = useTenant();
   const isShiftLead = user?.role === 'SHIFT_LEAD';
   const { data: employees = [] } = useEmployees();
   const { data: shifts = [] } = useShifts();
@@ -99,7 +101,7 @@ export default function TipEntryFormPage() {
         resetForm();
         setSuccess(`Entry saved for ${input.entryDate}.`);
       } else {
-        navigate(`/tips/${result.id}`);
+        navigate(`/${slug}/tips/${result.id}`);
       }
     } catch (e: any) { setError(e.message); }
   };

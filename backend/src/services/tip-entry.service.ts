@@ -132,7 +132,11 @@ export const tipEntryService = {
     return { ...tipEntry, cashTips, totalTipPool, results };
   },
 
-  async publish(tenantId: string, id: string, restaurantName: string, performedBy?: { userId: string; email: string }) {
+  async publish(tenantId: string, id: string, performedBy?: { userId: string; email: string }) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const restaurantName = tenant?.name ?? 'Demo Restaurant';
+    const slug = (tenant as any)?.slug ?? null;
+    const logoUrl = (tenant as any)?.logoUrl ?? null;
     const entry = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
       include: {
@@ -156,6 +160,8 @@ export const tipEntryService = {
           employeeName: calc.employee.name,
           employeeEmail: calc.employee.email,
           restaurantName,
+          slug,
+          logoUrl,
           entryDate: entry.entryDate,
           shifts: calc.shiftAssignments.map((sa) => sa.shift.name),
           hours: calc.totalHours,

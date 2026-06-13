@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   MANAGER
   SHIFT_LEAD
@@ -32,6 +33,8 @@ model User {
 model Tenant {
   id        String   @id @default(cuid())
   name      String
+  slug      String?  @unique
+  logoUrl   String?
   address   String?
   timezone  String   @default("America/Los_Angeles")
   createdAt DateTime @default(now())
@@ -185,6 +188,7 @@ model AuditLog {
 model MagicLinkToken {
   id        String    @id @default(cuid())
   email     String
+  tenantId  String?
   token     String    @unique
   expiresAt DateTime
   isUsed    Boolean   @default(false)

@@ -9,6 +9,8 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
+import VenueBrand from './VenueBrand';
 
 const DRAWER_WIDTH = 220;
 
@@ -28,13 +30,15 @@ export default function Layout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { logout, user } = useAuth();
+  const { slug } = useTenant();
   const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : managerNavItems;
+  const to = (path: string) => `/${slug}${path}`;
 
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Typography variant="h6" noWrap>Tip Pooling</Typography>
+          <VenueBrand variant="header" />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {user && (
               <>
@@ -45,7 +49,7 @@ export default function Layout() {
               </>
             )}
             <Tooltip title="Sign out">
-              <IconButton color="inherit" onClick={() => { logout(); navigate('/manager-login'); }}>
+              <IconButton color="inherit" onClick={() => { logout(); navigate(`/${slug}/manager-login`); }}>
                 <LogoutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -60,7 +64,7 @@ export default function Layout() {
         <Toolbar />
         <List>
           {navItems.map((item) => (
-            <ListItemButton key={item.path} selected={pathname.startsWith(item.path)} onClick={() => navigate(item.path)}>
+            <ListItemButton key={item.path} selected={pathname.startsWith(to(item.path))} onClick={() => navigate(to(item.path))}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
             </ListItemButton>

@@ -28,6 +28,8 @@ beforeAll(async () => {
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      slug TEXT UNIQUE,
+      logoUrl TEXT,
       address TEXT,
       timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -158,6 +160,7 @@ beforeAll(async () => {
     CREATE TABLE IF NOT EXISTS magic_link_tokens (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL,
+      tenantId TEXT,
       token TEXT NOT NULL UNIQUE,
       expiresAt DATETIME NOT NULL,
       isUsed INTEGER NOT NULL DEFAULT 0,
@@ -191,7 +194,7 @@ beforeEach(async () => {
 
   // Create test tenant
   await testPrisma.tenant.create({
-    data: { id: 'test-tenant', name: 'Test Restaurant', timezone: 'America/Los_Angeles' },
+    data: { id: 'test-tenant', name: 'Test Restaurant', slug: 'test', timezone: 'America/Los_Angeles' },
   });
 });
 

@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { Alert, Box, Button, Link, Paper, TextField, Typography } from '@mui/material';
 import { post } from '../api/client';
+import { useTenant } from '../context/TenantContext';
+import VenueBrand from '../components/VenueBrand';
 
 export default function EmployeeLoginPage() {
   const [params] = useSearchParams();
   const prefillEmail = params.get('email') ?? '';
+  const { slug } = useTenant();
 
   const [email, setEmail] = useState(prefillEmail);
   const [loading, setLoading] = useState(false);
@@ -17,7 +20,7 @@ export default function EmployeeLoginPage() {
     setLoading(true);
     setError('');
     try {
-      await post('/auth/magic-link', { email });
+      await post('/auth/magic-link', { email, slug });
       setSent(true);
     } catch (err: any) {
       setError(err.message || 'Could not send sign-in link. Check your email address.');
@@ -29,6 +32,7 @@ export default function EmployeeLoginPage() {
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.50' }}>
       <Paper sx={{ p: 4, width: '100%', maxWidth: 420 }} elevation={2}>
+        <VenueBrand />
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Welcome</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           Sign in to view your tip history. We'll send a one-time link to your work email.
@@ -59,7 +63,7 @@ export default function EmployeeLoginPage() {
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
           Manager or shift lead?{' '}
-          <Link component={RouterLink} to="/manager-login" underline="hover">Sign in here</Link>
+          <Link component={RouterLink} to={`/${slug}/manager-login`} underline="hover">Sign in here</Link>
         </Typography>
       </Paper>
     </Box>

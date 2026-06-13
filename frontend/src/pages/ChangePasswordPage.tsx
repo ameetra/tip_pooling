@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Link, Paper, TextField, Typography } from '@mui/material';
 import { post } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
   const { login, logout } = useAuth();
+  const { slug } = useTenant();
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -22,7 +24,7 @@ export default function ChangePasswordPage() {
     try {
       const { jwt } = await post<{ jwt: string }>('/auth/change-password', { newPassword: password });
       login(jwt);
-      navigate('/');
+      navigate(`/${slug}`);
     } catch (err: any) {
       setError(err.message || 'Could not change password.');
     } finally {
@@ -48,7 +50,7 @@ export default function ChangePasswordPage() {
         </form>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          <Link component="button" type="button" onClick={() => { logout(); navigate('/manager-login'); }} underline="hover">Sign out</Link>
+          <Link component="button" type="button" onClick={() => { logout(); navigate(`/${slug}/manager-login`); }} underline="hover">Sign out</Link>
         </Typography>
       </Paper>
     </Box>

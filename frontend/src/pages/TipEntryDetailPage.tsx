@@ -8,10 +8,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SendIcon from '@mui/icons-material/Send';
 import { useTipEntry, useDeleteTipEntry, usePublishTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useTenant } from '../context/TenantContext';
 
 export default function TipEntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { slug } = useTenant();
   const { data: entry, isLoading } = useTipEntry(id!);
   const deleteMut = useDeleteTipEntry();
   const publishMut = usePublishTipEntry();
@@ -21,7 +23,7 @@ export default function TipEntryDetailPage() {
 
   const handleDelete = async () => {
     await deleteMut.mutateAsync(id!);
-    navigate('/tips');
+    navigate(`/${slug}/tips`);
   };
 
   const handlePublish = async () => {
@@ -39,7 +41,7 @@ export default function TipEntryDetailPage() {
 
   return (
     <Box>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/tips')} sx={{ mb: 2 }}>Back to Entries</Button>
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(`/${slug}/tips`)} sx={{ mb: 2 }}>Back to Entries</Button>
 
       {publishResult && (
         <Alert severity={publishResult.emailsFailed > 0 ? 'warning' : 'success'} sx={{ mb: 2 }} onClose={() => setPublishResult(null)}>

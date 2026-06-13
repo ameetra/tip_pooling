@@ -1,16 +1,40 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import prisma from './client';
+import { createTenant } from '../services/tenant.service';
+
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+// Seed one venue: tenant + admin (via shared service) + shifts, support config, employees.
+async function seedVenue(v: { slug: string; name: string; adminEmail: string; adminPassword: string; employees: { name: string; email: string; role: string; rate: number }[] }) {
+  const { id } = await createTenant({
+    slug: v.slug, name: v.name, adminEmail: v.adminEmail, adminPassword: v.adminPassword,
+    logoUrl: `${APP_URL}/logos/${v.slug}.png`,
+  });
+  for (const name of ['Morning', 'Evening']) {
+    await prisma.shift.upsert({ where: { tenantId_name: { tenantId: id, name } }, update: {}, create: { tenantId: id, name } });
+  }
+  for (const emp of v.employees) {
+    await prisma.employee.upsert({
+      where: { tenantId_email: { tenantId: id, email: emp.email } }, update: {},
+      create: { tenantId: id, name: emp.name, email: emp.email, role: emp.role, hourlyRate: emp.rate },
+    });
+  }
+  const cfg = await prisma.supportStaffConfig.count({ where: { tenantId: id } });
+  if (cfg === 0) await prisma.supportStaffConfig.create({ data: { tenantId: id, role: 'BUSSER', percentage: 20 } });
+  return v.slug;
+}
 
 async function seed() {
   console.log('Seeding database...');
 
   const tenant = await prisma.tenant.upsert({
     where: { id: 'default-tenant' },
-    update: {},
+    update: { slug: 'demo' },
     create: {
       id: 'default-tenant',
       name: 'Demo Restaurant',
+      slug: 'demo',
       address: '123 Main St, Anytown, USA',
       timezone: 'America/Los_Angeles',
     },
@@ -98,10 +122,29 @@ async function seed() {
     }),
   ]);
 
+  // Three SaaS venues — path-based (/pieces, /protagonist, /antagonist).
+  // The two cafés share one admin login (cafe-admin@demo.com) that exists in both tenants.
+  const venues = await Promise.all([
+    seedVenue({ slug: 'pieces', name: 'Pieces', adminEmail: 'pieces-admin@demo.com', adminPassword: 'pieces123', employees: [
+      { name: 'Pat', email: 'pat@pieces.com', role: 'SERVER', rate: 16 },
+      { name: 'Quinn', email: 'quinn@pieces.com', role: 'SERVER', rate: 16 },
+      { name: 'Riley', email: 'riley@pieces.com', role: 'BUSSER', rate: 13 },
+    ]}),
+    seedVenue({ slug: 'protagonist', name: 'Protagonist Cafe', adminEmail: 'cafe-admin@demo.com', adminPassword: 'cafe1234', employees: [
+      { name: 'Sam', email: 'sam@protagonist.com', role: 'SERVER', rate: 15 },
+      { name: 'Taylor', email: 'taylor@protagonist.com', role: 'BUSSER', rate: 12 },
+    ]}),
+    seedVenue({ slug: 'antagonist', name: 'Antagonist Cafe', adminEmail: 'cafe-admin@demo.com', adminPassword: 'cafe1234', employees: [
+      { name: 'Uma', email: 'uma@antagonist.com', role: 'SERVER', rate: 15 },
+      { name: 'Vic', email: 'vic@antagonist.com', role: 'EXPEDITOR', rate: 14 },
+    ]}),
+  ]);
+
   console.log('Seed complete:', {
     tenant: tenant.name,
     shifts: [morning.name, evening.name],
     users: ['admin@demo.com', 'manager@demo.com', supportEmail],
+    venues,
   });
 
   await prisma.$disconnect();

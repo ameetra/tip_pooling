@@ -77,9 +77,9 @@ async function checkRateLimit(email: string, ipAddress: string | undefined) {
   }
 }
 
-export async function requestMagicLink(email: string, ipAddress?: string) {
+export async function requestMagicLink(email: string, tenant: { id: string; slug: string | null; name: string; logoUrl: string | null }, ipAddress?: string) {
   const employee = await (prisma as any).employee.findFirst({
-    where: { email: email.toLowerCase(), isActive: true },
+    where: { email: email.toLowerCase(), tenantId: tenant.id, isActive: true },
   });
   if (!employee) throw Object.assign(new Error('No active employee found with that email.'), { code: 'EMPLOYEE_NOT_FOUND' });
 
@@ -89,10 +89,10 @@ export async function requestMagicLink(email: string, ipAddress?: string) {
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
   await (prisma as any).magicLinkToken.create({
-    data: { email: email.toLowerCase(), token, expiresAt, ipAddress: ipAddress ?? null },
+    data: { email: email.toLowerCase(), tenantId: tenant.id, token, expiresAt, ipAddress: ipAddress ?? null },
   });
 
-  await sendMagicLinkEmail(employee.name, employee.email, token);
+  await sendMagicLinkEmail(employee.name, employee.email, token, tenant.slug, tenant.name, tenant.logoUrl);
 }
 
 export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
@@ -108,7 +108,7 @@ export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
   });
 
   const employee = await (prisma as any).employee.findFirst({
-    where: { email: record.email, isActive: true },
+    where: { email: record.email, ...(record.tenantId ? { tenantId: record.tenantId } : {}), isActive: true },
   });
   if (!employee) throw Object.assign(new Error('Employee account no longer active.'), { code: 'EMPLOYEE_NOT_FOUND' });
 

@@ -3,8 +3,6 @@ import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { TipEntryQuerySchema } from '../validation/tip.schema';
 
-const RESTAURANT_NAME = process.env.RESTAURANT_NAME || 'Demo Restaurant';
-
 function performer(req: Request) {
   const u = (req as any).user;
   return u ? { userId: u.sub, email: u.email } : undefined;
@@ -29,7 +27,7 @@ export const tipController = {
   async publish(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const result = await tipEntryService.publish(req.tenantId, id, RESTAURANT_NAME, performer(req));
+      const result = await tipEntryService.publish(req.tenantId, id, performer(req));
       if (!result) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
@@ -91,7 +89,8 @@ export const tipController = {
         effectiveHourlyRate: c.effectiveHourlyRate,
       }));
 
-      res.json({ success: true, data: { restaurantName: RESTAURANT_NAME, records } });
+      const tenant = await (prisma as any).tenant.findUnique({ where: { id: req.tenantId }, select: { name: true } });
+      res.json({ success: true, data: { restaurantName: tenant?.name ?? 'Demo Restaurant', records } });
     } catch (err) { next(err); }
   },
 

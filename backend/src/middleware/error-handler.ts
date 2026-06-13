@@ -32,6 +32,12 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  if ((err as any).code === 'TENANT_NOT_FOUND') {
+    response.error = { code: 'TENANT_NOT_FOUND', message: err.message };
+    res.status(404).json(response);
+    return;
+  }
+
   // Prisma unique constraint violation
   if (err.constructor?.name === 'PrismaClientKnownRequestError' && (err as any).code === 'P2002') {
     response.error = { code: 'DUPLICATE_ENTRY', message: 'A record with this value already exists' };
