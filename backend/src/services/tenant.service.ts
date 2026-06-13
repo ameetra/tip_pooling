@@ -34,13 +34,8 @@ export interface CreateTenantInput {
   adminPassword: string;
 }
 
-/**
- * Provision a venue: upsert the tenant by slug and its first ADMIN.
- * Reused by the `provision` Lambda action (M14) and the super-admin console (M15).
- * Admin is flagged mustChangePassword=true so the temp password is one-time (M13).
- */
-export async function createTenant(input: CreateTenantInput) {
-  const tenant = await (prisma as any).tenant.upsert({
+export async function upsertTenant(input: { slug: string; name: string; logoUrl?: string | null; timezone?: string }) {
+  return (prisma as any).tenant.upsert({
     where: { slug: input.slug },
     update: { name: input.name, logoUrl: input.logoUrl ?? null },
     create: {
@@ -50,19 +45,24 @@ export async function createTenant(input: CreateTenantInput) {
       timezone: input.timezone ?? 'America/Los_Angeles',
     },
   });
+}
 
-  const passwordHash = await bcrypt.hash(input.adminPassword, 10);
+/** Upsert an ADMIN for a venue. mustChangePassword=true → the temp password is one-time (M13). */
+export async function upsertVenueAdmin(tenantId: string, email: string, password: string) {
+  const passwordHash = await bcrypt.hash(password, 10);
   await (prisma as any).user.upsert({
-    where: { tenantId_email: { tenantId: tenant.id, email: input.adminEmail.toLowerCase() } },
+    where: { tenantId_email: { tenantId, email: email.toLowerCase() } },
     update: { passwordHash, role: 'ADMIN', isActive: true, mustChangePassword: true },
-    create: {
-      tenantId: tenant.id,
-      email: input.adminEmail.toLowerCase(),
-      passwordHash,
-      role: 'ADMIN',
-      mustChangePassword: true,
-    },
+    create: { tenantId, email: email.toLowerCase(), passwordHash, role: 'ADMIN', mustChangePassword: true },
   });
+}
 
+/**
+ * Provision a venue with its first ADMIN. Reused by the `provision` Lambda action (M14)
+ * and the super-admin console (M15).
+ */
+export async function createTenant(input: CreateTenantInput) {
+  const tenant = await upsertTenant(input);
+  await upsertVenueAdmin(tenant.id, input.adminEmail, input.adminPassword);
   return { id: tenant.id, slug: tenant.slug, name: tenant.name };
 }

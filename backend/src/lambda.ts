@@ -80,13 +80,21 @@ async function runMigrations() {
 }
 
 async function runProvision(venues: any[]) {
-  const { createTenant } = require('./services/tenant.service');
+  const { upsertTenant, upsertVenueAdmin } = require('./services/tenant.service');
   const results = [];
   for (const v of venues) {
-    if (!v.slug || !v.name || !v.adminEmail || !v.adminPassword) {
-      return { success: false, error: `Each venue needs slug, name, adminEmail, adminPassword (got ${JSON.stringify(v)})` };
+    const admins = v.admins ?? (v.adminEmail ? [{ email: v.adminEmail, password: v.adminPassword }] : []);
+    if (!v.slug || !v.name || admins.length === 0) {
+      return { success: false, error: `Each venue needs slug, name, and at least one admin (got ${JSON.stringify(v)})` };
     }
-    results.push(await createTenant(v));
+    const tenant = await upsertTenant(v);
+    for (const a of admins) {
+      if (!a.email || !a.password || a.password.length < 8) {
+        return { success: false, error: `Admin needs email + password >=8 chars (venue ${v.slug})` };
+      }
+      await upsertVenueAdmin(tenant.id, a.email, a.password);
+    }
+    results.push({ slug: tenant.slug, name: tenant.name, admins: admins.map((a: any) => a.email) });
   }
   return { success: true, provisioned: results };
 }
