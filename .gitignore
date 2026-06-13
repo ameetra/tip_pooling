@@ -81,3 +81,12 @@ temp/
 # Secrets — never commit
 CREDENTIALS.local.md
 *.local.md
+
+# Tenant staging data may contain employee PII — keep logos (images), ignore data files
+tenants/**/*.csv
+tenants/**/*.tsv
+tenants/**/*.xlsx
+tenants/**/*.xls
+tenants/**/*.json
+tenants/**/*.txt
+tenants/**/*.pdf
