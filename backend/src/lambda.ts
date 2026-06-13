@@ -72,6 +72,8 @@ async function runMigrations() {
       ALTER TABLE "magic_link_tokens" ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
       -- Keep the legacy single-tenant reachable at /demo after path-based routing ships
       UPDATE "tenants" SET "slug" = 'demo' WHERE "id" = 'default-tenant' AND "slug" IS NULL;
+      -- Backfill logo URLs onto the custom domain (one-time; no-op once rewritten)
+      UPDATE "tenants" SET "logoUrl" = replace("logoUrl", 'https://d3vrbd8qbym3pv.cloudfront.net', 'https://usegratify.com') WHERE "logoUrl" LIKE 'https://d3vrbd8qbym3pv.cloudfront.net%';
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
