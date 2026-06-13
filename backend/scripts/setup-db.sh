@@ -5,15 +5,16 @@ cd "$(dirname "$0")/.."
 
 PROFILE="tip-pooling"
 FUNCTION_NAME="tip-pooling-dev-api"
-SECRET_ARN="arn:aws:secretsmanager:us-east-1:REDACTED-ACCOUNT:secret:REDACTED-SECRET"
-RDS_ENDPOINT="REDACTED-RDS-ENDPOINT"
+# Reference the secret by name (account-agnostic; no ARN/account id hardcoded)
+SECRET_ID="tip-pooling-dev/db-master-password"
+RDS_ENDPOINT="${RDS_ENDPOINT:?set RDS_ENDPOINT to your RDS instance endpoint}"
 
 echo "=== Setting up PostgreSQL database ==="
 
 # Fetch credentials from Secrets Manager
 echo "Fetching credentials from Secrets Manager..."
 SECRET_JSON=$(aws secretsmanager get-secret-value \
-  --secret-id "$SECRET_ARN" \
+  --secret-id "$SECRET_ID" \
   --profile "$PROFILE" \
   --query SecretString \
   --output text)
