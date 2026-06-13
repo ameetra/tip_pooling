@@ -70,6 +70,8 @@ async function runMigrations() {
       ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;
       CREATE UNIQUE INDEX IF NOT EXISTS "tenants_slug_key" ON "tenants"("slug");
       ALTER TABLE "magic_link_tokens" ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
+      -- Keep the legacy single-tenant reachable at /demo after path-based routing ships
+      UPDATE "tenants" SET "slug" = 'demo' WHERE "id" = 'default-tenant' AND "slug" IS NULL;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
