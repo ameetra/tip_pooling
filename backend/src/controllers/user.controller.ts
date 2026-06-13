@@ -32,7 +32,7 @@ export const userController = {
 
       const passwordHash = await bcrypt.hash(password, 10);
       const user = await (prisma as any).user.create({
-        data: { tenantId: req.tenantId, email, passwordHash, role },
+        data: { tenantId: req.tenantId, email, passwordHash, role, mustChangePassword: true },
         select: { id: true, email: true, role: true, createdAt: true },
       });
       res.status(201).json({ success: true, data: user });
@@ -68,7 +68,7 @@ export const userController = {
         return;
       }
       const passwordHash = await bcrypt.hash(password, 10);
-      await (prisma as any).user.update({ where: { id }, data: { passwordHash } });
+      await (prisma as any).user.update({ where: { id }, data: { passwordHash, mustChangePassword: true } });
       res.json({ success: true });
     } catch (err) { next(err); }
   },

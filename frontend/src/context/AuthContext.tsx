@@ -6,6 +6,7 @@ interface JwtPayload {
   tenantId: string;
   role: string;
   email: string;
+  mustChangePassword?: boolean;
   exp: number;
 }
 

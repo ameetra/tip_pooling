@@ -15,6 +15,11 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
     const payload = verifyJwtToken(header.slice(7));
     req.user = payload;
     req.tenantId = payload.tenantId;
+    // Force password change: block every route except the change-password endpoint
+    if (payload.mustChangePassword && !req.originalUrl.startsWith('/api/v1/auth/change-password')) {
+      res.status(403).json({ success: false, error: { code: 'PASSWORD_CHANGE_REQUIRED', message: 'You must set a new password before continuing.' } });
+      return;
+    }
     next();
   } catch {
     res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token.' } });

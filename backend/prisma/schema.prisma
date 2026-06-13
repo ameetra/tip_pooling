@@ -20,6 +20,7 @@ model User {
   passwordHash String
   role         UserRole
   isActive     Boolean  @default(true)
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

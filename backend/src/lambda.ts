@@ -62,6 +62,8 @@ async function runMigrations() {
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP;
 
       ALTER TABLE "users" ALTER COLUMN "role" TYPE TEXT;
+
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN NOT NULL DEFAULT false;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {

@@ -14,13 +14,14 @@ export interface JwtPayload {
   tenantId: string;
   role: string;
   email: string;
+  mustChangePassword?: boolean;
 }
 
 function signJwt(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET!, { expiresIn: '8h' });
 }
 
-export async function loginUser(email: string, password: string, tenantId: string, ipAddress?: string): Promise<{ jwt: string }> {
+export async function loginUser(email: string, password: string, tenantId: string, ipAddress?: string): Promise<{ jwt: string; mustChangePassword: boolean }> {
   const user = await (prisma as any).user.findFirst({
     where: { email: email.toLowerCase(), tenantId, isActive: true },
   });
@@ -41,7 +42,23 @@ export async function loginUser(email: string, password: string, tenantId: strin
 
   auditService.log({ tenantId, entityType: 'USER', entityId: user.id, action: 'LOGIN', newValues: { email: user.email, role: user.role, ip: ipAddress } }).catch(() => {});
 
-  return { jwt: signJwt({ sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email }) };
+  const mustChangePassword = !!user.mustChangePassword;
+  return {
+    jwt: signJwt({ sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email, mustChangePassword }),
+    mustChangePassword,
+  };
+}
+
+export async function changePassword(userId: string, tenantId: string, newPassword: string): Promise<{ jwt: string }> {
+  const user = await (prisma as any).user.findFirst({ where: { id: userId, tenantId, isActive: true } });
+  if (!user) throw Object.assign(new Error('User not found.'), { code: 'USER_NOT_FOUND' });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await (prisma as any).user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false } });
+
+  auditService.log({ tenantId, entityType: 'USER', entityId: userId, action: 'PASSWORD_CHANGED', newValues: { email: user.email } }).catch(() => {});
+
+  return { jwt: signJwt({ sub: user.id, tenantId: user.tenantId, role: user.role, email: user.email, mustChangePassword: false }) };
 }
 
 async function checkRateLimit(email: string, ipAddress: string | undefined) {

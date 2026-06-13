@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import EmployeeLayout from './components/EmployeeLayout';
 import EmployeeLoginPage from './pages/EmployeeLoginPage';
 import ManagerLoginPage from './pages/ManagerLoginPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import VerifyPage from './pages/VerifyPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ShiftsPage from './pages/ShiftsPage';
@@ -17,8 +18,16 @@ import UsersPage from './pages/UsersPage';
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'SHIFT_LEAD'];
 
 function RequireAuth({ children, loginPath = '/login' }: { children: React.ReactNode; loginPath?: string }) {
+  const { token, user } = useAuth();
+  if (!token) return <Navigate to={loginPath} replace />;
+  if (user?.mustChangePassword) return <Navigate to="/change-password" replace />;
+  return <>{children}</>;
+}
+
+// Auth required, but allowed regardless of mustChangePassword (avoids redirect loop on the change-password page itself)
+function RequireToken({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
-  return token ? <>{children}</> : <Navigate to={loginPath} replace />;
+  return token ? <>{children}</> : <Navigate to="/manager-login" replace />;
 }
 
 function RoleRouter() {
@@ -34,6 +43,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<EmployeeLoginPage />} />
       <Route path="/manager-login" element={<ManagerLoginPage />} />
+      <Route path="/change-password" element={<RequireToken><ChangePasswordPage /></RequireToken>} />
       <Route path="/auth/verify" element={<VerifyPage />} />
 
       {/* Employee-only routes */}
