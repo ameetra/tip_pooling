@@ -19,7 +19,9 @@ import { shiftController } from './controllers/shift.controller';
 import { validateBody } from './middleware/validate';
 import { TipPreviewSchema, CreateTipEntrySchema } from './validation/tip.schema';
 
-const FRONTEND_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
+const FRONTEND_URL = process.env.APP_URL || 'https://usegratify.com';
+// Allow the primary domain plus the legacy CloudFront URL (transition / fallback).
+const ALLOWED_ORIGINS = [...new Set([FRONTEND_URL, 'https://usegratify.com', 'https://d3vrbd8qbym3pv.cloudfront.net'])];
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -33,7 +35,7 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+  app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   app.use(tenantContext);
 
