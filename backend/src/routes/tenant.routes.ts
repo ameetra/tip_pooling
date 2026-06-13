@@ -1,15 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { getBranding, listBranding } from '../services/tenant.service';
+import { getBranding } from '../services/tenant.service';
 
 const router = Router();
 
-// Public — used by login pages and the root venue picker (pre-auth)
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    res.json({ success: true, data: await listBranding() });
-  } catch (err) { next(err); }
-});
-
+// Public, per-venue only — the login page fetches its own venue's branding by slug.
+// The all-venues list is intentionally NOT public (would leak the tenant list); it
+// returns as a super-admin endpoint in M15 via tenant.service.listBranding.
 router.get('/:slug/branding', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branding = await getBranding(req.params.slug as string);

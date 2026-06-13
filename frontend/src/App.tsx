@@ -8,7 +8,7 @@ import EmployeeLoginPage from './pages/EmployeeLoginPage';
 import ManagerLoginPage from './pages/ManagerLoginPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import VerifyPage from './pages/VerifyPage';
-import VenuePickerPage from './pages/VenuePickerPage';
+import LandingPage from './pages/LandingPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ShiftsPage from './pages/ShiftsPage';
 import SupportConfigPage from './pages/SupportConfigPage';
@@ -87,7 +87,7 @@ function VenueRoutes() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<VenuePickerPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/:venueSlug/*" element={<TenantProvider><VenueRoutes /></TenantProvider>} />
     </Routes>
   );
