@@ -83,9 +83,10 @@ CREDENTIALS.local.md
 *.local.md
 .claude/settings.local.json
 
-# Operator docs — keep local (contain operational/sensitive info), not in the public repo
+# Operator / planning docs — keep local (operational + internal info), not in the public repo
 SUPER_ADMIN_GUIDE.md
 RUNBOOK_ADD_TENANT.md
+IMPLEMENTATION_PLAN.md
 
 # Tenant staging data may contain employee PII — keep logos (images), ignore data files
 tenants/**/*.csv
