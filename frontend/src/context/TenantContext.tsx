@@ -19,8 +19,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setInfo({ slug: venueSlug, name: '', logoUrl: null, loading: true, notFound: false });
     get<{ slug: string; name: string; logoUrl: string | null }>(`/tenants/${venueSlug}/branding`)
-      .then((d) => setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, loading: false, notFound: false }))
-      .catch(() => setInfo({ slug: venueSlug, name: '', logoUrl: null, loading: false, notFound: true }));
+      .then((d) => {
+        setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, loading: false, notFound: false });
+        document.title = `${d.name} — Gratify`;
+      })
+      .catch(() => {
+        setInfo({ slug: venueSlug, name: '', logoUrl: null, loading: false, notFound: true });
+        document.title = 'Gratify';
+      });
   }, [venueSlug]);
 
   return <TenantContext.Provider value={info}>{children}</TenantContext.Provider>;
