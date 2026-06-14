@@ -1,9 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyJwtToken } from '../services/auth.service';
 
+// Auth bypass exists only for the local test runner. It is hard-disabled inside Lambda
+// (AWS runtime always sets AWS_LAMBDA_FUNCTION_NAME), so a stray NODE_ENV=test in a
+// deployed environment can NEVER disable authentication or RBAC.
+const TEST_BYPASS = process.env.NODE_ENV === 'test' && !process.env.AWS_LAMBDA_FUNCTION_NAME;
+
 export function verifyJWT(req: Request, res: Response, next: NextFunction) {
   // In test mode, tenantContext already set req.tenantId from DEFAULT_TENANT_ID
-  if (process.env.NODE_ENV === 'test') return next();
+  if (TEST_BYPASS) return next();
 
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
@@ -28,7 +33,7 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
 
 export function requireRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (process.env.NODE_ENV === 'test') return next();
+    if (TEST_BYPASS) return next();
     if (!req.user || !roles.includes(req.user.role)) {
       res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions.' } });
       return;

@@ -3,7 +3,11 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@usegratify.com';
 const FROM_NAME = process.env.FROM_NAME || 'Tip Pooling';
-const APP_URL = process.env.APP_URL || 'https://d3vrbd8qbym3pv.cloudfront.net';
+const APP_URL = process.env.APP_URL || 'https://usegratify.com';
+
+// Escape user-controlled values before interpolating into email HTML (employee/venue names, etc.)
+const esc = (s: unknown) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export interface TipEmailData {
   employeeName: string;
@@ -36,14 +40,16 @@ export async function sendTipEmail(data: TipEmailData): Promise<void> {
 }
 
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
-  const shifts = d.shifts.join(', ') || '—';
+  const shifts = esc(d.shifts.join(', ')) || '—';
+  const name = esc(d.restaurantName);
+  const employee = esc(d.employeeName);
   return `
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
-  ${d.logoUrl ? `<img src="${d.logoUrl}" alt="${d.restaurantName}" style="max-height:56px; margin-bottom:8px;" />` : ''}
-  <h2 style="color: #1976d2; margin-top:0;">${d.restaurantName}</h2>
-  <p>Hi ${d.employeeName},</p>
+  ${d.logoUrl ? `<img src="${esc(d.logoUrl)}" alt="${name}" style="max-height:56px; margin-bottom:8px;" />` : ''}
+  <h2 style="color: #1976d2; margin-top:0;">${name}</h2>
+  <p>Hi ${employee},</p>
   <p>Here's your tip summary for <strong>${d.entryDate}</strong>:</p>
   <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
     <tr style="background:#f5f5f5;">
@@ -90,9 +96,9 @@ export async function sendMagicLinkEmail(employeeName: string, employeeEmail: st
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; color: #333;">
-  ${logoUrl ? `<img src="${logoUrl}" alt="${venueName ?? ''}" style="max-height:56px; margin-bottom:8px;" />` : ''}
-  ${venueName ? `<h2 style="color:#1976d2; margin-top:0;">${venueName}</h2>` : ''}
-  <p>Hi ${employeeName},</p>
+  ${logoUrl ? `<img src="${esc(logoUrl)}" alt="${esc(venueName)}" style="max-height:56px; margin-bottom:8px;" />` : ''}
+  ${venueName ? `<h2 style="color:#1976d2; margin-top:0;">${esc(venueName)}</h2>` : ''}
+  <p>Hi ${esc(employeeName)},</p>
   <p>Click the button below to sign in and view your tip history. This link expires in <strong>15 minutes</strong> and can only be used once.</p>
   <div style="margin: 24px 0;">
     <a href="${link}" style="background:#1976d2; color:#fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: bold;">

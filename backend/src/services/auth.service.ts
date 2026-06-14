@@ -18,8 +18,11 @@ export interface JwtPayload {
 }
 
 function signJwt(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET!, { expiresIn: '8h' });
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: '8h', algorithm: 'HS256' });
 }
+
+// Magic-link tokens are stored hashed at rest; the raw token only ever lives in the emailed URL.
+const hashToken = (raw: string) => crypto.createHash('sha256').update(raw).digest('hex');
 
 export async function loginUser(email: string, password: string, tenantId: string, ipAddress?: string): Promise<{ jwt: string; mustChangePassword: boolean }> {
   const user = await (prisma as any).user.findFirst({
@@ -85,17 +88,18 @@ export async function requestMagicLink(email: string, tenant: { id: string; slug
 
   await checkRateLimit(email.toLowerCase(), ipAddress);
 
-  const token = crypto.randomBytes(32).toString('hex');
+  const rawToken = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
   await (prisma as any).magicLinkToken.create({
-    data: { email: email.toLowerCase(), tenantId: tenant.id, token, expiresAt, ipAddress: ipAddress ?? null },
+    data: { email: email.toLowerCase(), tenantId: tenant.id, token: hashToken(rawToken), expiresAt, ipAddress: ipAddress ?? null },
   });
 
-  await sendMagicLinkEmail(employee.name, employee.email, token, tenant.slug, tenant.name, tenant.logoUrl);
+  await sendMagicLinkEmail(employee.name, employee.email, rawToken, tenant.slug, tenant.name, tenant.logoUrl);
 }
 
-export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
+export async function verifyMagicLink(rawToken: string): Promise<{ jwt: string }> {
+  const token = hashToken(rawToken);
   const record = await (prisma as any).magicLinkToken.findUnique({ where: { token } });
 
   if (!record) throw Object.assign(new Error('Invalid or expired magic link.'), { code: 'INVALID_TOKEN' });
@@ -116,5 +120,5 @@ export async function verifyMagicLink(token: string): Promise<{ jwt: string }> {
 }
 
 export function verifyJwtToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET!) as JwtPayload;
+  return jwt.verify(token, JWT_SECRET!, { algorithms: ['HS256'] }) as JwtPayload;
 }

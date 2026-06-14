@@ -29,10 +29,15 @@ const loginLimiter = rateLimit({
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many login attempts. Try again in 15 minutes.' } },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false }, // we intentionally configure trust proxy below
 });
 
 export function createApp() {
   const app = express();
+
+  // Behind CloudFront + API Gateway: derive the client IP from X-Forwarded-For so rate
+  // limiting and audit logs key on the real client, not a shared proxy address.
+  app.set('trust proxy', true);
 
   app.use(helmet());
   app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));

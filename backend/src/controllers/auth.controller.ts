@@ -2,10 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { loginUser, requestMagicLink, verifyMagicLink, changePassword } from '../services/auth.service';
 import { getTenantBySlug } from '../services/tenant.service';
+import { StrongPasswordSchema } from '../validation/user.schema';
 
-const loginSchema = z.object({ email: z.string().email(), password: z.string().min(8).max(128), slug: z.string().optional() });
+const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1).max(128), slug: z.string().optional() });
 const magicLinkSchema = z.object({ email: z.string().email(), slug: z.string().optional() });
-const changePasswordSchema = z.object({ newPassword: z.string().min(8).max(128) });
+const changePasswordSchema = z.object({ newPassword: StrongPasswordSchema });
 
 const unknownVenue = () => Object.assign(new Error('Unknown establishment.'), { code: 'TENANT_NOT_FOUND' });
 
