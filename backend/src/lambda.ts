@@ -17,6 +17,7 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'migrate') return runMigrations();
     if (event.action === 'seed') return runSeed();
     if (event.action === 'provision' && Array.isArray(event.venues)) return runProvision(event.venues);
+    if (event.action === 'importEmployees' && event.tenantSlug && Array.isArray(event.employees)) return runImportEmployees(event.tenantSlug, event.employees);
     if (event.action === 'updatePasswordHash' && event.email && event.hash) {
       return updatePasswordHash(event.email, event.hash);
     }
@@ -99,6 +100,32 @@ async function runProvision(venues: any[]) {
     results.push({ slug: tenant.slug, name: tenant.name, admins: admins.map((a: any) => a.email) });
   }
   return { success: true, provisioned: results };
+}
+
+// Bulk-import employees into a tenant (idempotent: skips existing emails). Reusable for any venue.
+async function runImportEmployees(tenantSlug: string, employees: any[]) {
+  const { getTenantBySlug } = require('./services/tenant.service');
+  const { employeeService } = require('./services/employee.service');
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
+
+  const valid = ['SERVER', 'BUSSER', 'EXPEDITOR'];
+  let created = 0, skipped = 0;
+  const errors: string[] = [];
+  for (const e of employees) {
+    const name = String(e.name ?? '').trim();
+    const email = String(e.email ?? '').trim().toLowerCase();
+    const role = String(e.role ?? '').trim().toUpperCase();
+    const hourlyRate = Number(e.hourlyRate);
+    if (!name || !email || !valid.includes(role) || !(hourlyRate > 0)) {
+      errors.push(`invalid: ${JSON.stringify(e)}`); continue;
+    }
+    const existing = await prisma.employee.findFirst({ where: { tenantId: tenant.id, email } });
+    if (existing) { skipped++; continue; }
+    await employeeService.create(tenant.id, { name, email, role, hourlyRate });
+    created++;
+  }
+  return { success: true, tenant: tenant.slug, created, skipped, errors };
 }
 
 async function runSeed() {
