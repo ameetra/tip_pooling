@@ -35,9 +35,22 @@ export default function TipEntryDetailPage() {
   if (isLoading) return <Typography>Loading...</Typography>;
   if (!entry) return <Typography>Entry not found</Typography>;
 
-  const cashTips = entry.closingDrawer - entry.startingDrawer - entry.cashSales;
-  const totalPool = cashTips + entry.electronicTips;
+  const drawerOverage = entry.cashInRegister - entry.cashSales;
+  const cashTipsTotal = drawerOverage + entry.cashTips;
+  const totalPool = cashTipsTotal + entry.posTips;
   const fmt = (n: number) => `$${n.toFixed(2)}`;
+
+  // Aggregate per employee — one row per person (they may have multiple role stints).
+  const byEmployee = new Map<string, { name: string; roles: string[]; hours: number; tips: number; totalPay: number }>();
+  for (const c of entry.tipCalculations) {
+    const r = byEmployee.get(c.employeeId) ?? { name: c.employee.name, roles: [], hours: 0, tips: 0, totalPay: 0 };
+    if (!r.roles.includes(c.roleOnDay)) r.roles.push(c.roleOnDay);
+    r.hours += c.totalHours;
+    r.tips += c.finalTips;
+    r.totalPay += c.totalPay;
+    byEmployee.set(c.employeeId, r);
+  }
+  const rows = [...byEmployee.entries()].map(([id, r]) => ({ id, ...r, rate: r.hours > 0 ? r.totalPay / r.hours : 0 }));
 
   return (
     <Box>
@@ -59,11 +72,11 @@ export default function TipEntryDetailPage() {
               : <Chip label="Draft" />}
           </Box>
           <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
-            <Chip label={`Starting: ${fmt(entry.startingDrawer)}`} />
-            <Chip label={`Closing: ${fmt(entry.closingDrawer)}`} />
+            <Chip label={`Cash in Register: ${fmt(entry.cashInRegister)}`} />
             <Chip label={`Cash Sales: ${fmt(entry.cashSales)}`} />
-            <Chip label={`Cash Tips: ${fmt(cashTips)}`} color="info" />
-            <Chip label={`Electronic: ${fmt(entry.electronicTips)}`} />
+            <Chip label={`Cash Tips (jar): ${fmt(entry.cashTips)}`} />
+            <Chip label={`POS Tips: ${fmt(entry.posTips)}`} />
+            <Chip label={`Cash Tips Total: ${fmt(cashTipsTotal)}`} color="info" />
             <Chip label={`Total Pool: ${fmt(totalPool)}`} color="primary" />
           </Stack>
         </CardContent>
@@ -74,25 +87,20 @@ export default function TipEntryDetailPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Employee</TableCell><TableCell>Role</TableCell><TableCell>Shifts</TableCell>
-              <TableCell>Hours</TableCell><TableCell>Base Tips</TableCell><TableCell>Given</TableCell>
-              <TableCell>Received</TableCell><TableCell>Final Tips</TableCell><TableCell>Total Pay</TableCell>
-              <TableCell>Eff. Rate</TableCell>
+              <TableCell>Employee</TableCell><TableCell>Role(s)</TableCell>
+              <TableCell>Hours</TableCell><TableCell>Tips</TableCell>
+              <TableCell>Total Pay</TableCell><TableCell>$/hr</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {entry.tipCalculations.map((calc) => (
-              <TableRow key={calc.id}>
-                <TableCell>{calc.employee.name}</TableCell>
-                <TableCell>{calc.roleOnDay}</TableCell>
-                <TableCell>{calc.shiftAssignments.map((sa) => sa.shift.name).join(', ')}</TableCell>
-                <TableCell>{calc.totalHours}</TableCell>
-                <TableCell>{fmt(calc.baseTips)}</TableCell>
-                <TableCell>{fmt(calc.supportTipsGiven)}</TableCell>
-                <TableCell>{fmt(calc.supportTipsReceived)}</TableCell>
-                <TableCell><strong>{fmt(calc.finalTips)}</strong></TableCell>
-                <TableCell>{fmt(calc.totalPay)}</TableCell>
-                <TableCell>{fmt(calc.effectiveHourlyRate)}/hr</TableCell>
+            {rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell>{r.name}</TableCell>
+                <TableCell>{r.roles.join(', ')}</TableCell>
+                <TableCell>{Number(r.hours.toFixed(2))}</TableCell>
+                <TableCell><strong>{fmt(r.tips)}</strong></TableCell>
+                <TableCell>{fmt(r.totalPay)}</TableCell>
+                <TableCell>{fmt(r.rate)}/hr</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -111,7 +119,7 @@ export default function TipEntryDetailPage() {
       <ConfirmDialog
         open={confirmPublish}
         title="Publish & Send Emails"
-        message={`This will send tip summary emails to all ${entry.tipCalculations.length} employee(s) for ${entry.entryDate}. This cannot be undone.`}
+        message={`This will send tip summary emails to all ${rows.length} employee(s) for ${entry.entryDate}. This cannot be undone.`}
         onConfirm={handlePublish}
         onCancel={() => setConfirmPublish(false)}
         confirmLabel="Publish & Send"

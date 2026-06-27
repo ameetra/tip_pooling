@@ -27,19 +27,6 @@ async function main() {
     },
   });
   console.log('Tenant:', tenant.name);
-
-  await prisma.shift.upsert({
-    where: { tenantId_name: { tenantId: tenant.id, name: 'Lunch' } },
-    update: {},
-    create: { tenantId: tenant.id, name: 'Lunch' },
-  });
-  await prisma.shift.upsert({
-    where: { tenantId_name: { tenantId: tenant.id, name: 'Dinner' } },
-    update: {},
-    create: { tenantId: tenant.id, name: 'Dinner' },
-  });
-  console.log('Shifts: Lunch, Dinner');
-
   console.log('Seed complete!');
 }
 

@@ -116,40 +116,56 @@ describe('Employee API', () => {
     });
   });
 
-  describe('POST /api/v1/employees/:id/update-rate', () => {
-    it('should update rate and add history entry', async () => {
+  describe('POST /api/v1/employees/:id/role-rates', () => {
+    it('updates the rate and adds a history entry', async () => {
       const created = await request(app)
         .post('/api/v1/employees')
         .send({ name: 'Alice', email: 'alice@test.com', role: 'SERVER', hourlyRate: 15 });
 
       const res = await request(app)
-        .post(`/api/v1/employees/${created.body.data.id}/update-rate`)
-        .send({ hourlyRate: 20 });
+        .post(`/api/v1/employees/${created.body.data.id}/role-rates`)
+        .send({ rates: [{ role: 'SERVER', hourlyRate: 20 }] });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.hourlyRate).toBe(20);
+      expect(res.body.data.hourlyRate).toBe(20); // legacy rate synced to primary role
+      expect(res.body.data.roleRates.find((r: any) => r.role === 'SERVER').hourlyRate).toBe(20);
       expect(res.body.data.rateHistory).toHaveLength(2);
-      expect(res.body.data.rateHistory[0].hourlyRate).toBe(20);
-      expect(res.body.data.rateHistory[1].hourlyRate).toBe(15);
+      expect(res.body.data.rateHistory.some((h: any) => h.hourlyRate === 20)).toBe(true);
+      expect(res.body.data.rateHistory.some((h: any) => h.hourlyRate === 15)).toBe(true);
     });
 
-    it('should accept custom effectiveDate', async () => {
+    it('adds a rate for a second role', async () => {
+      const created = await request(app)
+        .post('/api/v1/employees')
+        .send({ name: 'Alice', email: 'alice@test.com', role: 'SERVER', hourlyRate: 15 });
+
+      const res = await request(app)
+        .post(`/api/v1/employees/${created.body.data.id}/role-rates`)
+        .send({ rates: [{ role: 'BUSSER', hourlyRate: 11 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.hourlyRate).toBe(15); // primary role unchanged
+      const roles = res.body.data.roleRates.map((r: any) => r.role).sort();
+      expect(roles).toEqual(['BUSSER', 'SERVER']);
+    });
+
+    it('accepts a custom effectiveDate', async () => {
       const created = await request(app)
         .post('/api/v1/employees')
         .send({ name: 'Bob', email: 'bob@test.com', role: 'SERVER', hourlyRate: 12 });
 
       const res = await request(app)
-        .post(`/api/v1/employees/${created.body.data.id}/update-rate`)
-        .send({ hourlyRate: 15, effectiveDate: '2026-05-01' });
+        .post(`/api/v1/employees/${created.body.data.id}/role-rates`)
+        .send({ rates: [{ role: 'SERVER', hourlyRate: 15 }], effectiveDate: '2030-05-01' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.rateHistory[0].effectiveDate).toBe('2026-05-01');
+      expect(res.body.data.rateHistory.some((h: any) => h.effectiveDate === '2030-05-01' && h.hourlyRate === 15)).toBe(true);
     });
 
-    it('should return 404 for unknown employee', async () => {
+    it('returns 404 for an unknown employee', async () => {
       const res = await request(app)
-        .post('/api/v1/employees/nonexistent/update-rate')
-        .send({ hourlyRate: 20 });
+        .post('/api/v1/employees/nonexistent/role-rates')
+        .send({ rates: [{ role: 'SERVER', hourlyRate: 20 }] });
 
       expect(res.status).toBe(404);
     });
@@ -162,8 +178,8 @@ describe('Employee API', () => {
         .send({ name: 'Alice', email: 'alice@test.com', role: 'SERVER', hourlyRate: 15 });
 
       await request(app)
-        .post(`/api/v1/employees/${created.body.data.id}/update-rate`)
-        .send({ hourlyRate: 18, effectiveDate: '2026-06-01' });
+        .post(`/api/v1/employees/${created.body.data.id}/role-rates`)
+        .send({ rates: [{ role: 'SERVER', hourlyRate: 18 }], effectiveDate: '2030-06-01' });
 
       const res = await request(app)
         .get(`/api/v1/employees/${created.body.data.id}/rate-history`);
@@ -200,8 +216,8 @@ describe('Employee API', () => {
 
       // Update rate
       await request(app)
-        .post(`/api/v1/employees/${id}/update-rate`)
-        .send({ hourlyRate: 18 });
+        .post(`/api/v1/employees/${id}/role-rates`)
+        .send({ rates: [{ role: 'SERVER', hourlyRate: 18 }] });
 
       // Update name
       await request(app)

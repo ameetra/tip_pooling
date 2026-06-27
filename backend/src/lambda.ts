@@ -75,6 +75,36 @@ async function runMigrations() {
       UPDATE "tenants" SET "slug" = 'demo' WHERE "id" = 'default-tenant' AND "slug" IS NULL;
       -- Backfill logo URLs onto the custom domain (one-time; no-op once rewritten)
       UPDATE "tenants" SET "logoUrl" = replace("logoUrl", 'https://d3vrbd8qbym3pv.cloudfront.net', 'https://usegratify.com') WHERE "logoUrl" LIKE 'https://d3vrbd8qbym3pv.cloudfront.net%';
+
+      -- Flexible roles & wages + new cash-tip inputs (additive, non-destructive)
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "cashInRegister" DOUBLE PRECISION NOT NULL DEFAULT 0;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "cashTips" DOUBLE PRECISION NOT NULL DEFAULT 0;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "posTips" DOUBLE PRECISION NOT NULL DEFAULT 0;
+      -- Legacy drawer columns no longer written; relax constraints so new inserts can omit them
+      ALTER TABLE "tip_entries" ALTER COLUMN "startingDrawer" DROP NOT NULL;
+      ALTER TABLE "tip_entries" ALTER COLUMN "closingDrawer" DROP NOT NULL;
+      -- One-time backfill: POS tips carried over from the old electronicTips field
+      UPDATE "tip_entries" SET "posTips" = "electronicTips" WHERE "posTips" = 0 AND "electronicTips" <> 0;
+
+      ALTER TABLE "employee_rate_history" ADD COLUMN IF NOT EXISTS "role" TEXT NOT NULL DEFAULT 'SERVER';
+      UPDATE "employee_rate_history" rh SET "role" = e."role"
+        FROM "employees" e WHERE rh."employeeId" = e."id" AND rh."role" = 'SERVER' AND e."role" <> 'SERVER';
+
+      CREATE TABLE IF NOT EXISTS "employee_role_rates" (
+        "id" TEXT NOT NULL,
+        "employeeId" TEXT NOT NULL,
+        "role" TEXT NOT NULL,
+        "hourlyRate" DOUBLE PRECISION NOT NULL,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        PRIMARY KEY ("id"),
+        CONSTRAINT "employee_role_rates_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "employees"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "employee_role_rates_employeeId_role_key" ON "employee_role_rates"("employeeId", "role");
+      -- Backfill current per-role rate from each employee's existing single rate + primary role
+      INSERT INTO "employee_role_rates" ("id", "employeeId", "role", "hourlyRate")
+        SELECT 'err_' || e."id", e."id", e."role", e."hourlyRate" FROM "employees" e
+        ON CONFLICT ("employeeId", "role") DO NOTHING;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
@@ -147,15 +177,16 @@ async function runSeed() {
     const existingHistory = await prisma.employeeRateHistory.count({ where: { employeeId: { in: [alice.id, bob.id, charlie.id] } } });
     if (existingHistory === 0) {
       await prisma.employeeRateHistory.createMany({ data: [
-        { employeeId: alice.id, hourlyRate: 15.0, effectiveDate: '2026-01-01' },
-        { employeeId: bob.id, hourlyRate: 15.0, effectiveDate: '2026-01-01' },
-        { employeeId: charlie.id, hourlyRate: 12.0, effectiveDate: '2026-01-01' },
+        { employeeId: alice.id, role: 'SERVER', hourlyRate: 15.0, effectiveDate: '2026-01-01' },
+        { employeeId: bob.id, role: 'SERVER', hourlyRate: 15.0, effectiveDate: '2026-01-01' },
+        { employeeId: charlie.id, role: 'BUSSER', hourlyRate: 12.0, effectiveDate: '2026-01-01' },
       ]});
     }
 
     await Promise.all([
-      prisma.shift.upsert({ where: { tenantId_name: { tenantId: tenant.id, name: 'Morning' } }, update: {}, create: { tenantId: tenant.id, name: 'Morning' } }),
-      prisma.shift.upsert({ where: { tenantId_name: { tenantId: tenant.id, name: 'Evening' } }, update: {}, create: { tenantId: tenant.id, name: 'Evening' } }),
+      prisma.employeeRoleRate.upsert({ where: { employeeId_role: { employeeId: alice.id, role: 'SERVER' } }, update: {}, create: { employeeId: alice.id, role: 'SERVER', hourlyRate: 15.0 } }),
+      prisma.employeeRoleRate.upsert({ where: { employeeId_role: { employeeId: bob.id, role: 'SERVER' } }, update: {}, create: { employeeId: bob.id, role: 'SERVER', hourlyRate: 15.0 } }),
+      prisma.employeeRoleRate.upsert({ where: { employeeId_role: { employeeId: charlie.id, role: 'BUSSER' } }, update: {}, create: { employeeId: charlie.id, role: 'BUSSER', hourlyRate: 12.0 } }),
     ]);
 
     const supportEmail = process.env.SUPPORT_EMAIL || 'support@tippooling.app';

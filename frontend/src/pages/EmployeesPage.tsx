@@ -7,25 +7,36 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import { useEmployees, useCreateEmployee, useUpdateEmployee, useUpdateRate, useDeleteEmployee } from '../api/employees';
+import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, useDeleteEmployee } from '../api/employees';
 import EmployeeDialog from '../components/EmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Employee } from '../types';
+import type { Employee, EmployeeRole } from '../types';
 
 const today = new Date().toISOString().slice(0, 10);
+const ROLES: { value: EmployeeRole; label: string }[] = [
+  { value: 'SERVER', label: 'Server' },
+  { value: 'BUSSER', label: 'Busser' },
+  { value: 'EXPEDITOR', label: 'Expeditor' },
+];
+
+const rateFor = (emp: Employee, role: EmployeeRole) =>
+  emp.roleRates?.find((r) => r.role === role)?.hourlyRate;
+
+const ratesLabel = (emp: Employee) =>
+  (emp.roleRates ?? []).map((r) => `${r.role.toLowerCase()} $${r.hourlyRate.toFixed(2)}`).join(', ') || '—';
 
 export default function EmployeesPage() {
   const { data: employees = [], isLoading } = useEmployees();
   const createMut = useCreateEmployee();
   const updateMut = useUpdateEmployee();
-  const updateRateMut = useUpdateRate();
+  const setRatesMut = useSetRoleRates();
   const deleteMut = useDeleteEmployee();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [rateEmployee, setRateEmployee] = useState<Employee | null>(null);
-  const [newRate, setNewRate] = useState('');
+  const [rateInputs, setRateInputs] = useState<Record<EmployeeRole, string>>({ SERVER: '', BUSSER: '', EXPEDITOR: '' });
   const [rateEffectiveDate, setRateEffectiveDate] = useState(today);
   const [error, setError] = useState('');
 
@@ -49,17 +60,22 @@ export default function EmployeesPage() {
 
   const openRateDialog = (emp: Employee) => {
     setRateEmployee(emp);
-    setNewRate(String(emp.hourlyRate));
+    setRateInputs({
+      SERVER: rateFor(emp, 'SERVER')?.toString() ?? '',
+      BUSSER: rateFor(emp, 'BUSSER')?.toString() ?? '',
+      EXPEDITOR: rateFor(emp, 'EXPEDITOR')?.toString() ?? '',
+    });
     setRateEffectiveDate(today);
   };
 
   const handleRateSubmit = async () => {
     if (!rateEmployee) return;
+    const rates = ROLES
+      .filter((r) => rateInputs[r.value] !== '' && Number(rateInputs[r.value]) > 0)
+      .map((r) => ({ role: r.value, hourlyRate: Number(rateInputs[r.value]) }));
+    if (rates.length === 0) { setError('Set at least one rate'); return; }
     try {
-      await updateRateMut.mutateAsync({
-        id: rateEmployee.id,
-        data: { hourlyRate: Number(newRate), effectiveDate: rateEffectiveDate },
-      });
+      await setRatesMut.mutateAsync({ id: rateEmployee.id, data: { rates, effectiveDate: rateEffectiveDate } });
       setRateEmployee(null);
       setError('');
     } catch (e: any) { setError(e.message); }
@@ -82,9 +98,8 @@ export default function EmployeesPage() {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Hourly Rate</TableCell>
-              <TableCell>Rate Since</TableCell>
+              <TableCell>Primary Role</TableCell>
+              <TableCell>Base Rates (per role)</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -94,17 +109,16 @@ export default function EmployeesPage() {
                 <TableCell>{emp.name}</TableCell>
                 <TableCell>{emp.email}</TableCell>
                 <TableCell>{emp.role}</TableCell>
-                <TableCell>${emp.hourlyRate.toFixed(2)}</TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{emp.rateHistory?.[0]?.effectiveDate || '—'}</TableCell>
+                <TableCell>{ratesLabel(emp)}</TableCell>
                 <TableCell align="right">
-                  <IconButton size="small" onClick={() => openRateDialog(emp)} title="Update Rate"><AttachMoneyIcon /></IconButton>
+                  <IconButton size="small" onClick={() => openRateDialog(emp)} title="Edit Rates"><AttachMoneyIcon /></IconButton>
                   <IconButton size="small" onClick={() => handleEdit(emp)} title="Edit"><EditIcon /></IconButton>
                   <IconButton size="small" onClick={() => setDeleteId(emp.id)} title="Delete"><DeleteIcon /></IconButton>
                 </TableCell>
               </TableRow>
             ))}
             {employees.length === 0 && (
-              <TableRow><TableCell colSpan={6} align="center">No employees yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} align="center">No employees yet</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -113,20 +127,27 @@ export default function EmployeesPage() {
       <EmployeeDialog open={dialogOpen} employee={editing} onSubmit={handleSubmit} onClose={() => setDialogOpen(false)} />
       <ConfirmDialog open={!!deleteId} title="Delete Employee" message="This will deactivate the employee." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
 
-      {/* Update Rate Dialog */}
+      {/* Edit Rates Dialog — one base rate per role this person can work */}
       <Dialog open={!!rateEmployee} onClose={() => setRateEmployee(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Update Rate — {rateEmployee?.name}</DialogTitle>
+        <DialogTitle>Base Rates — {rateEmployee?.name}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
           <Typography variant="body2" color="text.secondary">
-            Current rate: ${rateEmployee?.hourlyRate.toFixed(2)}/hr
+            Set the hourly rate for each role. Leave a field blank if they don't work that role.
           </Typography>
-          <TextField label="New Hourly Rate ($)" type="number" value={newRate} onChange={(e) => setNewRate(e.target.value)} slotProps={{ htmlInput: { step: 0.5, min: 0 } }} />
+          {ROLES.map((r) => (
+            <TextField
+              key={r.value} label={`${r.label} rate ($/hr)`} type="number"
+              value={rateInputs[r.value]}
+              onChange={(e) => setRateInputs({ ...rateInputs, [r.value]: e.target.value })}
+              slotProps={{ htmlInput: { step: 0.5, min: 0 } }}
+            />
+          ))}
           <TextField label="Effective Date" type="date" value={rateEffectiveDate} onChange={(e) => setRateEffectiveDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRateEmployee(null)}>Cancel</Button>
-          <Button variant="contained" onClick={handleRateSubmit} disabled={updateRateMut.isPending || !newRate || Number(newRate) <= 0}>
-            {updateRateMut.isPending ? 'Saving...' : 'Update Rate'}
+          <Button variant="contained" onClick={handleRateSubmit} disabled={setRatesMut.isPending}>
+            {setRatesMut.isPending ? 'Saving...' : 'Save Rates'}
           </Button>
         </DialogActions>
       </Dialog>

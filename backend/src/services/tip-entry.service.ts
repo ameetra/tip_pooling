@@ -1,36 +1,33 @@
 import prisma from '../database/client';
-import { calculateTips, calculateCashTips, TipCalculationError } from './tip-calculation.service';
+import { calculateTips, computeCashTips, TipCalculationError } from './tip-calculation.service';
 import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery } from '../validation/tip.schema';
-import { Employee, SupportStaffConfig, TipCalculationResult } from '../types/tip-calculation.types';
+import { StintInput, StintResult, SupportStaffConfig } from '../types/tip-calculation.types';
 import { auditService } from './audit.service';
 import { sendTipEmail } from './email.service';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
-  const cashTips = calculateCashTips(input.closingDrawer, input.startingDrawer, input.cashSales);
-  const totalTipPool = cashTips + input.electronicTips;
+  const cashTips = computeCashTips(input.cashInRegister, input.cashSales, input.cashTips);
+  const totalTipPool = Number((cashTips + input.posTips).toFixed(2));
 
-  const employeeIds = input.employees.map((e) => e.employeeId);
-  const dbEmployees = await prisma.employee.findMany({
-    where: { id: { in: employeeIds }, tenantId },
-  });
+  const employeeIds = [...new Set(input.employees.map((e) => e.employeeId))];
+  const dbEmployees = await prisma.employee.findMany({ where: { id: { in: employeeIds }, tenantId } });
+  const empById = new Map(dbEmployees.map((e) => [e.id, e]));
 
-  const shiftIds = [...new Set(input.employees.flatMap((e) => e.shiftIds))];
-  const dbShifts = await prisma.shift.findMany({
-    where: { id: { in: shiftIds }, tenantId },
-  });
-  const shiftNameMap = new Map(dbShifts.map((s) => [s.id, s.name]));
+  const roleRates = await prisma.employeeRoleRate.findMany({ where: { employeeId: { in: employeeIds } } });
+  const rateByKey = new Map(roleRates.map((r) => [`${r.employeeId}:${r.role}`, r.hourlyRate]));
 
-  const employees: Employee[] = input.employees.map((entry) => {
-    const dbEmp = dbEmployees.find((e) => e.id === entry.employeeId);
+  const stints: StintInput[] = input.employees.map((entry) => {
+    const dbEmp = empById.get(entry.employeeId);
     if (!dbEmp) throw new TipCalculationError(`Employee ${entry.employeeId} not found`, 'EMPLOYEE_NOT_FOUND');
-    return {
-      id: dbEmp.id,
-      name: dbEmp.name,
-      roleOnDay: entry.roleOnDay as Employee['roleOnDay'],
-      shifts: entry.shiftIds.map((sid) => shiftNameMap.get(sid) || sid),
-      hoursWorked: entry.hoursWorked,
-      hourlyRate: dbEmp.hourlyRate,
-    };
+
+    // Per-role rate; fall back to the legacy single rate only for the employee's primary role.
+    let rate = rateByKey.get(`${entry.employeeId}:${entry.role}`);
+    if (rate === undefined && entry.role === dbEmp.role) rate = dbEmp.hourlyRate;
+    if (rate === undefined) {
+      throw new TipCalculationError(`${dbEmp.name} has no base rate set for role ${entry.role}`, 'MISSING_ROLE_RATE');
+    }
+
+    return { employeeId: dbEmp.id, name: dbEmp.name, role: entry.role, hours: entry.hoursWorked, hourlyRate: rate };
   });
 
   const supportConfigs = await prisma.supportStaffConfig.findMany({
@@ -45,54 +42,43 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
     supportStaffConfig.push({ role: c.role as SupportStaffConfig['role'], percentage: c.percentage });
   }
 
-  const empRateMap = new Map(employees.map((e) => [e.id, e.hourlyRate]));
-  const supportPctMap = new Map(supportStaffConfig.map((c) => [c.role, c.percentage]));
-
-  return { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap };
+  return { totalTipPool, stints, supportStaffConfig, cashTips, posTips: input.posTips };
 }
 
-async function saveCalculations(
-  tx: any,
-  entryId: string,
-  results: TipCalculationResult[],
-  empRateMap: Map<string, number>,
-  supportPctMap: Map<string, number>,
-  empShiftMap: Map<string, string[]>,
-) {
-  for (const result of results) {
-    const supportPct = result.roleOnDay === 'SERVER' ? 0 : (supportPctMap.get(result.roleOnDay as 'BUSSER' | 'EXPEDITOR') || 0);
-    const calc = await tx.tipCalculation.create({
+async function saveCalculations(tx: any, entryId: string, stints: StintResult[]) {
+  for (const s of stints) {
+    await tx.tipCalculation.create({
       data: {
         tipEntryId: entryId,
-        employeeId: result.employeeId,
-        roleOnDay: result.roleOnDay,
-        totalHours: result.hoursWorked,
-        hourlyPay: result.hourlyPay,
-        baseTips: result.baseTips,
-        supportTipsGiven: result.supportTipsGiven,
-        supportTipsReceived: result.supportTipsReceived,
-        finalTips: result.finalTips,
-        totalPay: result.totalPay,
-        effectiveHourlyRate: result.effectiveHourlyRate,
-        snapshotHourlyRate: empRateMap.get(result.employeeId) || 0,
-        snapshotSupportPct: supportPct,
+        employeeId: s.employeeId,
+        roleOnDay: s.role,
+        totalHours: s.hours,
+        hourlyPay: s.wage,
+        baseTips: s.baseTips,
+        supportTipsGiven: s.supportTipsGiven,
+        supportTipsReceived: s.supportTipsReceived,
+        finalTips: s.finalTips,
+        totalPay: s.totalPay,
+        effectiveHourlyRate: s.hours > 0 ? Number((s.totalPay / s.hours).toFixed(2)) : 0,
+        snapshotHourlyRate: s.hourlyRate,
+        snapshotSupportPct: s.supportPct,
       },
     });
-
-    const shiftIds = empShiftMap.get(result.employeeId) || [];
-    for (const shiftId of shiftIds) {
-      await tx.shiftAssignment.create({
-        data: { tipCalculationId: calc.id, shiftId },
-      });
-    }
   }
 }
 
+const cashColumns = (input: { cashInRegister: number; cashSales: number; cashTips: number; posTips: number }) => ({
+  cashInRegister: input.cashInRegister,
+  cashSales: input.cashSales,
+  cashTips: input.cashTips,
+  posTips: input.posTips,
+});
+
 export const tipEntryService = {
   async preview(tenantId: string, input: TipPreviewInput) {
-    const { totalTipPool, employees, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, input);
-    const results = calculateTips({ totalTipPool, employees, supportStaffConfig });
-    return { entryDate: input.entryDate, cashTips, electronicTips: input.electronicTips, totalTipPool, results };
+    const { totalTipPool, stints, supportStaffConfig, cashTips, posTips } = await buildCalcInput(tenantId, input);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
+    return { entryDate: input.entryDate, cashTips, posTips, totalTipPool, results: calc.employees };
   },
 
   async create(tenantId: string, input: CreateTipEntryInput, force = false, performedBy?: { userId: string; email: string }) {
@@ -101,35 +87,23 @@ export const tipEntryService = {
         where: { tenantId, entryDate: input.entryDate, isDeleted: false },
       });
       if (existing) {
-        throw new TipCalculationError(
-          `An active tip entry already exists for ${input.entryDate}`,
-          'DUPLICATE_ENTRY',
-        );
+        throw new TipCalculationError(`An active tip entry already exists for ${input.entryDate}`, 'DUPLICATE_ENTRY');
       }
     }
 
-    const { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap } = await buildCalcInput(tenantId, input);
-    const results = calculateTips({ totalTipPool, employees, supportStaffConfig });
-    const empShiftMap = new Map(input.employees.map((e) => [e.employeeId, e.shiftIds]));
+    const { totalTipPool, stints, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, input);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
 
     const tipEntry = await prisma.$transaction(async (tx) => {
       const entry = await tx.tipEntry.create({
-        data: {
-          tenantId,
-          entryDate: input.entryDate,
-          startingDrawer: input.startingDrawer,
-          closingDrawer: input.closingDrawer,
-          cashSales: input.cashSales,
-          electronicTips: input.electronicTips,
-        },
+        data: { tenantId, entryDate: input.entryDate, ...cashColumns(input) },
       });
-
-      await saveCalculations(tx, entry.id, results, empRateMap, supportPctMap, empShiftMap);
+      await saveCalculations(tx, entry.id, calc.stints);
       return entry;
     });
 
     await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', performedBy, newValues: { entryDate: input.entryDate, totalTipPool } });
-    return { ...tipEntry, cashTips, totalTipPool, results };
+    return { ...tipEntry, cashTips, totalTipPool, results: calc.employees };
   },
 
   async publish(tenantId: string, id: string, performedBy?: { userId: string; email: string }) {
@@ -139,46 +113,47 @@ export const tipEntryService = {
     const logoUrl = (tenant as any)?.logoUrl ?? null;
     const entry = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
-      include: {
-        tipCalculations: {
-          include: {
-            employee: { select: { name: true, email: true } },
-            shiftAssignments: { include: { shift: { select: { name: true } } } },
-          },
-        },
-      },
+      include: { tipCalculations: { include: { employee: { select: { name: true, email: true } } } } },
     });
     if (!entry) return null;
     if ((entry as any).publishedAt) throw new TipCalculationError('Entry is already published', 'ALREADY_PUBLISHED');
 
     await prisma.tipEntry.update({ where: { id }, data: { publishedAt: new Date() } as any });
 
-    // Send emails — log failures but don't block the response
+    // Aggregate per employee (an employee may have multiple role stints) → one email each.
+    const byEmployee = new Map<string, { name: string; email: string; roles: string[]; hours: number; finalTips: number; totalPay: number }>();
+    for (const c of entry.tipCalculations) {
+      const e = byEmployee.get(c.employeeId) ?? { name: c.employee.name, email: c.employee.email, roles: [], hours: 0, finalTips: 0, totalPay: 0 };
+      if (!e.roles.includes(c.roleOnDay)) e.roles.push(c.roleOnDay);
+      e.hours += c.totalHours;
+      e.finalTips += c.finalTips;
+      e.totalPay += c.totalPay;
+      byEmployee.set(c.employeeId, e);
+    }
+    const recipients = [...byEmployee.values()];
+
     const emailResults = await Promise.allSettled(
-      entry.tipCalculations.map((calc) =>
+      recipients.map((r) =>
         sendTipEmail({
-          employeeName: calc.employee.name,
-          employeeEmail: calc.employee.email,
+          employeeName: r.name,
+          employeeEmail: r.email,
           restaurantName,
           slug,
           logoUrl,
           entryDate: entry.entryDate,
-          shifts: calc.shiftAssignments.map((sa) => sa.shift.name),
-          hours: calc.totalHours,
-          finalTips: calc.finalTips,
-          totalPay: calc.totalPay,
-          effectiveHourlyRate: calc.effectiveHourlyRate,
+          roles: r.roles,
+          hours: Number(r.hours.toFixed(2)),
+          finalTips: Number(r.finalTips.toFixed(2)),
+          totalPay: Number(r.totalPay.toFixed(2)),
+          effectiveHourlyRate: r.hours > 0 ? Number((r.totalPay / r.hours).toFixed(2)) : 0,
         }),
       ),
     );
 
     const failed = emailResults.filter((r) => r.status === 'rejected');
-
-    // Log per-employee email results
-    const emailDetails = entry.tipCalculations.map((calc, i) => ({
-      employeeId: calc.employeeId,
-      employeeName: calc.employee.name,
-      employeeEmail: calc.employee.email,
+    const emailDetails = recipients.map((r, i) => ({
+      employeeName: r.name,
+      employeeEmail: r.email,
       status: emailResults[i].status === 'fulfilled' ? 'sent' : 'failed',
       error: emailResults[i].status === 'rejected' ? (emailResults[i] as PromiseRejectedResult).reason?.message : null,
     }));
@@ -192,47 +167,31 @@ export const tipEntryService = {
   },
 
   async edit(tenantId: string, id: string, input: EditTipEntryInput, performedBy?: { userId: string; email: string }) {
-    const existing = await prisma.tipEntry.findFirst({
-      where: { id, tenantId, isDeleted: false },
-    });
+    const existing = await prisma.tipEntry.findFirst({ where: { id, tenantId, isDeleted: false } });
     if (!existing) return null;
     if ((existing as any).publishedAt) throw new TipCalculationError('Cannot edit a published entry', 'ALREADY_PUBLISHED');
 
-    // Merge existing values with partial updates
     const merged: CreateTipEntryInput = {
       entryDate: existing.entryDate,
-      startingDrawer: input.startingDrawer ?? existing.startingDrawer,
-      closingDrawer: input.closingDrawer ?? existing.closingDrawer,
+      cashInRegister: input.cashInRegister ?? existing.cashInRegister,
       cashSales: input.cashSales ?? existing.cashSales,
-      electronicTips: input.electronicTips ?? existing.electronicTips,
+      cashTips: input.cashTips ?? existing.cashTips,
+      posTips: input.posTips ?? existing.posTips,
       employees: input.employees,
     };
 
-    const { totalTipPool, employees, supportStaffConfig, cashTips, empRateMap, supportPctMap } = await buildCalcInput(tenantId, merged);
-    const results = calculateTips({ totalTipPool, employees, supportStaffConfig });
-    const empShiftMap = new Map(input.employees.map((e) => [e.employeeId, e.shiftIds]));
+    const { totalTipPool, stints, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, merged);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
 
     const newEntry = await prisma.$transaction(async (tx) => {
-      // Create new entry
       const entry = await tx.tipEntry.create({
-        data: {
-          tenantId,
-          entryDate: existing.entryDate,
-          startingDrawer: merged.startingDrawer,
-          closingDrawer: merged.closingDrawer,
-          cashSales: merged.cashSales,
-          electronicTips: merged.electronicTips,
-        },
+        data: { tenantId, entryDate: existing.entryDate, ...cashColumns(merged) },
       });
-
-      await saveCalculations(tx, entry.id, results, empRateMap, supportPctMap, empShiftMap);
-
-      // Soft-delete old entry and link to new one
+      await saveCalculations(tx, entry.id, calc.stints);
       await tx.tipEntry.updateMany({
         where: { id: existing.id },
         data: { isDeleted: true, deletedAt: new Date(), replacedById: entry.id },
       });
-
       return entry;
     });
 
@@ -242,7 +201,7 @@ export const tipEntryService = {
       oldValues: { id: existing.id, entryDate: existing.entryDate },
       newValues: { id: newEntry.id, replacedOldId: existing.id },
     });
-    return { ...newEntry, cashTips, totalTipPool, results };
+    return { ...newEntry, cashTips, totalTipPool, results: calc.employees };
   },
 
   async findAll(tenantId: string, query?: TipEntryQuery) {
@@ -258,12 +217,7 @@ export const tipEntryService = {
     }
 
     const [data, total] = await Promise.all([
-      prisma.tipEntry.findMany({
-        where,
-        orderBy: { entryDate: 'desc' },
-        skip,
-        take: limit,
-      }),
+      prisma.tipEntry.findMany({ where, orderBy: { entryDate: 'desc' }, skip, take: limit }),
       prisma.tipEntry.count({ where }),
     ]);
 
@@ -275,10 +229,7 @@ export const tipEntryService = {
       where: { id, tenantId, isDeleted: false },
       include: {
         tipCalculations: {
-          include: {
-            employee: { select: { id: true, name: true, email: true, role: true } },
-            shiftAssignments: { include: { shift: { select: { id: true, name: true } } } },
-          },
+          include: { employee: { select: { id: true, name: true, email: true, role: true } } },
         },
       },
     });

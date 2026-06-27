@@ -54,15 +54,15 @@ beforeAll(async () => {
   `);
 
   await testPrisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS shifts (
+    CREATE TABLE IF NOT EXISTS employee_role_rates (
       id TEXT PRIMARY KEY,
-      tenantId TEXT NOT NULL,
-      name TEXT NOT NULL,
-      isActive INTEGER NOT NULL DEFAULT 1,
+      employeeId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      hourlyRate REAL NOT NULL,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (tenantId) REFERENCES tenants(id),
-      UNIQUE(tenantId, name)
+      FOREIGN KEY (employeeId) REFERENCES employees(id),
+      UNIQUE(employeeId, role)
     )
   `);
 
@@ -83,9 +83,12 @@ beforeAll(async () => {
       id TEXT PRIMARY KEY,
       tenantId TEXT NOT NULL,
       entryDate TEXT NOT NULL,
-      startingDrawer REAL NOT NULL,
-      closingDrawer REAL NOT NULL,
+      cashInRegister REAL NOT NULL DEFAULT 0,
       cashSales REAL NOT NULL DEFAULT 0,
+      cashTips REAL NOT NULL DEFAULT 0,
+      posTips REAL NOT NULL DEFAULT 0,
+      startingDrawer REAL,
+      closingDrawer REAL,
       electronicTips REAL NOT NULL DEFAULT 0,
       isDeleted INTEGER NOT NULL DEFAULT 0,
       deletedAt DATETIME,
@@ -119,20 +122,10 @@ beforeAll(async () => {
   `);
 
   await testPrisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS shift_assignments (
-      id TEXT PRIMARY KEY,
-      tipCalculationId TEXT NOT NULL,
-      shiftId TEXT NOT NULL,
-      FOREIGN KEY (tipCalculationId) REFERENCES tip_calculations(id),
-      FOREIGN KEY (shiftId) REFERENCES shifts(id),
-      UNIQUE(tipCalculationId, shiftId)
-    )
-  `);
-
-  await testPrisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS employee_rate_history (
       id TEXT PRIMARY KEY,
       employeeId TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'SERVER',
       hourlyRate REAL NOT NULL,
       effectiveDate TEXT NOT NULL,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -172,7 +165,6 @@ beforeAll(async () => {
 
   // Create indexes
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_employees_tenant_active ON employees(tenantId, isActive)`);
-  await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_shifts_tenant_active ON shifts(tenantId, isActive)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_support_config_tenant_role ON support_staff_config(tenantId, role)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_tip_entries_tenant_date ON tip_entries(tenantId, entryDate, isDeleted)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_tip_calcs_entry ON tip_calculations(tipEntryId)`);
@@ -183,13 +175,12 @@ beforeEach(async () => {
   // Clean all tables in reverse dependency order
   await testPrisma.$executeRawUnsafe('DELETE FROM audit_logs');
   await testPrisma.$executeRawUnsafe('DELETE FROM magic_link_tokens');
-  await testPrisma.$executeRawUnsafe('DELETE FROM shift_assignments');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_calculations');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_entries');
   await testPrisma.$executeRawUnsafe('DELETE FROM support_staff_config');
+  await testPrisma.$executeRawUnsafe('DELETE FROM employee_role_rates');
   await testPrisma.$executeRawUnsafe('DELETE FROM employee_rate_history');
   await testPrisma.$executeRawUnsafe('DELETE FROM employees');
-  await testPrisma.$executeRawUnsafe('DELETE FROM shifts');
   await testPrisma.$executeRawUnsafe('DELETE FROM tenants');
 
   // Create test tenant

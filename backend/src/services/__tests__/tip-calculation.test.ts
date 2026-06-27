@@ -1,387 +1,166 @@
-import { calculateTips, calculateCashTips, TipCalculationError } from '../tip-calculation.service';
-import { Employee, SupportStaffConfig, TipCalculationInput } from '../../types/tip-calculation.types';
+import { calculateTips, computeCashTips, TipCalculationError } from '../tip-calculation.service';
+import { StintInput, SupportStaffConfig, TipCalculationInput, TipCalculationResult } from '../../types/tip-calculation.types';
 
-const makeServer = (overrides: Partial<Employee> = {}): Employee => ({
-  id: 'server-1',
-  name: 'Server A',
-  roleOnDay: 'SERVER',
-  shifts: ['shift-1'],
-  hoursWorked: 8,
-  hourlyRate: 15,
-  ...overrides,
-});
+const server = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 's1', name: 'Server A', role: 'SERVER', hours: 8, hourlyRate: 15, ...o });
+const busser = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'b1', name: 'Busser A', role: 'BUSSER', hours: 6, hourlyRate: 12, ...o });
+const expeditor = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'e1', name: 'Expeditor A', role: 'EXPEDITOR', hours: 4, hourlyRate: 13, ...o });
 
-const makeBusser = (overrides: Partial<Employee> = {}): Employee => ({
-  id: 'busser-1',
-  name: 'Busser A',
-  roleOnDay: 'BUSSER',
-  shifts: ['shift-1'],
-  hoursWorked: 6,
-  hourlyRate: 12,
-  ...overrides,
-});
+const run = (totalTipPool: number, stints: StintInput[], supportStaffConfig: SupportStaffConfig[] = []) =>
+  calculateTips({ totalTipPool, stints, supportStaffConfig });
 
-const defaultSupportConfig: SupportStaffConfig[] = [
-  { role: 'BUSSER', percentage: 20 },
-  { role: 'EXPEDITOR', percentage: 15 },
-];
+const sumTips = (r: TipCalculationResult) => Number(r.stints.reduce((s, x) => s + x.finalTips, 0).toFixed(2));
+const emp = (r: TipCalculationResult, id: string) => r.employees.find((e) => e.employeeId === id)!;
+const stint = (r: TipCalculationResult, id: string, role: string) => r.stints.find((s) => s.employeeId === id && s.role === role)!;
 
-const sumFinalTips = (results: ReturnType<typeof calculateTips>) =>
-  Number(results.reduce((sum, r) => sum + r.finalTips, 0).toFixed(2));
-
-describe('Tip Calculation Service', () => {
-  // TC-CALC-001: Single server receives 100% of tips
-  it('TC-CALC-001: single server gets 100% of tips', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [makeServer()],
-      supportStaffConfig: defaultSupportConfig,
-    };
-    const results = calculateTips(input);
-    expect(results).toHaveLength(1);
-    expect(results[0].finalTips).toBe(1000);
-    expect(results[0].baseTips).toBe(1000);
+describe('Tip Calculation Service (prorated hours, per-role pool)', () => {
+  it('single server gets 100% of the pool', () => {
+    const r = run(1000, [server()]);
+    expect(emp(r, 's1').totalTips).toBe(1000);
   });
 
-  // TC-CALC-002: Two servers equal hours = 50/50 split
-  it('TC-CALC-002: two servers equal hours split 50/50', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8 }),
-      ],
-      supportStaffConfig: defaultSupportConfig,
-    };
-    const results = calculateTips(input);
-    expect(results[0].finalTips).toBe(500);
-    expect(results[1].finalTips).toBe(500);
+  it('two servers equal hours split 50/50', () => {
+    const r = run(1000, [server({ employeeId: 's1' }), server({ employeeId: 's2' })]);
+    expect(emp(r, 's1').totalTips).toBe(500);
+    expect(emp(r, 's2').totalTips).toBe(500);
   });
 
-  // TC-CALC-003: Two servers unequal hours (2:1 ratio)
-  it('TC-CALC-003: two servers unequal hours (2:1 ratio)', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 900,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 4 }),
-      ],
-      supportStaffConfig: defaultSupportConfig,
-    };
-    const results = calculateTips(input);
-    expect(results[0].finalTips).toBe(600);
-    expect(results[1].finalTips).toBe(300);
+  it('two servers unequal hours split 2:1', () => {
+    const r = run(900, [server({ employeeId: 's1', hours: 8 }), server({ employeeId: 's2', hours: 4 })]);
+    expect(emp(r, 's1').totalTips).toBe(600);
+    expect(emp(r, 's2').totalTips).toBe(300);
   });
 
-  // TC-CALC-004: Server works multiple shifts (tips by total hours, not per-shift)
-  it('TC-CALC-004: server works multiple shifts, tips by total hours', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8, shifts: ['shift-1', 'shift-2'] }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8, shifts: ['shift-1'] }),
-      ],
-      supportStaffConfig: defaultSupportConfig,
-    };
-    const results = calculateTips(input);
-    // Both 8 hrs = 50/50 regardless of number of shifts
-    expect(results[0].finalTips).toBe(500);
-    expect(results[1].finalTips).toBe(500);
+  it('busser takes its configured % off the top; servers split the rest', () => {
+    const r = run(1000, [server({ employeeId: 's1' }), server({ employeeId: 's2' }), busser()], [{ role: 'BUSSER', percentage: 20 }]);
+    expect(emp(r, 'b1').totalTips).toBe(200);      // 20% of 1000
+    expect(emp(r, 's1').totalTips).toBe(400);      // 80% of pool, split 50/50
+    expect(emp(r, 's2').totalTips).toBe(400);
+    expect(sumTips(r)).toBe(1000);
   });
 
-  // TC-CALC-005: Busser receives percentage from servers on same shift
-  it('TC-CALC-005: busser receives percentage from servers on same shift', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8 }),
-        makeBusser({ id: 'b1', name: 'Busser A', shifts: ['shift-1'] }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }],
-    };
-    const results = calculateTips(input);
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-    // Each server gets $500 base. Busser gets 20% from each = $100 + $100 = $200
-    expect(busser.finalTips).toBe(200);
-    expect(busser.supportTipsReceived).toBe(200);
+  it("a role's pool is split among that role's staff by hours", () => {
+    const r = run(1000, [
+      server({ employeeId: 's1', hours: 10 }),
+      busser({ employeeId: 'carol', name: 'Carol', hours: 6 }),
+      busser({ employeeId: 'dave', name: 'Dave', hours: 4 }),
+    ], [{ role: 'BUSSER', percentage: 20 }]);
+    expect(emp(r, 'carol').totalTips).toBe(120);   // 6/10 of $200
+    expect(emp(r, 'dave').totalTips).toBe(80);      // 4/10 of $200
+    expect(emp(r, 's1').totalTips).toBe(800);
+    expect(sumTips(r)).toBe(1000);
   });
 
-  // TC-CALC-006: Support staff cap applied
-  it('TC-CALC-006: support staff cap applied when tips exceed highest server', () => {
-    // Create scenario where busser percentage would exceed highest server's final tips
-    // 1 server short shift, busser with high percentage from that server
-    const input: TipCalculationInput = {
-      totalTipPool: 100,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 2, shifts: ['shift-1'] }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8, shifts: ['shift-2'] }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 8, shifts: ['shift-1', 'shift-2'] }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 50 }],
-    };
-    const results = calculateTips(input);
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-    const serverA = results.find((r) => r.employeeId === 's1')!;
-    const serverB = results.find((r) => r.employeeId === 's2')!;
-
-    // Server A base: (2/10)*100 = $20. Server B base: (8/10)*100 = $80
-    // Busser uncapped: 50% of $20 (shift-1) + 50% of $80 (shift-2) = $10 + $40 = $50
-    // Highest server on busser's shifts: max(serverA.final, serverB.final)
-    // ServerA final after deduction = 20-10 = 10, ServerB final after deduction = 80-40 = 40
-    // Highest = 40. Busser tips $50 > $40? Yes, cap to $40
-    expect(busser.finalTips).toBeLessThanOrEqual(
-      Math.max(serverA.finalTips, serverB.finalTips),
-    );
+  it('two support roles each take their own % of the pool', () => {
+    const r = run(1000, [server({ employeeId: 's1', hours: 10 }), busser({ hours: 6 }), expeditor({ hours: 4 })],
+      [{ role: 'BUSSER', percentage: 20 }, { role: 'EXPEDITOR', percentage: 15 }]);
+    expect(emp(r, 'b1').totalTips).toBe(200);
+    expect(emp(r, 'e1').totalTips).toBe(150);
+    expect(emp(r, 's1').totalTips).toBe(650);
+    expect(sumTips(r)).toBe(1000);
   });
 
-  // TC-CALC-007: Support staff cap not needed
-  it('TC-CALC-007: support staff cap not needed when tips below server', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 6 }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 10 }],
-    };
-    const results = calculateTips(input);
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-    // Server base: $1000. Busser gets 10% = $100. Server final = $900. $100 < $900 = no cap
-    expect(busser.finalTips).toBe(100);
+  it('applies a day-wide cap: support cannot out-earn the top server; excess returns to servers', () => {
+    const servers = Array.from({ length: 10 }, (_, i) => server({ employeeId: `s${i}`, hours: 1 }));
+    const r = run(1000, [...servers, busser({ employeeId: 'b1', hours: 5 })], [{ role: 'BUSSER', percentage: 50 }]);
+    // Server pool $500 over 10 servers = $50 each (max server tip = $50).
+    // Busser pool $500 (single busser) capped at $50; excess $450 returns to servers.
+    expect(emp(r, 'b1').totalTips).toBe(50);
+    expect(sumTips(r)).toBe(1000);
+    r.employees.filter((e) => e.employeeId !== 'b1').forEach((e) => expect(e.totalTips).toBeGreaterThan(50));
   });
 
-  // TC-CALC-008: Multiple support staff on same shift
-  it('TC-CALC-008: multiple support staff calculate independently', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8 }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 6 }),
-        {
-          id: 'e1',
-          name: 'Expeditor A',
-          roleOnDay: 'EXPEDITOR',
-          shifts: ['shift-1'],
-          hoursWorked: 4,
-          hourlyRate: 13,
-        },
-      ],
-      supportStaffConfig: [
-        { role: 'BUSSER', percentage: 20 },
-        { role: 'EXPEDITOR', percentage: 15 },
-      ],
-    };
-    const results = calculateTips(input);
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-    const expeditor = results.find((r) => r.employeeId === 'e1')!;
-
-    // Each server base: $500. Busser 20% from each = $200. Expeditor 15% from each = $150
-    expect(busser.supportTipsReceived).toBe(200);
-    expect(expeditor.supportTipsReceived).toBe(150);
+  it('no cap when support stays below the top server', () => {
+    const r = run(1000, [server({ employeeId: 's1' }), busser()], [{ role: 'BUSSER', percentage: 10 }]);
+    expect(emp(r, 'b1').totalTips).toBe(100);
+    expect(emp(r, 's1').totalTips).toBe(900);
   });
 
-  // TC-CALC-009: Rounding: $10 split 3 ways
-  it('TC-CALC-009: $10 split 3 ways = $3.33, $3.33, $3.34', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 10,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 8 }),
-        makeServer({ id: 's3', name: 'Server C', hoursWorked: 8 }),
-      ],
-      supportStaffConfig: [],
-    };
-    const results = calculateTips(input);
-    const tips = results.map((r) => r.finalTips).sort((a, b) => a - b);
-    // Two get $3.33, one gets $3.34 (rounding remainder to highest earner)
+  it('aggregates a multi-role employee: wages per role, $/hr once', () => {
+    const r = run(1000, [
+      { employeeId: 'alice', name: 'Alice', role: 'SERVER', hours: 4, hourlyRate: 15 },
+      { employeeId: 'alice', name: 'Alice', role: 'BUSSER', hours: 3, hourlyRate: 12 },
+      { employeeId: 'bob', name: 'Bob', role: 'SERVER', hours: 6, hourlyRate: 15 },
+    ], [{ role: 'BUSSER', percentage: 20 }]);
+
+    const alice = emp(r, 'alice');
+    expect(alice.roles.sort()).toEqual(['BUSSER', 'SERVER']);
+    expect(alice.totalHours).toBe(7);
+    expect(alice.totalWage).toBe(96);                 // 4*15 + 3*12
+    expect(alice.totalTips).toBe(520);                // 320 server + 200 busser
+    expect(alice.effectiveHourlyRate).toBe(88);       // (96+520)/7
+    expect(emp(r, 'bob').totalTips).toBe(480);
+    expect(sumTips(r)).toBe(1000);
+  });
+
+  it('rounds remainder to the highest earner ($10 / 3 servers)', () => {
+    const r = run(10, [server({ employeeId: 's1' }), server({ employeeId: 's2' }), server({ employeeId: 's3' })]);
+    const tips = r.stints.map((s) => s.finalTips).sort((a, b) => a - b);
     expect(tips).toEqual([3.33, 3.33, 3.34]);
-    expect(sumFinalTips(results)).toBe(10);
+    expect(sumTips(r)).toBe(10);
   });
 
-  // TC-CALC-010: Total distributed equals tip pool (±$0.01)
-  it('TC-CALC-010: total distributed equals tip pool exactly', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 777.77,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 6 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 7 }),
-        makeServer({ id: 's3', name: 'Server C', hoursWorked: 5 }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 4 }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }],
-    };
-    const results = calculateTips(input);
-    const total = sumFinalTips(results);
-    expect(Math.abs(total - 777.77)).toBeLessThanOrEqual(0.01);
+  it('keeps total distributed equal to the pool', () => {
+    const r = run(777.77, [
+      server({ employeeId: 's1', hours: 6 }), server({ employeeId: 's2', hours: 7 }),
+      server({ employeeId: 's3', hours: 5 }), busser({ hours: 4 }),
+    ], [{ role: 'BUSSER', percentage: 20 }]);
+    expect(sumTips(r)).toBe(777.77);
   });
 
-  // TC-CALC-011: Zero servers throws error
-  it('TC-CALC-011: zero servers throws error', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [makeBusser()],
-      supportStaffConfig: defaultSupportConfig,
-    };
-    expect(() => calculateTips(input)).toThrow('At least one server is required');
+  it('decimal hours prorate accurately', () => {
+    const r = run(1000, [server({ employeeId: 's1', hours: 4.5 }), server({ employeeId: 's2', hours: 7.25 })]);
+    expect(emp(r, 's1').totalTips).toBeCloseTo(382.98, 1);
+    expect(emp(r, 's2').totalTips).toBeCloseTo(617.02, 1);
+    expect(sumTips(r)).toBe(1000);
   });
 
-  // TC-CALC-012: Zero hours throws error
-  it('TC-CALC-012: zero server hours throws error', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [makeServer({ hoursWorked: 0 })],
-      supportStaffConfig: [],
-    };
-    // hoursWorked 0 fails the 0.5-16 validation first
-    expect(() => calculateTips(input)).toThrow(TipCalculationError);
-  });
+  describe('validation', () => {
+    it('throws when there are no servers', () => {
+      expect(() => run(1000, [busser()], [{ role: 'BUSSER', percentage: 20 }])).toThrow('At least one server is required');
+    });
 
-  // TC-CALC-013: Negative tip pool throws error
-  it('TC-CALC-013: negative tip pool throws error', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: -100,
-      employees: [makeServer()],
-      supportStaffConfig: [],
-    };
-    expect(() => calculateTips(input)).toThrow('Total tip pool cannot be negative');
-  });
+    it('throws on invalid stint hours (out of 0.5-16)', () => {
+      expect(() => run(1000, [server({ hours: 0 })])).toThrow(TipCalculationError);
+      expect(() => run(1000, [server({ hours: 17 })])).toThrow('invalid hours');
+    });
 
-  // TC-CALC-014: Closing < starting drawer validation
-  it('TC-CALC-014: closing drawer less than starting drawer throws error', () => {
-    expect(() => calculateCashTips(400, 500, 0)).toThrow(
-      'Closing drawer cannot be less than starting drawer',
-    );
-  });
+    it('throws when one employee works more than 16 hours total across roles', () => {
+      expect(() => run(1000, [
+        { employeeId: 'a', name: 'A', role: 'SERVER', hours: 10, hourlyRate: 15 },
+        { employeeId: 'a', name: 'A', role: 'BUSSER', hours: 8, hourlyRate: 12 },
+      ], [{ role: 'BUSSER', percentage: 20 }])).toThrow('hours total');
+    });
 
-  // TC-CALC-015: Employee > 16 hours validation
-  it('TC-CALC-015: employee over 16 hours throws error', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [makeServer({ hoursWorked: 17 })],
-      supportStaffConfig: [],
-    };
-    expect(() => calculateTips(input)).toThrow('invalid hours: 17');
-  });
+    it('throws on a negative tip pool', () => {
+      expect(() => run(-100, [server()])).toThrow('Total tip pool cannot be negative');
+    });
 
-  // TC-CALC-016: Duplicate employee validation
-  it('TC-CALC-016: duplicate employee throws error', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 'same-id', name: 'Server A' }),
-        makeServer({ id: 'same-id', name: 'Server B' }),
-      ],
-      supportStaffConfig: [],
-    };
-    expect(() => calculateTips(input)).toThrow('Duplicate employee');
-  });
+    it('throws on a duplicate (employee, role) stint', () => {
+      expect(() => run(1000, [server({ employeeId: 'x' }), server({ employeeId: 'x' })])).toThrow('Duplicate stint');
+    });
 
-  // TC-CALC-017: Support staff with no shared shifts = $0
-  it('TC-CALC-017: support staff with no shared shifts gets $0', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', shifts: ['shift-1'] }),
-        makeBusser({ id: 'b1', shifts: ['shift-2'] }), // different shift
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }],
-    };
-    const results = calculateTips(input);
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-    expect(busser.finalTips).toBe(0);
-    expect(busser.supportTipsReceived).toBe(0);
-  });
+    it('throws when support percentages total 100% or more', () => {
+      expect(() => run(1000, [server({ employeeId: 's1' }), busser(), expeditor()],
+        [{ role: 'BUSSER', percentage: 50 }, { role: 'EXPEDITOR', percentage: 50 }])).toThrow('Support percentages total');
+    });
 
-  // TC-CALC-018: Complex 3-way: 2 servers + 1 busser
-  it('TC-CALC-018: complex scenario with 2 servers and 1 busser', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 900,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 6, shifts: ['shift-1'] }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 3, shifts: ['shift-1'] }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 4, shifts: ['shift-1'] }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }],
-    };
-    const results = calculateTips(input);
-    const serverA = results.find((r) => r.employeeId === 's1')!;
-    const serverB = results.find((r) => r.employeeId === 's2')!;
-    const busser = results.find((r) => r.employeeId === 'b1')!;
-
-    // Server A base: (6/9)*900 = $600, Server B base: (3/9)*900 = $300
-    expect(serverA.baseTips).toBe(600);
-    expect(serverB.baseTips).toBe(300);
-
-    // Busser gets 20% from each: 20%*$600 + 20%*$300 = $120 + $60 = $180
-    expect(busser.supportTipsReceived).toBe(180);
-
-    // Server A final: $600 - $120 = $480, Server B final: $300 - $60 = $240
-    expect(serverA.finalTips).toBe(480);
-    expect(serverB.finalTips).toBe(240);
-
-    // Total check
-    expect(sumFinalTips(results)).toBe(900);
-  });
-
-  // TC-CALC-019: Decimal hours (4.5, 7.25)
-  it('TC-CALC-019: decimal hours are prorated accurately', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 1000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 4.5 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 7.25 }),
-      ],
-      supportStaffConfig: [],
-    };
-    const results = calculateTips(input);
-    const sA = results.find((r) => r.employeeId === 's1')!;
-    const sB = results.find((r) => r.employeeId === 's2')!;
-
-    // Total hours: 11.75. A: 4.5/11.75 = 0.38297... * 1000 = $382.98
-    // B: 7.25/11.75 = 0.61702... * 1000 = $617.02
-    expect(sA.finalTips).toBeCloseTo(382.98, 1);
-    expect(sB.finalTips).toBeCloseTo(617.02, 1);
-    expect(sumFinalTips(results)).toBe(1000);
-  });
-
-  // TC-CALC-020: Large tip ($10,000+) precision
-  it('TC-CALC-020: large tip pool maintains precision', () => {
-    const input: TipCalculationInput = {
-      totalTipPool: 15000,
-      employees: [
-        makeServer({ id: 's1', name: 'Server A', hoursWorked: 8 }),
-        makeServer({ id: 's2', name: 'Server B', hoursWorked: 6 }),
-        makeServer({ id: 's3', name: 'Server C', hoursWorked: 10 }),
-        makeBusser({ id: 'b1', name: 'Busser A', hoursWorked: 7 }),
-      ],
-      supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }],
-    };
-    const results = calculateTips(input);
-    const total = sumFinalTips(results);
-    expect(Math.abs(total - 15000)).toBeLessThanOrEqual(0.01);
-
-    // All tips should be positive
-    results.forEach((r) => {
-      expect(r.finalTips).toBeGreaterThanOrEqual(0);
+    it('gives 0 tips (not NaN) to a support role with no configured percentage', () => {
+      const r = run(1000, [server({ employeeId: 's1' }), busser()], []); // no config
+      expect(emp(r, 'b1').totalTips).toBe(0);
+      expect(emp(r, 's1').totalTips).toBe(1000);
+      expect(sumTips(r)).toBe(1000);
     });
   });
 
-  // Additional: Cash tips formula verification (PRD example)
-  describe('calculateCashTips', () => {
-    it('calculates cash tips with cash sales deducted', () => {
-      // PRD example: Starting $500, Closing $1800, Cash Sales $1000
-      expect(calculateCashTips(1800, 500, 1000)).toBe(300);
+  describe('computeCashTips', () => {
+    it('adds drawer overage and the tip jar', () => {
+      expect(computeCashTips(1000, 800, 50)).toBe(250);   // (1000-800) + 50
     });
-
-    it('defaults cash sales to 0 for credit-card-only', () => {
-      expect(calculateCashTips(1800, 500)).toBe(1300);
+    it('allows a negative drawer overage (register short)', () => {
+      expect(computeCashTips(900, 1000, 300)).toBe(200);  // -100 + 300
     });
-
-    it('handles separate tip jar scenario', () => {
-      // Starting = 0, Closing = total tips, Cash Sales = 0
-      expect(calculateCashTips(250, 0, 0)).toBe(250);
+    it('handles a jar-only scenario', () => {
+      expect(computeCashTips(0, 0, 250)).toBe(250);
     });
   });
 });

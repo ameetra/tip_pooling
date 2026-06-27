@@ -3,7 +3,6 @@ import {
   AppBar, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, IconButton, Tooltip,
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
-import ScheduleIcon from '@mui/icons-material/Schedule';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -17,7 +16,6 @@ const DRAWER_WIDTH = 220;
 const managerNavItems = [
   { label: 'Tips', path: '/tips', icon: <ReceiptIcon /> },
   { label: 'Employees', path: '/employees', icon: <PeopleIcon /> },
-  { label: 'Shifts', path: '/shifts', icon: <ScheduleIcon /> },
   { label: 'Config', path: '/config', icon: <SettingsIcon /> },
   { label: 'Staff', path: '/users', icon: <AdminPanelSettingsIcon /> },
 ];

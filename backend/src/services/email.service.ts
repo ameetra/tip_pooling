@@ -16,7 +16,7 @@ export interface TipEmailData {
   slug?: string | null;
   logoUrl?: string | null;
   entryDate: string;
-  shifts: string[];
+  roles: string[];
   hours: number;
   finalTips: number;
   totalPay: number;
@@ -40,7 +40,7 @@ export async function sendTipEmail(data: TipEmailData): Promise<void> {
 }
 
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
-  const shifts = esc(d.shifts.join(', ')) || '—';
+  const roles = esc(d.roles.join(', ')) || '—';
   const name = esc(d.restaurantName);
   const employee = esc(d.employeeName);
   return `
@@ -53,8 +53,8 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
   <p>Here's your tip summary for <strong>${d.entryDate}</strong>:</p>
   <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
     <tr style="background:#f5f5f5;">
-      <td style="padding: 8px 12px;">Shift(s)</td>
-      <td style="padding: 8px 12px; text-align:right;">${shifts}</td>
+      <td style="padding: 8px 12px;">Role(s)</td>
+      <td style="padding: 8px 12px; text-align:right;">${roles}</td>
     </tr>
     <tr>
       <td style="padding: 8px 12px;">Hours worked</td>
@@ -120,7 +120,7 @@ function buildPlainText(d: TipEmailData, loginUrl: string): string {
 
 Hi ${d.employeeName},
 
-Shift(s): ${d.shifts.join(', ') || '—'}
+Role(s): ${d.roles.join(', ') || '—'}
 Hours worked: ${d.hours.toFixed(1)}
 Tips earned: $${d.finalTips.toFixed(2)}
 Total pay (wages + tips): $${d.totalPay.toFixed(2)}

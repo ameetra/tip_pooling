@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from './client';
-import type { Employee, CreateEmployeeInput, UpdateEmployeeInput, UpdateRateInput } from '../types';
+import type { Employee, CreateEmployeeInput, UpdateEmployeeInput, SetRoleRatesInput } from '../types';
 
 export const useEmployees = () =>
   useQuery({ queryKey: ['employees'], queryFn: () => get<Employee[]>('/employees') });
@@ -21,10 +21,10 @@ export const useUpdateEmployee = () => {
   });
 };
 
-export const useUpdateRate = () => {
+export const useSetRoleRates = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateRateInput }) => post<Employee>(`/employees/${id}/update-rate`, data),
+    mutationFn: ({ id, data }: { id: string; data: SetRoleRatesInput }) => post<Employee>(`/employees/${id}/role-rates`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
 };

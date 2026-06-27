@@ -29,17 +29,6 @@ CREATE TABLE IF NOT EXISTS employees (
 CREATE UNIQUE INDEX IF NOT EXISTS employees_tenantId_email_key ON employees("tenantId", email);
 CREATE INDEX IF NOT EXISTS employees_tenantId_isActive_idx ON employees("tenantId", "isActive");
 
-CREATE TABLE IF NOT EXISTS shifts (
-  id TEXT PRIMARY KEY,
-  "tenantId" TEXT NOT NULL REFERENCES tenants(id),
-  name TEXT NOT NULL,
-  "isActive" BOOLEAN NOT NULL DEFAULT true,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX IF NOT EXISTS shifts_tenantId_name_key ON shifts("tenantId", name);
-CREATE INDEX IF NOT EXISTS shifts_tenantId_isActive_idx ON shifts("tenantId", "isActive");
-
 CREATE TABLE IF NOT EXISTS support_staff_config (
   id TEXT PRIMARY KEY,
   "tenantId" TEXT NOT NULL REFERENCES tenants(id),
@@ -83,13 +72,6 @@ CREATE TABLE IF NOT EXISTS tip_calculations (
   "snapshotSupportPct" DOUBLE PRECISION NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS tip_calculations_tipEntryId_idx ON tip_calculations("tipEntryId");
-
-CREATE TABLE IF NOT EXISTS shift_assignments (
-  id TEXT PRIMARY KEY,
-  "tipCalculationId" TEXT NOT NULL REFERENCES tip_calculations(id),
-  "shiftId" TEXT NOT NULL REFERENCES shifts(id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS shift_assignments_tipCalculationId_shiftId_key ON shift_assignments("tipCalculationId", "shiftId");
 
 CREATE TABLE IF NOT EXISTS employee_rate_history (
   id TEXT PRIMARY KEY,
@@ -159,16 +141,6 @@ export const handler = async (event: any) => {
           address: '123 Main St, San Francisco, CA 94102',
           timezone: 'America/Los_Angeles',
         },
-      });
-      await prisma.shift.upsert({
-        where: { tenantId_name: { tenantId: tenant.id, name: 'Lunch' } },
-        update: {},
-        create: { tenantId: tenant.id, name: 'Lunch' },
-      });
-      await prisma.shift.upsert({
-        where: { tenantId_name: { tenantId: tenant.id, name: 'Dinner' } },
-        update: {},
-        create: { tenantId: tenant.id, name: 'Dinner' },
       });
       return { statusCode: 200, body: JSON.stringify({ message: 'Seed complete', tenant: tenant.name }) };
     }

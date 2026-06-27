@@ -37,10 +37,10 @@ export default function TipEntriesPage() {
           <TableHead>
             <TableRow>
               <TableCell>Date</TableCell>
-              <TableCell>Starting Drawer</TableCell>
-              <TableCell>Closing Drawer</TableCell>
+              <TableCell>Cash in Register</TableCell>
               <TableCell>Cash Sales</TableCell>
-              <TableCell>Electronic Tips</TableCell>
+              <TableCell>Cash Tips (jar)</TableCell>
+              <TableCell>POS Tips</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -49,10 +49,10 @@ export default function TipEntriesPage() {
             {entries.map((entry) => (
               <TableRow key={entry.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/${slug}/tips/${entry.id}`)}>
                 <TableCell>{entry.entryDate}</TableCell>
-                <TableCell>${entry.startingDrawer.toFixed(2)}</TableCell>
-                <TableCell>${entry.closingDrawer.toFixed(2)}</TableCell>
+                <TableCell>${entry.cashInRegister.toFixed(2)}</TableCell>
                 <TableCell>${entry.cashSales.toFixed(2)}</TableCell>
-                <TableCell>${entry.electronicTips.toFixed(2)}</TableCell>
+                <TableCell>${entry.cashTips.toFixed(2)}</TableCell>
+                <TableCell>${entry.posTips.toFixed(2)}</TableCell>
                 <TableCell>
                   {entry.publishedAt
                     ? <Chip label="Published" color="success" size="small" />

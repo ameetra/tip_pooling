@@ -1,23 +1,28 @@
 import { z } from 'zod';
 
-const EmployeeShiftEntry = z.object({
+// One role-stint. The same employee may appear in multiple stints with different roles.
+const EmployeeStintEntry = z.object({
   employeeId: z.string().min(1),
-  roleOnDay: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
+  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
   hoursWorked: z.number().min(0.5).max(16),
-  shiftIds: z.array(z.string().min(1)).min(1),
 });
+
+// Total pool = (cashInRegister - cashSales) + cashTips + posTips. Must be >= 0.
+const cashFields = {
+  cashInRegister: z.number().min(0).default(0),
+  cashSales: z.number().min(0).default(0),
+  cashTips: z.number().min(0).default(0),
+  posTips: z.number().min(0).default(0),
+};
+const poolNonNegative = (d: { cashInRegister: number; cashSales: number; cashTips: number; posTips: number }) =>
+  (d.cashInRegister - d.cashSales) + d.cashTips + d.posTips >= 0;
+const poolError = { message: 'Total tips cannot be negative', path: ['cashInRegister'] };
 
 export const TipPreviewSchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
-  startingDrawer: z.number().min(0),
-  closingDrawer: z.number().min(0),
-  cashSales: z.number().min(0).default(0),
-  electronicTips: z.number().min(0).default(0),
-  employees: z.array(EmployeeShiftEntry).min(1),
-}).refine(
-  (d) => d.closingDrawer >= d.startingDrawer + d.cashSales,
-  { message: 'Closing drawer must be >= starting drawer + cash sales', path: ['closingDrawer'] },
-);
+  ...cashFields,
+  employees: z.array(EmployeeStintEntry).min(1),
+}).refine(poolNonNegative, poolError);
 
 export const CreateTipEntrySchema = TipPreviewSchema;
 
@@ -32,11 +37,11 @@ export const SupportStaffConfigSchema = z.object({
 });
 
 export const EditTipEntrySchema = z.object({
-  startingDrawer: z.number().min(0).optional(),
-  closingDrawer: z.number().min(0).optional(),
+  cashInRegister: z.number().min(0).optional(),
   cashSales: z.number().min(0).optional(),
-  electronicTips: z.number().min(0).optional(),
-  employees: z.array(EmployeeShiftEntry).min(1),
+  cashTips: z.number().min(0).optional(),
+  posTips: z.number().min(0).optional(),
+  employees: z.array(EmployeeStintEntry).min(1),
 });
 
 export const PaginationSchema = z.object({

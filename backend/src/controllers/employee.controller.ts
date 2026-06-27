@@ -36,10 +36,10 @@ export const employeeController = {
     } catch (err) { next(err); }
   },
 
-  async updateRate(req: Request, res: Response, next: NextFunction) {
+  async setRoleRates(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const employee = await employeeService.updateRate(req.tenantId, id, req.body);
+      const employee = await employeeService.setRoleRates(req.tenantId, id, req.body);
       if (!employee) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Employee not found' } }); return; }
       res.json({ success: true, data: employee });
     } catch (err) { next(err); }

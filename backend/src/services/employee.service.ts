@@ -1,17 +1,34 @@
 import prisma from '../database/client';
-import { CreateEmployeeInput, EmployeeQuery, UpdateEmployeeInput, UpdateRateInput } from '../validation/employee.schema';
+import { CreateEmployeeInput, EmployeeQuery, SetRoleRatesInput, UpdateEmployeeInput } from '../validation/employee.schema';
 import { auditService } from './audit.service';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const withRates = {
+  roleRates: { orderBy: { role: 'asc' as const } },
+  rateHistory: { orderBy: [{ effectiveDate: 'desc' as const }, { createdAt: 'desc' as const }] },
+};
+
 export const employeeService = {
   async create(tenantId: string, data: CreateEmployeeInput) {
-    const employee = await prisma.employee.create({ data: { ...data, tenantId } });
-    await prisma.employeeRateHistory.create({
-      data: { employeeId: employee.id, hourlyRate: data.hourlyRate, effectiveDate: today() },
+    // Build the per-role rate map: legacy single hourlyRate (primary role) + any explicit rates.
+    const rateMap = new Map<string, number>();
+    if (data.hourlyRate != null) rateMap.set(data.role, data.hourlyRate);
+    for (const r of data.rates ?? []) rateMap.set(r.role, r.hourlyRate);
+    const primaryRate = rateMap.get(data.role)!;
+
+    const employee = await prisma.employee.create({
+      data: { tenantId, name: data.name, email: data.email, role: data.role, hourlyRate: primaryRate },
     });
+
+    const eff = today();
+    for (const [role, hourlyRate] of rateMap) {
+      await prisma.employeeRoleRate.create({ data: { employeeId: employee.id, role, hourlyRate } });
+      await prisma.employeeRateHistory.create({ data: { employeeId: employee.id, role, hourlyRate, effectiveDate: eff } });
+    }
+
     await auditService.log({ tenantId, entityType: 'EMPLOYEE', entityId: employee.id, action: 'CREATE', newValues: data });
-    return employee;
+    return prisma.employee.findFirst({ where: { id: employee.id, tenantId }, include: withRates });
   },
 
   async findAll(tenantId: string, query?: EmployeeQuery) {
@@ -24,11 +41,8 @@ export const employeeService = {
 
     const [data, total] = await Promise.all([
       prisma.employee.findMany({
-        where,
-        orderBy: { name: 'asc' },
-        skip,
-        take: limit,
-        include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }], take: 1 } },
+        where, orderBy: { name: 'asc' }, skip, take: limit,
+        include: { roleRates: { orderBy: { role: 'asc' } } },
       }),
       prisma.employee.count({ where }),
     ]);
@@ -37,10 +51,7 @@ export const employeeService = {
   },
 
   findById(tenantId: string, id: string) {
-    return prisma.employee.findFirst({
-      where: { id, tenantId },
-      include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }] } },
-    });
+    return prisma.employee.findFirst({ where: { id, tenantId }, include: withRates });
   },
 
   async update(tenantId: string, id: string, data: UpdateEmployeeInput) {
@@ -48,33 +59,33 @@ export const employeeService = {
     const result = await prisma.employee.updateMany({ where: { id, tenantId }, data });
     if (result.count === 0) return null;
     await auditService.log({ tenantId, entityType: 'EMPLOYEE', entityId: id, action: 'UPDATE', oldValues: existing, newValues: data });
-    return prisma.employee.findFirst({
-      where: { id, tenantId },
-      include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }], take: 1 } },
-    });
+    return prisma.employee.findFirst({ where: { id, tenantId }, include: withRates });
   },
 
-  async updateRate(tenantId: string, id: string, data: UpdateRateInput) {
+  async setRoleRates(tenantId: string, id: string, data: SetRoleRatesInput) {
     const employee = await prisma.employee.findFirst({ where: { id, tenantId } });
     if (!employee) return null;
 
-    const effectiveDate = data.effectiveDate || today();
-    await prisma.employeeRateHistory.create({
-      data: { employeeId: id, hourlyRate: data.hourlyRate, effectiveDate },
-    });
-    await prisma.employee.updateMany({
-      where: { id, tenantId },
-      data: { hourlyRate: data.hourlyRate },
-    });
+    const eff = data.effectiveDate || today();
+    for (const r of data.rates) {
+      await prisma.employeeRoleRate.upsert({
+        where: { employeeId_role: { employeeId: id, role: r.role } },
+        update: { hourlyRate: r.hourlyRate },
+        create: { employeeId: id, role: r.role, hourlyRate: r.hourlyRate },
+      });
+      await prisma.employeeRateHistory.create({ data: { employeeId: id, role: r.role, hourlyRate: r.hourlyRate, effectiveDate: eff } });
+    }
+
+    // Keep the legacy single rate in sync with the primary role's rate.
+    const primary = data.rates.find((r) => r.role === employee.role);
+    if (primary) await prisma.employee.updateMany({ where: { id, tenantId }, data: { hourlyRate: primary.hourlyRate } });
+
     await auditService.log({
       tenantId, entityType: 'EMPLOYEE', entityId: id, action: 'UPDATE_RATE',
       oldValues: { hourlyRate: employee.hourlyRate },
-      newValues: { hourlyRate: data.hourlyRate, effectiveDate },
+      newValues: { rates: data.rates, effectiveDate: eff },
     });
-    return prisma.employee.findFirst({
-      where: { id, tenantId },
-      include: { rateHistory: { orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }] } },
-    });
+    return prisma.employee.findFirst({ where: { id, tenantId }, include: withRates });
   },
 
   getRateHistory(tenantId: string, id: string) {

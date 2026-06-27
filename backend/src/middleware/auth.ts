@@ -7,8 +7,13 @@ import { verifyJwtToken } from '../services/auth.service';
 const TEST_BYPASS = process.env.NODE_ENV === 'test' && !process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 export function verifyJWT(req: Request, res: Response, next: NextFunction) {
-  // In test mode, tenantContext already set req.tenantId from DEFAULT_TENANT_ID
-  if (TEST_BYPASS) return next();
+  // In test mode, populate a stand-in user so role-dependent logic is exercisable.
+  // Defaults to ADMIN; tests can override with an x-test-role header.
+  if (TEST_BYPASS) {
+    const role = (req.headers['x-test-role'] as string) || 'ADMIN';
+    req.user = { sub: 'test-user', email: 'test@example.com', role, tenantId: req.tenantId } as any;
+    return next();
+  }
 
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {

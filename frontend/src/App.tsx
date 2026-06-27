@@ -10,7 +10,6 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import VerifyPage from './pages/VerifyPage';
 import LandingPage from './pages/LandingPage';
 import EmployeesPage from './pages/EmployeesPage';
-import ShiftsPage from './pages/ShiftsPage';
 import SupportConfigPage from './pages/SupportConfigPage';
 import TipEntriesPage from './pages/TipEntriesPage';
 import TipEntryFormPage from './pages/TipEntryFormPage';
@@ -73,7 +72,6 @@ function VenueRoutes() {
       <Route element={<RequireAuth kind="manager"><Layout /></RequireAuth>}>
         <Route index element={<RoleRouter />} />
         <Route path="employees" element={<EmployeesPage />} />
-        <Route path="shifts" element={<ShiftsPage />} />
         <Route path="config" element={<SupportConfigPage />} />
         <Route path="tips" element={<TipEntriesPage />} />
         <Route path="tips/new" element={<TipEntryFormPage />} />

@@ -6,7 +6,6 @@ import { get } from '../api/client';
 interface TipRecord {
   date: string;
   role: string;
-  shifts: string[];
   hours: number;
   hourlyPay: number;
   tips: number;
@@ -78,7 +77,6 @@ export default function EmployeeTipHistoryPage() {
                       <Typography sx={{ fontWeight: 600 }}>{fmtDate(r.date)}</Typography>
                       <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
                         <Chip label={r.role} size="small" variant="outlined" />
-                        {r.shifts.map(s => <Chip key={s} label={s} size="small" />)}
                       </Stack>
                     </Box>
                     <Box sx={{ textAlign: 'right' }}>

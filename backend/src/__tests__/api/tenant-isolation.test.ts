@@ -18,14 +18,11 @@ describe('Tenant Isolation', () => {
     await testPrisma.employee.create({
       data: { id: 'other-emp', tenantId: otherTenantId, name: 'Other Alice', email: 'alice@other.com', role: 'SERVER', hourlyRate: 20 },
     });
-    await testPrisma.shift.create({
-      data: { id: 'other-shift', tenantId: otherTenantId, name: 'Other Morning' },
-    });
     await testPrisma.supportStaffConfig.create({
       data: { tenantId: otherTenantId, role: 'BUSSER', percentage: 10 },
     });
     await testPrisma.tipEntry.create({
-      data: { id: 'other-entry', tenantId: otherTenantId, entryDate: '2026-04-10', startingDrawer: 500, closingDrawer: 800, cashSales: 0, electronicTips: 100 },
+      data: { id: 'other-entry', tenantId: otherTenantId, entryDate: '2026-04-10', cashInRegister: 300, cashSales: 0, cashTips: 0, posTips: 100 },
     });
   });
 
@@ -42,14 +39,6 @@ describe('Tenant Isolation', () => {
   it('should not get other tenant employee by id', async () => {
     const res = await request(app).get('/api/v1/employees/other-emp');
     expect(res.status).toBe(404);
-  });
-
-  it('should not list other tenant shifts', async () => {
-    await request(app).post('/api/v1/shifts').send({ name: 'My Morning' });
-
-    const res = await request(app).get('/api/v1/shifts');
-    expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0].name).toBe('My Morning');
   });
 
   it('should not list other tenant tip entries', async () => {
@@ -75,10 +64,5 @@ describe('Tenant Isolation', () => {
     // Verify other tenant employee still exists
     const emp = await testPrisma.employee.findFirst({ where: { id: 'other-emp' } });
     expect(emp!.isActive).toBe(true);
-  });
-
-  it('should not delete other tenant shift', async () => {
-    const res = await request(app).delete('/api/v1/shifts/other-shift');
-    expect(res.status).toBe(404);
   });
 });

@@ -1,7 +1,14 @@
 export type EmployeeRole = 'SERVER' | 'BUSSER' | 'EXPEDITOR';
 
+export interface EmployeeRoleRate {
+  id: string;
+  role: EmployeeRole;
+  hourlyRate: number;
+}
+
 export interface EmployeeRateHistory {
   id: string;
+  role: EmployeeRole;
   hourlyRate: number;
   effectiveDate: string;
   createdAt: string;
@@ -13,18 +20,24 @@ export interface Employee {
   name: string;
   email: string;
   role: EmployeeRole;
-  hourlyRate: number;
+  hourlyRate: number; // legacy primary-role rate
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  roleRates?: EmployeeRoleRate[];
   rateHistory?: EmployeeRateHistory[];
+}
+
+export interface RoleRateInput {
+  role: EmployeeRole;
+  hourlyRate: number;
 }
 
 export interface CreateEmployeeInput {
   name: string;
   email: string;
   role: EmployeeRole;
-  hourlyRate: number;
+  rates: RoleRateInput[];
 }
 
 export interface UpdateEmployeeInput {
@@ -34,18 +47,9 @@ export interface UpdateEmployeeInput {
   isActive?: boolean;
 }
 
-export interface UpdateRateInput {
-  hourlyRate: number;
+export interface SetRoleRatesInput {
+  rates: RoleRateInput[];
   effectiveDate?: string;
-}
-
-export interface Shift {
-  id: string;
-  tenantId: string;
-  name: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface SupportStaffConfig {
@@ -61,10 +65,10 @@ export interface TipEntry {
   id: string;
   tenantId: string;
   entryDate: string;
-  startingDrawer: number;
-  closingDrawer: number;
+  cashInRegister: number;
   cashSales: number;
-  electronicTips: number;
+  cashTips: number;
+  posTips: number;
   isDeleted: boolean;
   deletedAt: string | null;
   publishedAt: string | null;
@@ -72,43 +76,55 @@ export interface TipEntry {
   updatedAt: string;
 }
 
-export interface TipCalculationResult {
+// Per-role stint within a calculation result.
+export interface StintResult {
   employeeId: string;
   name: string;
-  roleOnDay: EmployeeRole;
-  shifts: string[];
-  hoursWorked: number;
-  hourlyPay: number;
+  role: EmployeeRole;
+  hours: number;
+  hourlyRate: number;
+  wage: number;
   baseTips: number;
   supportTipsGiven: number;
   supportTipsReceived: number;
   finalTips: number;
   totalPay: number;
+}
+
+// Per-employee aggregate — one row per employee per day.
+export interface EmployeeResult {
+  employeeId: string;
+  name: string;
+  roles: EmployeeRole[];
+  totalHours: number;
+  totalWage: number;
+  totalTips: number;
+  totalPay: number;
   effectiveHourlyRate: number;
+  stints: StintResult[];
 }
 
 export interface TipPreviewResponse {
   entryDate: string;
   cashTips: number;
-  electronicTips: number;
+  posTips: number;
   totalTipPool: number;
-  results: TipCalculationResult[];
+  results: EmployeeResult[];
 }
 
-export interface EmployeeShiftEntry {
+export interface EmployeeStintEntry {
   employeeId: string;
-  roleOnDay: EmployeeRole;
+  role: EmployeeRole;
   hoursWorked: number;
-  shiftIds: string[];
 }
 
 export interface TipEntryInput {
   entryDate: string;
-  startingDrawer: number;
-  closingDrawer: number;
+  cashInRegister: number;
   cashSales: number;
-  electronicTips: number;
-  employees: EmployeeShiftEntry[];
+  cashTips: number;
+  posTips: number;
+  employees: EmployeeStintEntry[];
 }
 
 export interface TipEntryDetail extends TipEntry {
@@ -125,6 +141,5 @@ export interface TipEntryDetail extends TipEntry {
     totalPay: number;
     effectiveHourlyRate: number;
     employee: { id: string; name: string; email: string; role: string };
-    shiftAssignments: { shift: { id: string; name: string } }[];
   }[];
 }

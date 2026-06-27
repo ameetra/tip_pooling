@@ -42,7 +42,6 @@ model Tenant {
 
   users              User[]
   employees          Employee[]
-  shifts             Shift[]
   supportStaffConfig SupportStaffConfig[]
   tipEntries         TipEntry[]
 
@@ -54,35 +53,35 @@ model Employee {
   tenantId   String
   name       String
   email      String
-  role       String   // SERVER, BUSSER, EXPEDITOR
-  hourlyRate Float
+  role       String   // primary role: SERVER, BUSSER, EXPEDITOR
+  hourlyRate Float    // legacy single rate; per-role rates live in EmployeeRoleRate
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  tenant         Tenant               @relation(fields: [tenantId], references: [id])
+  tenant          Tenant                @relation(fields: [tenantId], references: [id])
   tipCalculations TipCalculation[]
-  rateHistory    EmployeeRateHistory[]
+  rateHistory     EmployeeRateHistory[]
+  roleRates       EmployeeRoleRate[]
 
   @@unique([tenantId, email])
   @@index([tenantId, isActive])
   @@map("employees")
 }
 
-model Shift {
-  id        String   @id @default(cuid())
-  tenantId  String
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Current base rate per (employee, role). An employee can work multiple roles at different rates.
+model EmployeeRoleRate {
+  id         String   @id @default(cuid())
+  employeeId String
+  role       String   // SERVER, BUSSER, EXPEDITOR
+  hourlyRate Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  shiftAssignments ShiftAssignment[]
+  employee Employee @relation(fields: [employeeId], references: [id])
 
-  @@unique([tenantId, name])
-  @@index([tenantId, isActive])
-  @@map("shifts")
+  @@unique([employeeId, role])
+  @@map("employee_role_rates")
 }
 
 model SupportStaffConfig {
@@ -103,10 +102,13 @@ model TipEntry {
   id              String    @id @default(cuid())
   tenantId        String
   entryDate       String    // YYYY-MM-DD (SQLite has no DATE type)
-  startingDrawer  Float
-  closingDrawer   Float
+  cashInRegister  Float     @default(0)
   cashSales       Float     @default(0)
-  electronicTips  Float     @default(0)
+  cashTips        Float     @default(0) // tip jar
+  posTips         Float     @default(0) // electronic/credit-card tips from POS
+  startingDrawer  Float?    // legacy, unused (kept for historical entries)
+  closingDrawer   Float?    // legacy, unused
+  electronicTips  Float     @default(0) // legacy, superseded by posTips
   isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   replacedById    String?
@@ -139,27 +141,15 @@ model TipCalculation {
 
   tipEntry         TipEntry          @relation(fields: [tipEntryId], references: [id])
   employee         Employee          @relation(fields: [employeeId], references: [id])
-  shiftAssignments ShiftAssignment[]
 
   @@index([tipEntryId])
   @@map("tip_calculations")
 }
 
-model ShiftAssignment {
-  id               String @id @default(cuid())
-  tipCalculationId String
-  shiftId          String
-
-  tipCalculation TipCalculation @relation(fields: [tipCalculationId], references: [id])
-  shift          Shift          @relation(fields: [shiftId], references: [id])
-
-  @@unique([tipCalculationId, shiftId])
-  @@map("shift_assignments")
-}
-
 model EmployeeRateHistory {
   id            String   @id @default(cuid())
   employeeId    String
+  role          String   @default("SERVER") // role this rate applies to
   hourlyRate    Float
   effectiveDate String   // YYYY-MM-DD
   createdAt     DateTime @default(now())

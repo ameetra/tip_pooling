@@ -71,22 +71,30 @@ export const tipController = {
           employeeId,
           tipEntry: { tenantId: req.tenantId, isDeleted: false, entryDate: { gte: sinceStr } },
         },
-        include: {
-          tipEntry: { select: { entryDate: true } },
-          shiftAssignments: { include: { shift: { select: { name: true } } } },
-        },
+        include: { tipEntry: { select: { entryDate: true } } },
         orderBy: { tipEntry: { entryDate: 'desc' } },
       });
 
-      const records = calcs.map((c: any) => ({
-        date: c.tipEntry.entryDate,
-        role: c.roleOnDay,
-        shifts: c.shiftAssignments.map((sa: any) => sa.shift.name),
-        hours: c.totalHours,
-        hourlyPay: c.hourlyPay,
-        tips: c.finalTips,
-        totalPay: c.totalPay,
-        effectiveHourlyRate: c.effectiveHourlyRate,
+      // Aggregate per date — an employee may have multiple role stints on the same day.
+      const byDate = new Map<string, any>();
+      for (const c of calcs) {
+        const date = c.tipEntry.entryDate;
+        const r = byDate.get(date) ?? { date, roles: [], hours: 0, hourlyPay: 0, tips: 0, totalPay: 0 };
+        if (!r.roles.includes(c.roleOnDay)) r.roles.push(c.roleOnDay);
+        r.hours += c.totalHours;
+        r.hourlyPay += c.hourlyPay;
+        r.tips += c.finalTips;
+        r.totalPay += c.totalPay;
+        byDate.set(date, r);
+      }
+      const records = [...byDate.values()].map((r) => ({
+        date: r.date,
+        role: r.roles.join(', '),
+        hours: Number(r.hours.toFixed(2)),
+        hourlyPay: Number(r.hourlyPay.toFixed(2)),
+        tips: Number(r.tips.toFixed(2)),
+        totalPay: Number(r.totalPay.toFixed(2)),
+        effectiveHourlyRate: r.hours > 0 ? Number((r.totalPay / r.hours).toFixed(2)) : 0,
       }));
 
       const tenant = await (prisma as any).tenant.findUnique({ where: { id: req.tenantId }, select: { name: true } });
