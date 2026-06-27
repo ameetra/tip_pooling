@@ -83,6 +83,10 @@ CREDENTIALS.local.md
 *.local.md
 .claude/settings.local.json
 
+# Local MCP server config (Playwright, etc.) + its output — local tooling, not shared
+.mcp.json
+.playwright-mcp/
+
 # Operator / planning / security docs — keep local (operational + internal info), not in the public repo
 SUPER_ADMIN_GUIDE.md
 RUNBOOK_ADD_TENANT.md
