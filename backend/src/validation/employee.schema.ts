@@ -8,14 +8,14 @@ export const EmployeeQuerySchema = PaginationSchema.extend({
 export type EmployeeQuery = z.infer<typeof EmployeeQuerySchema>;
 
 const RoleRate = z.object({
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
+  role: z.enum(['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR']),
   hourlyRate: z.number().positive().max(999),
 });
 
 export const CreateEmployeeSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email().max(255),
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
+  role: z.enum(['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR']),
   hourlyRate: z.number().positive().max(999).optional(),
   rates: z.array(RoleRate).optional(),
 }).refine(
@@ -26,7 +26,7 @@ export const CreateEmployeeSchema = z.object({
 export const UpdateEmployeeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().max(255).optional(),
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']).optional(),
+  role: z.enum(['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR']).optional(),
   isActive: z.boolean().optional(),
 });
 

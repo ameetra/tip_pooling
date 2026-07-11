@@ -2,6 +2,7 @@ import { calculateTips, computeCashTips, TipCalculationError } from '../tip-calc
 import { StintInput, SupportStaffConfig, TipCalculationInput, TipCalculationResult } from '../../types/tip-calculation.types';
 
 const server = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 's1', name: 'Server A', role: 'SERVER', hours: 8, hourlyRate: 15, ...o });
+const shiftLead = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'sl1', name: 'Lead A', role: 'SHIFT_LEAD', hours: 8, hourlyRate: 17, ...o });
 const busser = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'b1', name: 'Busser A', role: 'BUSSER', hours: 6, hourlyRate: 12, ...o });
 const expeditor = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'e1', name: 'Expeditor A', role: 'EXPEDITOR', hours: 4, hourlyRate: 13, ...o });
 
@@ -92,6 +93,29 @@ describe('Tip Calculation Service (prorated hours, per-role pool)', () => {
     expect(sumTips(r)).toBe(1000);
   });
 
+  it('a shift lead pools with servers (same per-hour tip), only the higher base lifts $/hr', () => {
+    const r = run(1000, [server({ employeeId: 's1', hours: 5 }), shiftLead({ employeeId: 'sl1', hours: 5 })]);
+    expect(emp(r, 'sl1').totalTips).toBe(500);                 // identical tip share to the equal-hours server
+    expect(emp(r, 's1').totalTips).toBe(500);
+    expect(emp(r, 'sl1').totalWage).toBe(85);                  // 5 * 17 (vs server 5 * 15 = 75)
+    expect(emp(r, 'sl1').effectiveHourlyRate).toBeGreaterThan(emp(r, 's1').effectiveHourlyRate);
+    expect(sumTips(r)).toBe(1000);
+  });
+
+  it('a shift-lead-only day is valid (counts as a tipped earner) and bussers still take their %', () => {
+    const r = run(1000, [shiftLead({ employeeId: 'sl1' }), busser()], [{ role: 'BUSSER', percentage: 20 }]);
+    expect(emp(r, 'sl1').totalTips).toBe(800);
+    expect(emp(r, 'b1').totalTips).toBe(200);
+    expect(sumTips(r)).toBe(1000);
+  });
+
+  it('the day-wide cap compares against the top tipped earner including shift leads', () => {
+    const leads = Array.from({ length: 10 }, (_, i) => shiftLead({ employeeId: `sl${i}`, hours: 1 }));
+    const r = run(1000, [...leads, busser({ employeeId: 'b1', hours: 5 })], [{ role: 'BUSSER', percentage: 50 }]);
+    expect(emp(r, 'b1').totalTips).toBe(50);                   // capped at the top lead's $50
+    expect(sumTips(r)).toBe(1000);
+  });
+
   it('rounds remainder to the highest earner ($10 / 3 servers)', () => {
     const r = run(10, [server({ employeeId: 's1' }), server({ employeeId: 's2' }), server({ employeeId: 's3' })]);
     const tips = r.stints.map((s) => s.finalTips).sort((a, b) => a - b);
@@ -115,8 +139,8 @@ describe('Tip Calculation Service (prorated hours, per-role pool)', () => {
   });
 
   describe('validation', () => {
-    it('throws when there are no servers', () => {
-      expect(() => run(1000, [busser()], [{ role: 'BUSSER', percentage: 20 }])).toThrow('At least one server is required');
+    it('throws when there are no tipped earners (servers or shift leads)', () => {
+      expect(() => run(1000, [busser()], [{ role: 'BUSSER', percentage: 20 }])).toThrow('At least one server or shift lead is required');
     });
 
     it('throws on invalid stint hours (out of 0.5-16)', () => {

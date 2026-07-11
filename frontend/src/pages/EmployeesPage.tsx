@@ -11,19 +11,16 @@ import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, us
 import EmployeeDialog from '../components/EmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Employee, EmployeeRole } from '../types';
+import { ROLE_OPTIONS, ROLE_VALUES, formatRole } from '../constants/roles';
 
 const today = new Date().toISOString().slice(0, 10);
-const ROLES: { value: EmployeeRole; label: string }[] = [
-  { value: 'SERVER', label: 'Server' },
-  { value: 'BUSSER', label: 'Busser' },
-  { value: 'EXPEDITOR', label: 'Expeditor' },
-];
+const emptyRates = () => Object.fromEntries(ROLE_VALUES.map((r) => [r, ''])) as Record<EmployeeRole, string>;
 
 const rateFor = (emp: Employee, role: EmployeeRole) =>
   emp.roleRates?.find((r) => r.role === role)?.hourlyRate;
 
 const ratesLabel = (emp: Employee) =>
-  (emp.roleRates ?? []).map((r) => `${r.role.toLowerCase()} $${r.hourlyRate.toFixed(2)}`).join(', ') || '—';
+  (emp.roleRates ?? []).map((r) => `${formatRole(r.role)} $${r.hourlyRate.toFixed(2)}`).join(', ') || '—';
 
 export default function EmployeesPage() {
   const { data: employees = [], isLoading } = useEmployees();
@@ -36,7 +33,7 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [rateEmployee, setRateEmployee] = useState<Employee | null>(null);
-  const [rateInputs, setRateInputs] = useState<Record<EmployeeRole, string>>({ SERVER: '', BUSSER: '', EXPEDITOR: '' });
+  const [rateInputs, setRateInputs] = useState<Record<EmployeeRole, string>>(emptyRates);
   const [rateEffectiveDate, setRateEffectiveDate] = useState(today);
   const [error, setError] = useState('');
 
@@ -60,17 +57,15 @@ export default function EmployeesPage() {
 
   const openRateDialog = (emp: Employee) => {
     setRateEmployee(emp);
-    setRateInputs({
-      SERVER: rateFor(emp, 'SERVER')?.toString() ?? '',
-      BUSSER: rateFor(emp, 'BUSSER')?.toString() ?? '',
-      EXPEDITOR: rateFor(emp, 'EXPEDITOR')?.toString() ?? '',
-    });
+    setRateInputs(Object.fromEntries(
+      ROLE_VALUES.map((r) => [r, rateFor(emp, r)?.toString() ?? '']),
+    ) as Record<EmployeeRole, string>);
     setRateEffectiveDate(today);
   };
 
   const handleRateSubmit = async () => {
     if (!rateEmployee) return;
-    const rates = ROLES
+    const rates = ROLE_OPTIONS
       .filter((r) => rateInputs[r.value] !== '' && Number(rateInputs[r.value]) > 0)
       .map((r) => ({ role: r.value, hourlyRate: Number(rateInputs[r.value]) }));
     if (rates.length === 0) { setError('Set at least one rate'); return; }
@@ -108,7 +103,7 @@ export default function EmployeesPage() {
               <TableRow key={emp.id}>
                 <TableCell>{emp.name}</TableCell>
                 <TableCell>{emp.email}</TableCell>
-                <TableCell>{emp.role}</TableCell>
+                <TableCell>{formatRole(emp.role)}</TableCell>
                 <TableCell>{ratesLabel(emp)}</TableCell>
                 <TableCell align="right">
                   <IconButton size="small" onClick={() => openRateDialog(emp)} title="Edit Rates"><AttachMoneyIcon /></IconButton>
@@ -134,7 +129,7 @@ export default function EmployeesPage() {
           <Typography variant="body2" color="text.secondary">
             Set the hourly rate for each role. Leave a field blank if they don't work that role.
           </Typography>
-          {ROLES.map((r) => (
+          {ROLE_OPTIONS.map((r) => (
             <TextField
               key={r.value} label={`${r.label} rate ($/hr)`} type="number"
               value={rateInputs[r.value]}

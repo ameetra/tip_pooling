@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { TipEntryQuerySchema } from '../validation/tip.schema';
+import { formatRole } from '../types/tip-calculation.types';
 
 function performer(req: Request) {
   const u = (req as any).user;
@@ -89,7 +90,7 @@ export const tipController = {
       }
       const records = [...byDate.values()].map((r) => ({
         date: r.date,
-        role: r.roles.join(', '),
+        role: r.roles.map(formatRole).join(', '),
         hours: Number(r.hours.toFixed(2)),
         hourlyPay: Number(r.hourlyPay.toFixed(2)),
         tips: Number(r.tips.toFixed(2)),

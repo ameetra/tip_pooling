@@ -6,6 +6,7 @@ import {
   SupportStaffConfig,
   TipCalculationInput,
   TipCalculationResult,
+  isTipped,
 } from '../types/tip-calculation.types';
 
 const round2 = (n: number) => Number(n.toFixed(2));
@@ -31,12 +32,12 @@ function validate(input: TipCalculationInput): void {
     throw new TipCalculationError('At least one employee is required', 'NO_EMPLOYEES');
   }
 
-  const serverHours = stints.filter((s) => s.role === 'SERVER').reduce((sum, s) => sum + s.hours, 0);
-  if (stints.every((s) => s.role !== 'SERVER')) {
-    throw new TipCalculationError('At least one server is required', 'NO_SERVERS');
+  const tippedHours = stints.filter((s) => isTipped(s.role)).reduce((sum, s) => sum + s.hours, 0);
+  if (!stints.some((s) => isTipped(s.role))) {
+    throw new TipCalculationError('At least one server or shift lead is required', 'NO_SERVERS');
   }
-  if (serverHours <= 0) {
-    throw new TipCalculationError('Total server hours must be greater than zero', 'ZERO_SERVER_HOURS');
+  if (tippedHours <= 0) {
+    throw new TipCalculationError('Total server/shift-lead hours must be greater than zero', 'ZERO_SERVER_HOURS');
   }
 
   const stintKeys = new Set<string>();
@@ -71,9 +72,9 @@ export function calculateTips(input: TipCalculationInput): TipCalculationResult 
   const { totalTipPool, stints, supportStaffConfig } = input;
   const pctByRole = new Map<string, number>(supportStaffConfig.map((c) => [c.role, c.percentage / 100]));
 
-  const serverStints = stints.filter((s) => s.role === 'SERVER');
-  const supportStints = stints.filter((s) => s.role !== 'SERVER');
-  const totalServerHours = serverStints.reduce((sum, s) => sum + s.hours, 0);
+  const tippedStints = stints.filter((s) => isTipped(s.role));
+  const supportStints = stints.filter((s) => !isTipped(s.role));
+  const totalTippedHours = tippedStints.reduce((sum, s) => sum + s.hours, 0);
 
   // Support roles actually present today, and their share of the pool.
   const presentSupportRoles = [...new Set(supportStints.map((s) => s.role))];
@@ -85,11 +86,12 @@ export function calculateTips(input: TipCalculationInput): TipCalculationResult 
     );
   }
 
-  const serverPool = round2(totalTipPool * (1 - totalSupportPct));
+  const tippedPool = round2(totalTipPool * (1 - totalSupportPct));
 
-  // Servers: gross prorated share, then deduct the support take (off the top, prorated by hours).
-  const serverResults = serverStints.map((s) => {
-    const gross = (s.hours / totalServerHours) * totalTipPool;
+  // Tipped earners (servers + shift leads): gross prorated share, then deduct the support take
+  // (off the top, prorated by hours). Tip share ignores base wage, so shift leads split exactly like servers.
+  const tippedResults = tippedStints.map((s) => {
+    const gross = (s.hours / totalTippedHours) * totalTipPool;
     const baseTips = round2(gross);
     const finalTips = round2(gross * (1 - totalSupportPct));
     const supportTipsGiven = round2(baseTips - finalTips);
@@ -105,10 +107,10 @@ export function calculateTips(input: TipCalculationInput): TipCalculationResult 
     return buildStint(s, { baseTips: 0, supportTipsGiven: 0, supportTipsReceived: received, finalTips: received, supportPct: pct });
   });
 
-  // Day-wide cap: no support stint earns more in tips than the top-earning server stint.
-  applyCap(serverResults, supportResults, totalServerHours);
+  // Day-wide cap: no support stint earns more in tips than the top-earning tipped stint.
+  applyCap(tippedResults, supportResults, totalTippedHours);
 
-  const all = [...serverResults, ...supportResults];
+  const all = [...tippedResults, ...supportResults];
 
   // Rounding: ensure total distributed == pool exactly (within $0.01); remainder to highest earner.
   const distributed = all.reduce((sum, r) => sum + r.finalTips, 0);
@@ -119,28 +121,28 @@ export function calculateTips(input: TipCalculationInput): TipCalculationResult 
     top.totalPay = round2(top.wage + top.finalTips);
   }
 
-  void serverPool; // serverPool is implied by the per-stint math above; kept for clarity
+  void tippedPool; // tippedPool is implied by the per-stint math above; kept for clarity
 
   return { stints: all, employees: aggregateByEmployee(all) };
 }
 
-function applyCap(servers: StintResult[], support: StintResult[], totalServerHours: number): void {
-  if (servers.length === 0) return;
-  const highestServerTip = Math.max(...servers.map((s) => s.finalTips));
+function applyCap(tipped: StintResult[], support: StintResult[], totalTippedHours: number): void {
+  if (tipped.length === 0) return;
+  const highestTippedTip = Math.max(...tipped.map((s) => s.finalTips));
 
   for (const sup of support) {
-    if (sup.finalTips <= highestServerTip) continue;
-    const excess = round2(sup.finalTips - highestServerTip);
-    sup.supportTipsReceived = highestServerTip;
-    sup.finalTips = highestServerTip;
+    if (sup.finalTips <= highestTippedTip) continue;
+    const excess = round2(sup.finalTips - highestTippedTip);
+    sup.supportTipsReceived = highestTippedTip;
+    sup.finalTips = highestTippedTip;
     sup.totalPay = round2(sup.wage + sup.finalTips);
 
-    // Return excess to servers, prorated by server hours.
-    servers.forEach((svr) => {
-      const refund = round2((svr.hours / totalServerHours) * excess);
-      svr.finalTips = round2(svr.finalTips + refund);
-      svr.supportTipsGiven = round2(svr.supportTipsGiven - refund);
-      svr.totalPay = round2(svr.wage + svr.finalTips);
+    // Return excess to tipped earners, prorated by their hours.
+    tipped.forEach((t) => {
+      const refund = round2((t.hours / totalTippedHours) * excess);
+      t.finalTips = round2(t.finalTips + refund);
+      t.supportTipsGiven = round2(t.supportTipsGiven - refund);
+      t.totalPay = round2(t.wage + t.finalTips);
     });
   }
 }

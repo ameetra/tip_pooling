@@ -12,6 +12,7 @@ import { useTipPreview, useCreateTipEntry } from '../api/tips';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import type { EmployeeRole, TipEntryInput, EmployeeResult } from '../types';
+import { ROLE_OPTIONS, formatRole } from '../constants/roles';
 
 interface EmployeeRow {
   employeeId: string;
@@ -20,11 +21,6 @@ interface EmployeeRow {
 }
 
 const today = new Date().toISOString().slice(0, 10);
-const ROLES: { value: EmployeeRole; label: string }[] = [
-  { value: 'SERVER', label: 'Server' },
-  { value: 'BUSSER', label: 'Busser' },
-  { value: 'EXPEDITOR', label: 'Expeditor' },
-];
 
 export default function TipEntryFormPage() {
   const navigate = useNavigate();
@@ -136,7 +132,7 @@ export default function TipEntryFormPage() {
               {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
             </TextField>
             <TextField select label="Role" value={row.role} onChange={(e) => updateRow(i, 'role', e.target.value)} sx={{ width: 140 }}>
-              {ROLES.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
+              {ROLE_OPTIONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
             </TextField>
             <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 16, step: 0.5 } }} sx={{ width: 110 }} />
             <IconButton onClick={() => removeRow(i)}><DeleteIcon /></IconButton>
@@ -183,7 +179,7 @@ function PreviewTable({ results }: { results: EmployeeResult[] }) {
           {results.map((r) => (
             <TableRow key={r.employeeId}>
               <TableCell>{r.name}</TableCell>
-              <TableCell>{r.roles.join(', ')}</TableCell>
+              <TableCell>{r.roles.map(formatRole).join(', ')}</TableCell>
               <TableCell>{r.totalHours}</TableCell>
               <TableCell>{fmt(r.totalWage)}</TableCell>
               <TableCell><strong>{fmt(r.totalTips)}</strong></TableCell>

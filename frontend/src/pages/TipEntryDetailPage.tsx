@@ -9,6 +9,7 @@ import SendIcon from '@mui/icons-material/Send';
 import { useTipEntry, useDeleteTipEntry, usePublishTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useTenant } from '../context/TenantContext';
+import { formatRole } from '../constants/roles';
 
 export default function TipEntryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -96,7 +97,7 @@ export default function TipEntryDetailPage() {
             {rows.map((r) => (
               <TableRow key={r.id}>
                 <TableCell>{r.name}</TableCell>
-                <TableCell>{r.roles.join(', ')}</TableCell>
+                <TableCell>{r.roles.map(formatRole).join(', ')}</TableCell>
                 <TableCell>{Number(r.hours.toFixed(2))}</TableCell>
                 <TableCell><strong>{fmt(r.tips)}</strong></TableCell>
                 <TableCell>{fmt(r.totalPay)}</TableCell>

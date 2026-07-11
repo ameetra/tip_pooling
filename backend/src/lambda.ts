@@ -139,7 +139,7 @@ async function runImportEmployees(tenantSlug: string, employees: any[]) {
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
 
-  const valid = ['SERVER', 'BUSSER', 'EXPEDITOR'];
+  const valid = ['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR'];
   let created = 0, skipped = 0;
   const errors: string[] = [];
   for (const e of employees) {

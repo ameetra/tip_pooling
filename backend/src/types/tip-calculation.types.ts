@@ -1,5 +1,14 @@
-export type EmployeeRole = 'SERVER' | 'BUSSER' | 'EXPEDITOR';
+export const ROLE_VALUES = ['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR'] as const;
+export type EmployeeRole = (typeof ROLE_VALUES)[number];
 export type SupportRole = 'BUSSER' | 'EXPEDITOR';
+
+// Tipped earners pool their tips together (prorated by hours); everything else is support staff.
+export const TIPPED_ROLES: readonly EmployeeRole[] = ['SERVER', 'SHIFT_LEAD'];
+export const isTipped = (role: EmployeeRole): boolean => TIPPED_ROLES.includes(role);
+
+// Underscore-aware title case for display: 'SHIFT_LEAD' -> 'Shift Lead'.
+export const formatRole = (role: string): string =>
+  role.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
 
 // One role-stint: an employee working a given role for some hours at a given base rate.
 // The same employee may have multiple stints in a day (e.g. server in the morning, busser later).

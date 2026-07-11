@@ -3,7 +3,7 @@ import { z } from 'zod';
 // One role-stint. The same employee may appear in multiple stints with different roles.
 const EmployeeStintEntry = z.object({
   employeeId: z.string().min(1),
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
+  role: z.enum(['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR']),
   hoursWorked: z.number().min(0.5).max(16),
 });
 

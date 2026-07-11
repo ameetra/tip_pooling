@@ -7,20 +7,16 @@ import {
   TextField, MenuItem, Typography,
 } from '@mui/material';
 import type { Employee, EmployeeRole, RoleRateInput } from '../types';
-
-const ROLES: { value: EmployeeRole; label: string }[] = [
-  { value: 'SERVER', label: 'Server' },
-  { value: 'BUSSER', label: 'Busser' },
-  { value: 'EXPEDITOR', label: 'Expeditor' },
-];
+import { ROLE_OPTIONS, ROLE_VALUES } from '../constants/roles';
 
 const optionalRate = z.number().positive('Must be positive').max(999).optional();
 
 const schema = z.object({
   name: z.string().min(1, 'Required').max(100),
   email: z.string().email('Invalid email').max(255),
-  role: z.enum(['SERVER', 'BUSSER', 'EXPEDITOR']),
+  role: z.enum(ROLE_VALUES),
   SERVER: optionalRate,
+  SHIFT_LEAD: optionalRate,
   BUSSER: optionalRate,
   EXPEDITOR: optionalRate,
 }).refine((d) => d[d.role] != null, {
@@ -55,7 +51,7 @@ export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Pr
     if (open) {
       reset(employee
         ? { name: employee.name, email: employee.email, role: employee.role }
-        : { name: '', email: '', role: 'SERVER', SERVER: 15, BUSSER: undefined, EXPEDITOR: undefined });
+        : { name: '', email: '', role: 'SERVER', SERVER: 15, SHIFT_LEAD: undefined, BUSSER: undefined, EXPEDITOR: undefined });
     }
   }, [open, employee, reset]);
 
@@ -64,7 +60,7 @@ export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Pr
       onSubmit({ name: d.name, email: d.email, role: d.role });
       return;
     }
-    const rates = ROLES
+    const rates = ROLE_OPTIONS
       .filter((r) => d[r.value] != null)
       .map((r) => ({ role: r.value, hourlyRate: d[r.value] as number }));
     onSubmit({ name: d.name, email: d.email, role: d.role, rates });
@@ -83,7 +79,7 @@ export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Pr
           )} />
           <Controller name="role" control={control} render={({ field }) => (
             <TextField {...field} select label="Primary Role" helperText="Used as the default when adding this person to a tip entry">
-              {ROLES.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
+              {ROLE_OPTIONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
             </TextField>
           )} />
           {!isEdit && (
@@ -91,7 +87,7 @@ export default function EmployeeDialog({ open, employee, onSubmit, onClose }: Pr
               <Typography variant="subtitle2" color="text.secondary">
                 Base hourly rates — set one per role this person can work
               </Typography>
-              {ROLES.map((r) => (
+              {ROLE_OPTIONS.map((r) => (
                 <Controller key={r.value} name={r.value} control={control} render={({ field }) => (
                   <TextField
                     label={`${r.label} rate ($/hr)`} type="number"

@@ -1,4 +1,4 @@
-export type EmployeeRole = 'SERVER' | 'BUSSER' | 'EXPEDITOR';
+export type EmployeeRole = 'SERVER' | 'SHIFT_LEAD' | 'BUSSER' | 'EXPEDITOR';
 
 export interface EmployeeRoleRate {
   id: string;

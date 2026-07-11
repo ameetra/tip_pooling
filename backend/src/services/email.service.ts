@@ -1,4 +1,5 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { formatRole } from '../types/tip-calculation.types';
 
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@usegratify.com';
@@ -40,7 +41,7 @@ export async function sendTipEmail(data: TipEmailData): Promise<void> {
 }
 
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
-  const roles = esc(d.roles.join(', ')) || '—';
+  const roles = esc(d.roles.map(formatRole).join(', ')) || '—';
   const name = esc(d.restaurantName);
   const employee = esc(d.employeeName);
   return `
@@ -120,7 +121,7 @@ function buildPlainText(d: TipEmailData, loginUrl: string): string {
 
 Hi ${d.employeeName},
 
-Role(s): ${d.roles.join(', ') || '—'}
+Role(s): ${d.roles.map(formatRole).join(', ') || '—'}
 Hours worked: ${d.hours.toFixed(1)}
 Tips earned: $${d.finalTips.toFixed(2)}
 Total pay (wages + tips): $${d.totalPay.toFixed(2)}
