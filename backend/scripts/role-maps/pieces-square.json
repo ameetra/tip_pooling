@@ -1,0 +1,9 @@
+{
+  "Bar Tender": "SERVER",
+  "Bar": "SERVER",
+  "Game Navigator": "SERVER",
+  "Expo": "EXPEDITOR",
+  "Busser": "BUSSER",
+  "Shift Lead": "SHIFT_LEAD",
+  "Bar Lead": "SHIFT_LEAD"
+}
