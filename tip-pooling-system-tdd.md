@@ -1080,7 +1080,7 @@ Content-Type: application/json
     "details": [
       {
         "field": "hoursWorked",
-        "message": "Hours must be between 0.5 and 16"
+        "message": "Hours must be between 0.5 and 24"
       }
     ]
   }

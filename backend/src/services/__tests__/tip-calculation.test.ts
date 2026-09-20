@@ -143,15 +143,19 @@ describe('Tip Calculation Service (prorated hours, per-role pool)', () => {
       expect(() => run(1000, [busser()], [{ role: 'BUSSER', percentage: 20 }])).toThrow('At least one server or shift lead is required');
     });
 
-    it('throws on invalid stint hours (out of 0.5-16)', () => {
+    it('throws on invalid stint hours (out of 0.5-24)', () => {
       expect(() => run(1000, [server({ hours: 0 })])).toThrow(TipCalculationError);
-      expect(() => run(1000, [server({ hours: 17 })])).toThrow('invalid hours');
+      expect(() => run(1000, [server({ hours: 25 })])).toThrow('invalid hours');
     });
 
-    it('throws when one employee works more than 16 hours total across roles', () => {
+    it('accepts a long double shift (17.22h server, from real Pieces data)', () => {
+      expect(() => run(1000, [server({ hours: 17.22 })])).not.toThrow();
+    });
+
+    it('throws when one employee works more than 24 hours total across roles', () => {
       expect(() => run(1000, [
-        { employeeId: 'a', name: 'A', role: 'SERVER', hours: 10, hourlyRate: 15 },
-        { employeeId: 'a', name: 'A', role: 'BUSSER', hours: 8, hourlyRate: 12 },
+        { employeeId: 'a', name: 'A', role: 'SERVER', hours: 16, hourlyRate: 15 },
+        { employeeId: 'a', name: 'A', role: 'BUSSER', hours: 10, hourlyRate: 12 },
       ], [{ role: 'BUSSER', percentage: 20 }])).toThrow('hours total');
     });
 

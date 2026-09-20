@@ -77,7 +77,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - At least one SERVER must exist (throw error if only support staff)
 - Total server hours > 0 (throw error if all servers have 0 hours)
 - Tip pool >= 0 (no negative tips)
-- Hours worked: 0.5 <= hours <= 16 per employee
+- Hours worked: 0.5 <= hours <= 24 per employee (raised from 16 after real Pieces data had a 17.22h double shift)
 
 **Test Coverage Required:**
 - 90%+ code coverage for calculation service

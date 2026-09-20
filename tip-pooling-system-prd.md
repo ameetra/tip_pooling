@@ -159,7 +159,7 @@ A cloud-based tip pooling management system that automates the calculation and d
   - [ ] Role for that day (Server, Busser, Expeditor)
   - [ ] Shift(s) worked (multiple selection allowed)
   - [ ] Hours worked (decimal format, e.g., 4.5)
-- [ ] System validates hours worked (0.5 to 16 hours)
+- [ ] System validates hours worked (0.5 to 24 hours)
 - [ ] System allows same employee to work multiple shifts
 - [ ] System validates at least one Server per shift
 

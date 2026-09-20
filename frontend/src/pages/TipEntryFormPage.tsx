@@ -134,7 +134,7 @@ export default function TipEntryFormPage() {
             <TextField select label="Role" value={row.role} onChange={(e) => updateRow(i, 'role', e.target.value)} sx={{ width: 140 }}>
               {ROLE_OPTIONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
             </TextField>
-            <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 16, step: 0.5 } }} sx={{ width: 110 }} />
+            <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }} sx={{ width: 110 }} />
             <IconButton onClick={() => removeRow(i)}><DeleteIcon /></IconButton>
           </Stack>
         ))}

@@ -6,6 +6,8 @@ import {
   SupportStaffConfig,
   TipCalculationInput,
   TipCalculationResult,
+  MAX_DAILY_HOURS,
+  MIN_STINT_HOURS,
   isTipped,
 } from '../types/tip-calculation.types';
 
@@ -49,8 +51,8 @@ function validate(input: TipCalculationInput): void {
     }
     stintKeys.add(key);
 
-    if (s.hours < 0.5 || s.hours > 16) {
-      throw new TipCalculationError(`${s.name} has invalid hours: ${s.hours} (must be 0.5-16)`, 'INVALID_HOURS');
+    if (s.hours < MIN_STINT_HOURS || s.hours > MAX_DAILY_HOURS) {
+      throw new TipCalculationError(`${s.name} has invalid hours: ${s.hours} (must be ${MIN_STINT_HOURS}-${MAX_DAILY_HOURS})`, 'INVALID_HOURS');
     }
     if (!Number.isFinite(s.hourlyRate) || s.hourlyRate < 0) {
       throw new TipCalculationError(`${s.name} has an invalid rate for ${s.role}`, 'INVALID_RATE');
@@ -59,9 +61,9 @@ function validate(input: TipCalculationInput): void {
   }
 
   for (const [, total] of hoursByEmployee) {
-    if (total > 16) {
-      const s = stints.find((x) => (hoursByEmployee.get(x.employeeId) ?? 0) > 16)!;
-      throw new TipCalculationError(`${s.name} works ${total} hours total (max 16/day)`, 'EMPLOYEE_HOURS_EXCEEDED');
+    if (total > MAX_DAILY_HOURS) {
+      const s = stints.find((x) => (hoursByEmployee.get(x.employeeId) ?? 0) > MAX_DAILY_HOURS)!;
+      throw new TipCalculationError(`${s.name} works ${total} hours total (max ${MAX_DAILY_HOURS}/day)`, 'EMPLOYEE_HOURS_EXCEEDED');
     }
   }
 }

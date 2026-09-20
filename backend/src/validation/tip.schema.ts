@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { MAX_DAILY_HOURS, MIN_STINT_HOURS } from '../types/tip-calculation.types';
 
 // One role-stint. The same employee may appear in multiple stints with different roles.
 const EmployeeStintEntry = z.object({
   employeeId: z.string().min(1),
   role: z.enum(['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR']),
-  hoursWorked: z.number().min(0.5).max(16),
+  hoursWorked: z.number().min(MIN_STINT_HOURS).max(MAX_DAILY_HOURS),
 });
 
 // Total pool = (cashInRegister - cashSales) + cashTips + posTips. Must be >= 0.

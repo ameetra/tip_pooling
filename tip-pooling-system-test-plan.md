@@ -111,7 +111,7 @@
 | TC-CALC-012 | Zero hours throws error | Server with 0 hours | Error: "Total server hours must be greater than zero" | P0 |
 | TC-CALC-013 | Negative tip pool throws error | Total tips < 0 | Error: "Total tip pool cannot be negative" | P0 |
 | TC-CALC-014 | Negative drawer balance | Closing < starting drawer | Validation error | P1 |
-| TC-CALC-015 | Employee works > 16 hours | Hours = 17 | Validation error | P2 |
+| TC-CALC-015 | Employee works > 24 hours | Hours = 25 | Validation error | P2 |
 | TC-CALC-016 | Same employee listed twice | Duplicate employee in list | Validation error | P1 |
 | TC-CALC-017 | Support staff with no shared shifts | Busser and server work different shifts | Busser receives $0 from that server | P1 |
 | TC-CALC-018 | Three-way split with support staff | 2 servers, 1 busser, complex scenario | Accurate calculation per algorithm | P0 |
@@ -237,7 +237,7 @@ describe('TipCalculationService', () => {
 | TC-FORM-004 | Cash sales rejects negative | -$100.00 | Error: "Must be positive or zero" | P1 |
 | TC-FORM-005 | Closing drawer validation with cash sales | Start: $500, Sales: $1000, Close: $450 | Error: "Must be >= starting + cash sales" | P0 |
 | TC-FORM-006 | Cash tips calculated correctly | Start: $500, Sales: $1000, Close: $1800 | Cash tips: $300 displayed | P0 |
-| TC-FORM-007 | Hours worked validates range | 17 hours | Error: "Max 16 hours" | P1 |
+| TC-FORM-007 | Hours worked validates range | 25 hours | Error: "Max 24 hours" | P1 |
 | TC-FORM-008 | Hours worked accepts decimals | 4.5 hours | No validation error | P0 |
 | TC-FORM-009 | At least one employee required | Empty employee list | Error: "Add at least one employee" | P0 |
 | TC-FORM-010 | At least one server required | Only support staff, no servers | Error: "At least one server required" | P0 |

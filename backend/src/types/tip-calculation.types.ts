@@ -2,6 +2,9 @@ export const ROLE_VALUES = ['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR'] as co
 export type EmployeeRole = (typeof ROLE_VALUES)[number];
 export type SupportRole = 'BUSSER' | 'EXPEDITOR';
 
+export const MIN_STINT_HOURS = 0.5;
+export const MAX_DAILY_HOURS = 24;
+
 // Tipped earners pool their tips together (prorated by hours); everything else is support staff.
 export const TIPPED_ROLES: readonly EmployeeRole[] = ['SERVER', 'SHIFT_LEAD'];
 export const isTipped = (role: EmployeeRole): boolean => TIPPED_ROLES.includes(role);
