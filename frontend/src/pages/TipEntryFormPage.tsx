@@ -151,7 +151,7 @@ export default function TipEntryFormPage() {
             <Typography variant="h6" sx={{ mb: 1 }}>
               Preview {preview.isPending && <CircularProgress size={16} sx={{ ml: 1 }} />}
             </Typography>
-            <PreviewTable results={preview.data.results} />
+            <PreviewTable results={preview.data.results} showPay={!isShiftLead} />
           </Paper>
         )}
       </Box>
@@ -163,7 +163,7 @@ export default function TipEntryFormPage() {
   );
 }
 
-function PreviewTable({ results }: { results: EmployeeResult[] }) {
+function PreviewTable({ results, showPay }: { results: EmployeeResult[]; showPay: boolean }) {
   const fmt = (n: number) => `$${n.toFixed(2)}`;
   return (
     <TableContainer>
@@ -171,8 +171,9 @@ function PreviewTable({ results }: { results: EmployeeResult[] }) {
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell><TableCell>Role(s)</TableCell><TableCell>Hours</TableCell>
-            <TableCell>Wages</TableCell><TableCell>Tips</TableCell>
-            <TableCell>Total Pay</TableCell><TableCell>$/hr</TableCell>
+            {showPay && <TableCell>Wages</TableCell>}
+            <TableCell>Tips</TableCell>
+            {showPay && <><TableCell>Total Pay</TableCell><TableCell>$/hr</TableCell></>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -181,10 +182,9 @@ function PreviewTable({ results }: { results: EmployeeResult[] }) {
               <TableCell>{r.name}</TableCell>
               <TableCell>{r.roles.map(formatRole).join(', ')}</TableCell>
               <TableCell>{r.totalHours}</TableCell>
-              <TableCell>{fmt(r.totalWage)}</TableCell>
+              {showPay && <TableCell>{fmt(r.totalWage)}</TableCell>}
               <TableCell><strong>{fmt(r.totalTips)}</strong></TableCell>
-              <TableCell>{fmt(r.totalPay)}</TableCell>
-              <TableCell>{fmt(r.effectiveHourlyRate)}/hr</TableCell>
+              {showPay && <><TableCell>{fmt(r.totalPay)}</TableCell><TableCell>{fmt(r.effectiveHourlyRate)}/hr</TableCell></>}
             </TableRow>
           ))}
         </TableBody>
