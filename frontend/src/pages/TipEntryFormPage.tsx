@@ -22,6 +22,22 @@ interface EmployeeRow {
 
 const today = new Date().toISOString().slice(0, 10);
 
+// Digits with an optional decimal point and at most 2 decimal places.
+const MONEY = /^\d*\.?\d{0,2}$/;
+const amount = (s: string) => Number(s) || 0;
+
+function MoneyField({ label, value, onChange, required, helperText }: {
+  label: string; value: string; onChange: (v: string) => void; required?: boolean; helperText?: string;
+}) {
+  return (
+    <TextField
+      label={label} value={value} required={required} helperText={helperText} placeholder="0.00"
+      onChange={(e) => MONEY.test(e.target.value) && onChange(e.target.value)}
+      slotProps={{ inputLabel: { shrink: true }, htmlInput: { inputMode: 'decimal' } }}
+    />
+  );
+}
+
 export default function TipEntryFormPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -33,8 +49,8 @@ export default function TipEntryFormPage() {
 
   const [entryDate, setEntryDate] = useState(today);
   const [cashInRegister, setCashInRegister] = useState('');
-  const [cashSales, setCashSales] = useState('0');
-  const [cashTips, setCashTips] = useState('0');
+  const [cashSales, setCashSales] = useState('');
+  const [cashTips, setCashTips] = useState('');
   const [posTips, setPosTips] = useState('');
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
@@ -43,16 +59,16 @@ export default function TipEntryFormPage() {
   const resetForm = () => {
     setEntryDate(today);
     setCashInRegister('');
-    setCashSales('0');
-    setCashTips('0');
+    setCashSales('');
+    setCashTips('');
     setPosTips('');
     setRows([]);
     preview.reset();
   };
 
-  const drawerOverage = Number(cashInRegister || 0) - Number(cashSales || 0);
-  const cashTipsTotal = drawerOverage + Number(cashTips || 0);
-  const totalPool = cashTipsTotal + Number(posTips || 0);
+  const drawerOverage = amount(cashInRegister) - amount(cashSales);
+  const cashTipsTotal = drawerOverage + amount(cashTips);
+  const totalPool = cashTipsTotal + amount(posTips);
 
   const addRow = () => setRows([...rows, { employeeId: '', role: 'SERVER', hoursWorked: '' }]);
   const removeRow = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
@@ -68,13 +84,13 @@ export default function TipEntryFormPage() {
 
   const buildInput = useCallback((): TipEntryInput | null => {
     const emps = rows.filter((r) => r.employeeId && Number(r.hoursWorked) > 0);
-    if (!emps.length || cashInRegister === '') return null;
+    if (!emps.length || cashInRegister === '' || posTips === '') return null;
     return {
       entryDate,
-      cashInRegister: Number(cashInRegister),
-      cashSales: Number(cashSales || 0),
-      cashTips: Number(cashTips || 0),
-      posTips: Number(posTips || 0),
+      cashInRegister: amount(cashInRegister),
+      cashSales: amount(cashSales),
+      cashTips: amount(cashTips),
+      posTips: amount(posTips),
       employees: emps.map((r) => ({ employeeId: r.employeeId, role: r.role, hoursWorked: Number(r.hoursWorked) })),
     };
   }, [entryDate, cashInRegister, cashSales, cashTips, posTips, rows]);
@@ -108,10 +124,10 @@ export default function TipEntryFormPage() {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
           <TextField label="Date" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField label="Cash in Register" type="number" value={cashInRegister} onChange={(e) => setCashInRegister(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} helperText="After removing the starting float" />
-          <TextField label="Cash Sales (POS)" type="number" value={cashSales} onChange={(e) => setCashSales(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} />
-          <TextField label="Cash Tips (jar)" type="number" value={cashTips} onChange={(e) => setCashTips(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} />
-          <TextField label="POS Tips" type="number" value={posTips} onChange={(e) => setPosTips(e.target.value)} slotProps={{ htmlInput: { min: 0 } }} />
+          <MoneyField label="Cash in Register" value={cashInRegister} onChange={setCashInRegister} required helperText="After removing the starting float" />
+          <MoneyField label="Cash Sales (POS)" value={cashSales} onChange={setCashSales} />
+          <MoneyField label="Cash Tips (jar)" value={cashTips} onChange={setCashTips} />
+          <MoneyField label="POS Tips" value={posTips} onChange={setPosTips} required />
         </Stack>
         <Stack direction="row" spacing={3} sx={{ mt: 2, flexWrap: 'wrap' }} useFlexGap>
           <Chip label={`Drawer Overage: $${drawerOverage.toFixed(2)}`} variant="outlined" />
