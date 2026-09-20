@@ -27,14 +27,18 @@ export const TipPreviewSchema = z.object({
 
 export const CreateTipEntrySchema = TipPreviewSchema;
 
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+  .refine((d) => !Number.isNaN(Date.parse(d)), 'Invalid date');
+
 export const SupportStaffConfigSchema = z.object({
   configs: z.array(
     z.object({
       role: z.enum(['BUSSER', 'EXPEDITOR']),
       percentage: z.number().min(0).max(50),
+      effectiveDate: calendarDate.optional(),
     }),
   ).min(1),
-  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
+  effectiveDate: calendarDate.optional(),
 });
 
 export const EditTipEntrySchema = z.object({

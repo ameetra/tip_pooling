@@ -32,3 +32,38 @@
 **Prevention:**
 - Centralized error normalization in the client; any consumer reading `err.message` now gets the
   API's human message for both error shapes.
+
+### 🟡 Bug #2: Effective dates on support-staff % and wages were stored but ignored by the tip calculation
+**Date Found:** 2026-09-20
+**Severity:** High (incorrect calculations)
+**Status:** ✅ RESOLVED
+**Found By:** Product owner (config screen had no "as-of" date; asked whether wage dates were honored)
+
+**Symptoms:**
+- The support-staff config screen had no effective date, so a % change could only be made once the pay period ended.
+- A future-dated change would have applied immediately, and any change applied to entries for past dates.
+
+**Root Cause:**
+- `buildCalcInput` took the latest `support_staff_config` row per role (sorted by effective date, no cap at the entry date)
+  and the current `employee_role_rates` row for wages, never comparing effective dates to the entry's date.
+  The `effectiveDate` columns and the wage dialog's date field existed but nothing read them.
+
+**Fix:**
+- New `pickAsOf` (services/effective-date.ts): newest record effective on/before the entry date; earliest record if the
+  entry predates all of them (backfills); ties go to the most recently entered record.
+- Support % now resolved via `supportConfigService.getAsOf(tenantId, entryDate)`; wages via `employee_rate_history`
+  as of the entry date (falling back to the current per-role rate, then the legacy single rate).
+- `POST /config/support-staff` accepts an `effectiveDate` per role; `GET` returns the % in force today (venue timezone).
+- Config screen: per-role "Effective from" date, scheduled-change chip, change history.
+
+**Files Modified:**
+- `backend/src/services/{effective-date,support-config.service,tip-entry.service}.ts`, `backend/src/validation/tip.schema.ts`
+- `frontend/src/pages/SupportConfigPage.tsx`, `frontend/src/api/support-config.ts`
+
+**Test Added:**
+- `tip-entry.test.ts` "Effective dates in the tip calculation" (busser % and server wage the day before / on / before the change)
+- `support-config.test.ts` "effective dates", `services/__tests__/effective-date.test.ts`
+
+**Prevention:**
+- Any effective-dated setting must be resolved through `pickAsOf` with the entry date, never "latest row".
+- Known nuance: the Employees page lists the most recently *entered* rate, even if it is future-dated; the calculation uses the dated history.

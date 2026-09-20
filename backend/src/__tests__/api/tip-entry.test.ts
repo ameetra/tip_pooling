@@ -254,3 +254,48 @@ describe('Support Config API', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('Effective dates in the tip calculation', () => {
+  // Changes take effect on 2099-06-01, so the test stays deterministic whenever it runs.
+  const cash = { cashInRegister: 1300, cashSales: 1000, cashTips: 0, posTips: 200 }; // pool = 500
+  let serverId: string;
+  let busserId: string;
+
+  beforeEach(async () => {
+    const create = (body: object) => request(app).post('/api/v1/employees').send(body).then((r) => r.body.data.id as string);
+    serverId = await create({ name: 'Dana', email: 'dana@test.com', role: 'SERVER', hourlyRate: 15 });
+    busserId = await create({ name: 'Eli', email: 'eli@test.com', role: 'BUSSER', hourlyRate: 12 });
+
+    await request(app).post('/api/v1/config/support-staff').send({ configs: [
+      { role: 'BUSSER', percentage: 10, effectiveDate: '2000-01-01' },
+      { role: 'BUSSER', percentage: 20, effectiveDate: '2099-06-01' },
+    ] });
+    await request(app).post(`/api/v1/employees/${serverId}/role-rates`)
+      .send({ rates: [{ role: 'SERVER', hourlyRate: 20 }], effectiveDate: '2099-06-01' });
+  });
+
+  const preview = async (entryDate: string) => {
+    const res = await request(app).post('/api/v1/tips/preview').send({
+      entryDate, ...cash,
+      employees: [
+        { employeeId: serverId, role: 'SERVER', hoursWorked: 8 },
+        { employeeId: busserId, role: 'BUSSER', hoursWorked: 8 },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const byName = (n: string) => res.body.data.results.find((r: any) => r.name === n);
+    return { busserTips: byName('Eli').totalTips, serverWage: byName('Dana').totalWage };
+  };
+
+  it('uses the old busser % and server wage the day before the change', async () => {
+    expect(await preview('2099-05-31')).toEqual({ busserTips: 50, serverWage: 120 });
+  });
+
+  it('uses the new busser % and server wage on the effective date', async () => {
+    expect(await preview('2099-06-01')).toEqual({ busserTips: 100, serverWage: 160 });
+  });
+
+  it('backfilling a date before any record uses the earliest busser % and server wage', async () => {
+    expect(await preview('1999-12-31')).toEqual({ busserTips: 50, serverWage: 120 });
+  });
+});

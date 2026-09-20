@@ -1,19 +1,26 @@
 import prisma from '../database/client';
 import { PaginationQuery, SupportStaffConfigInput } from '../validation/tip.schema';
 import { auditService } from './audit.service';
+import { pickAsOf, toDateString, todayIn } from './effective-date';
+
+const tenantToday = async (tenantId: string) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  return todayIn(tenant?.timezone ?? 'America/Los_Angeles');
+};
 
 export const supportConfigService = {
+  // Each role's configuration in force on `date` (used by the tip calculation with the entry's date).
+  async getAsOf(tenantId: string, date: string) {
+    const configs = await prisma.supportStaffConfig.findMany({ where: { tenantId } });
+    const roles = [...new Set(configs.map((c) => c.role))];
+    return roles.flatMap((role) => {
+      const inForce = pickAsOf(configs.filter((c) => c.role === role), date, (c) => toDateString(c.effectiveDate));
+      return inForce ? [inForce] : [];
+    });
+  },
+
   async getCurrent(tenantId: string) {
-    const configs = await prisma.supportStaffConfig.findMany({
-      where: { tenantId },
-      orderBy: { effectiveDate: 'desc' },
-    });
-    const seen = new Set<string>();
-    return configs.filter((c) => {
-      if (seen.has(c.role)) return false;
-      seen.add(c.role);
-      return true;
-    });
+    return this.getAsOf(tenantId, await tenantToday(tenantId));
   },
 
   async getHistory(tenantId: string, query?: PaginationQuery) {
@@ -25,7 +32,7 @@ export const supportConfigService = {
     const [data, total] = await Promise.all([
       prisma.supportStaffConfig.findMany({
         where,
-        orderBy: { effectiveDate: 'desc' },
+        orderBy: [{ effectiveDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: limit,
       }),
@@ -35,12 +42,13 @@ export const supportConfigService = {
     return { data, pagination: { page, limit, total } };
   },
 
+  // Each role can carry its own effective date; the top-level date is a shared fallback.
   async setConfig(tenantId: string, data: SupportStaffConfigInput) {
-    const effectiveDate = data.effectiveDate ? new Date(data.effectiveDate) : new Date();
+    const fallbackDate = data.effectiveDate ?? (await tenantToday(tenantId));
     const created = await Promise.all(
       data.configs.map((c) =>
         prisma.supportStaffConfig.create({
-          data: { tenantId, role: c.role, percentage: c.percentage, effectiveDate },
+          data: { tenantId, role: c.role, percentage: c.percentage, effectiveDate: new Date(c.effectiveDate ?? fallbackDate) },
         }),
       ),
     );

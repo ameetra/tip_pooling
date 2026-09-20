@@ -4,6 +4,8 @@ import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery 
 import { StintInput, StintResult, SupportStaffConfig } from '../types/tip-calculation.types';
 import { auditService } from './audit.service';
 import { sendTipEmail } from './email.service';
+import { pickAsOf } from './effective-date';
+import { supportConfigService } from './support-config.service';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const cashTips = computeCashTips(input.cashInRegister, input.cashSales, input.cashTips);
@@ -15,13 +17,16 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
 
   const roleRates = await prisma.employeeRoleRate.findMany({ where: { employeeId: { in: employeeIds } } });
   const rateByKey = new Map(roleRates.map((r) => [`${r.employeeId}:${r.role}`, r.hourlyRate]));
+  const rateHistory = await prisma.employeeRateHistory.findMany({ where: { employeeId: { in: employeeIds } } });
 
   const stints: StintInput[] = input.employees.map((entry) => {
     const dbEmp = empById.get(entry.employeeId);
     if (!dbEmp) throw new TipCalculationError(`Employee ${entry.employeeId} not found`, 'EMPLOYEE_NOT_FOUND');
 
-    // Per-role rate; fall back to the legacy single rate only for the employee's primary role.
-    let rate = rateByKey.get(`${entry.employeeId}:${entry.role}`);
+    // Rate in force on the entry date; fall back to the current per-role rate, then (primary role only) the legacy single rate.
+    const roleHistory = rateHistory.filter((h) => h.employeeId === entry.employeeId && h.role === entry.role);
+    let rate = pickAsOf(roleHistory, input.entryDate, (h) => h.effectiveDate)?.hourlyRate
+      ?? rateByKey.get(`${entry.employeeId}:${entry.role}`);
     if (rate === undefined && entry.role === dbEmp.role) rate = dbEmp.hourlyRate;
     if (rate === undefined) {
       throw new TipCalculationError(`${dbEmp.name} has no base rate set for role ${entry.role}`, 'MISSING_ROLE_RATE');
@@ -30,17 +35,8 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
     return { employeeId: dbEmp.id, name: dbEmp.name, role: entry.role, hours: entry.hoursWorked, hourlyRate: rate };
   });
 
-  const supportConfigs = await prisma.supportStaffConfig.findMany({
-    where: { tenantId },
-    orderBy: { effectiveDate: 'desc' },
-  });
-  const seen = new Set<string>();
-  const supportStaffConfig: SupportStaffConfig[] = [];
-  for (const c of supportConfigs) {
-    if (seen.has(c.role)) continue;
-    seen.add(c.role);
-    supportStaffConfig.push({ role: c.role as SupportStaffConfig['role'], percentage: c.percentage });
-  }
+  const supportStaffConfig: SupportStaffConfig[] = (await supportConfigService.getAsOf(tenantId, input.entryDate))
+    .map((c) => ({ role: c.role as SupportStaffConfig['role'], percentage: c.percentage }));
 
   return { totalTipPool, stints, supportStaffConfig, cashTips, posTips: input.posTips };
 }
