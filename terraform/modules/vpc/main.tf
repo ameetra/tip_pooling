@@ -84,16 +84,22 @@ resource "aws_instance" "nat" {
   vpc_security_group_ids = [aws_security_group.nat.id]
   source_dest_check      = false
 
+  # user_data only runs at first boot, so changing it must replace the instance.
+  user_data_replace_on_change = true
+
+  # The default iptables-services rules end the FORWARD chain with a REJECT (icmp-host-prohibited), so rules
+  # appended after it never match and clients see EHOSTUNREACH. Flush FORWARD first, then accept and masquerade.
   user_data = <<-EOF
     #!/bin/bash
-    yum install -y iptables-services
-    systemctl enable iptables
-    systemctl start iptables
-    echo 1 > /proc/sys/net/ipv4/ip_forward
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-    iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE
-    iptables -A FORWARD -i ens5 -o ens5 -m state --state RELATED,ESTABLISHED -j ACCEPT
-    iptables -A FORWARD -i ens5 -o ens5 -j ACCEPT
+    set -euxo pipefail
+    dnf install -y iptables-services
+    systemctl enable --now iptables
+    echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/90-nat.conf
+    sysctl --system
+    IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n1)
+    iptables -F FORWARD
+    iptables -A FORWARD -j ACCEPT
+    iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
     service iptables save
   EOF
 
