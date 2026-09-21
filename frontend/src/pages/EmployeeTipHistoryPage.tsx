@@ -6,6 +6,7 @@ import { get } from '../api/client';
 interface TipRecord {
   date: string;
   role: string;
+  roleBreakdown: { role: string; hours: number; tips: number }[];
   hours: number;
   hourlyPay: number;
   tips: number;
@@ -99,6 +100,16 @@ export default function EmployeeTipHistoryPage() {
                   <Line label="Tips earned" value={fmt(r.tips)} highlight />
                   <Line label="Total pay (wages + tips)" value={fmt(r.totalPay)} />
                   <Line label="Effective hourly rate" value={`${fmt(r.effectiveHourlyRate)}/hr`} />
+
+                  {/* Only when more than one role worked that day: where the tips came from. */}
+                  {r.roleBreakdown.length > 1 && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Tips by role</Typography>
+                      {r.roleBreakdown.map((b) => (
+                        <Line key={b.role} label={`${b.role} · ${b.hours.toFixed(1)}h`} value={fmt(b.tips)} />
+                      ))}
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             ))}

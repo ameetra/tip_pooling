@@ -18,6 +18,7 @@ export interface TipEmailData {
   logoUrl?: string | null;
   entryDate: string;
   roles: string[];
+  roleBreakdown?: { role: string; hours: number; tips: number }[];
   hours: number;
   finalTips: number;
   totalPay: number;
@@ -42,6 +43,27 @@ export async function sendTipEmail(data: TipEmailData): Promise<void> {
 
 // Total pay is wages + tips, so wages is what's left after tips.
 const wagesOf = (d: TipEmailData) => d.totalPay - d.finalTips;
+
+// Where the tips came from, shown only when the person worked more than one role that day.
+const rolesToSplit = (d: TipEmailData) => ((d.roleBreakdown?.length ?? 0) > 1 ? d.roleBreakdown! : []);
+
+const roleSplitHtml = (d: TipEmailData) => {
+  const rows = rolesToSplit(d);
+  if (!rows.length) return '';
+  return `
+  <p style="margin: 16px 0 4px; font-size: 13px; color: #666;">Tips by role</p>
+  <table style="width:100%; border-collapse: collapse; font-size: 13px; color: #555;">
+${rows.map((r) => `    <tr>
+      <td style="padding: 4px 12px;">${esc(r.role)} · ${r.hours.toFixed(1)}h</td>
+      <td style="padding: 4px 12px; text-align:right;">$${r.tips.toFixed(2)}</td>
+    </tr>`).join('\n')}
+  </table>`;
+};
+
+const roleSplitText = (d: TipEmailData) => {
+  const rows = rolesToSplit(d);
+  return rows.length ? `\nTips by role:\n${rows.map((r) => `  ${r.role} (${r.hours.toFixed(1)}h): $${r.tips.toFixed(2)}`).join('\n')}\n` : '';
+};
 
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
   const roles = esc(d.roles.map(formatRole).join(', ')) || '—';
@@ -80,7 +102,7 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
       <td style="padding: 8px 12px;">Effective hourly rate</td>
       <td style="padding: 8px 12px; text-align:right;">$${d.effectiveHourlyRate.toFixed(2)}/hr</td>
     </tr>
-  </table>
+  </table>${roleSplitHtml(d)}
   <div style="margin: 24px 0;">
     <a href="${loginUrl}" style="background:#1976d2; color:#fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: bold;">
       View My Tip History
@@ -134,7 +156,7 @@ Wages: $${wagesOf(d).toFixed(2)}
 Tips earned: $${d.finalTips.toFixed(2)}
 Total pay (wages + tips): $${d.totalPay.toFixed(2)}
 Effective hourly rate: $${d.effectiveHourlyRate.toFixed(2)}/hr
-
+${roleSplitText(d)}
 View your tip history: ${loginUrl}
 
 This is an automated message from your tip management system.`;

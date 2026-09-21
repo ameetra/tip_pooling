@@ -5,6 +5,7 @@ import { StintInput, StintResult, SupportStaffConfig } from '../types/tip-calcul
 import { auditService } from './audit.service';
 import { sendTipEmail } from './email.service';
 import { pickAsOf } from './effective-date';
+import { roleBreakdown } from './role-breakdown';
 import { supportConfigService } from './support-config.service';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
@@ -117,13 +118,14 @@ export const tipEntryService = {
     await prisma.tipEntry.update({ where: { id }, data: { publishedAt: new Date() } as any });
 
     // Aggregate per employee (an employee may have multiple role stints) → one email each.
-    const byEmployee = new Map<string, { name: string; email: string; roles: string[]; hours: number; finalTips: number; totalPay: number }>();
+    const byEmployee = new Map<string, { name: string; email: string; roles: string[]; hours: number; finalTips: number; totalPay: number; stints: typeof entry.tipCalculations }>();
     for (const c of entry.tipCalculations) {
-      const e = byEmployee.get(c.employeeId) ?? { name: c.employee.name, email: c.employee.email, roles: [], hours: 0, finalTips: 0, totalPay: 0 };
+      const e = byEmployee.get(c.employeeId) ?? { name: c.employee.name, email: c.employee.email, roles: [], hours: 0, finalTips: 0, totalPay: 0, stints: [] };
       if (!e.roles.includes(c.roleOnDay)) e.roles.push(c.roleOnDay);
       e.hours += c.totalHours;
       e.finalTips += c.finalTips;
       e.totalPay += c.totalPay;
+      e.stints.push(c);
       byEmployee.set(c.employeeId, e);
     }
     const recipients = [...byEmployee.values()];
@@ -138,6 +140,7 @@ export const tipEntryService = {
           logoUrl,
           entryDate: entry.entryDate,
           roles: r.roles,
+          roleBreakdown: roleBreakdown(r.stints),
           hours: Number(r.hours.toFixed(2)),
           finalTips: Number(r.finalTips.toFixed(2)),
           totalPay: Number(r.totalPay.toFixed(2)),

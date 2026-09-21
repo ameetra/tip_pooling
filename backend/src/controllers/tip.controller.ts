@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { payrollReportService } from '../services/payroll-report.service';
+import { roleBreakdown } from '../services/role-breakdown';
 import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
 
@@ -89,8 +90,9 @@ export const tipController = {
       const byDate = new Map<string, any>();
       for (const c of calcs) {
         const date = c.tipEntry.entryDate;
-        const r = byDate.get(date) ?? { date, roles: [], hours: 0, hourlyPay: 0, tips: 0, totalPay: 0 };
+        const r = byDate.get(date) ?? { date, roles: [], stints: [], hours: 0, hourlyPay: 0, tips: 0, totalPay: 0 };
         if (!r.roles.includes(c.roleOnDay)) r.roles.push(c.roleOnDay);
+        r.stints.push(c);
         r.hours += c.totalHours;
         r.hourlyPay += c.hourlyPay;
         r.tips += c.finalTips;
@@ -100,6 +102,7 @@ export const tipController = {
       const records = [...byDate.values()].map((r) => ({
         date: r.date,
         role: r.roles.map(formatRole).join(', '),
+        roleBreakdown: roleBreakdown(r.stints),
         hours: Number(r.hours.toFixed(2)),
         hourlyPay: Number(r.hourlyPay.toFixed(2)),
         tips: Number(r.tips.toFixed(2)),
