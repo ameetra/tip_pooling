@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from './context/AuthContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
@@ -17,9 +17,7 @@ import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
 import PayrollReportPage from './pages/PayrollReportPage';
-import { MANAGEMENT_ROLES } from './constants/roles';
-
-const STAFF_ROLES = ['ADMIN', 'MANAGER', 'SHIFT_LEAD'];
+import { isManagement, isStaff } from './constants/roles';
 
 function RequireAuth({ children, kind }: { children: React.ReactNode; kind: 'employee' | 'manager' }) {
   const { token, user } = useAuth();
@@ -36,20 +34,21 @@ function RequireToken({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to={`/${slug}/manager-login`} replace />;
 }
 
-// Only the listed roles see the page; everyone else is sent to their own home via RoleRouter.
-function RequireRole({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+// Each kind of login has one home page.
+const homePath = (role: string) => (role === 'SHIFT_LEAD' ? 'tips/new' : isStaff(role) ? 'tips' : 'my-tips');
+
+// Renders the page only for roles that pass `allow`; everyone else is sent to their own home page.
+function RequireRole({ allow, children }: { allow: (role: string) => boolean; children: React.ReactNode }) {
   const { user } = useAuth();
   const { slug } = useTenant();
-  return user && roles.includes(user.role) ? <>{children}</> : <Navigate to={`/${slug}`} replace />;
+  if (!user) return <Navigate to={`/${slug}/manager-login`} replace />;
+  return allow(user.role) ? <>{children}</> : <Navigate to={`/${slug}/${homePath(user.role)}`} replace />;
 }
 
 function RoleRouter() {
   const { user } = useAuth();
   const { slug } = useTenant();
-  if (!user) return <Navigate to={`/${slug}/manager-login`} replace />;
-  if (user.role === 'SHIFT_LEAD') return <Navigate to={`/${slug}/tips/new`} replace />;
-  if (STAFF_ROLES.includes(user.role)) return <Navigate to={`/${slug}/tips`} replace />;
-  return <Navigate to={`/${slug}/my-tips`} replace />;
+  return <Navigate to={user ? `/${slug}/${homePath(user.role)}` : `/${slug}/manager-login`} replace />;
 }
 
 function VenueRoutes() {
@@ -72,21 +71,25 @@ function VenueRoutes() {
       <Route path="change-password" element={<RequireToken><ChangePasswordPage /></RequireToken>} />
       <Route path="auth/verify" element={<VerifyPage />} />
 
-      {/* Employee-only routes */}
-      <Route element={<RequireAuth kind="employee"><EmployeeLayout /></RequireAuth>}>
+      {/* Employee-only routes: anyone who isn't staff */}
+      <Route element={<RequireAuth kind="employee"><RequireRole allow={(role) => !isStaff(role)}><EmployeeLayout /></RequireRole></RequireAuth>}>
         <Route path="my-tips" element={<EmployeeTipHistoryPage />} />
       </Route>
 
-      {/* Admin/Manager/Shift-lead routes */}
-      <Route element={<RequireAuth kind="manager"><Layout /></RequireAuth>}>
+      {/* Staff routes: admin, manager, shift lead */}
+      <Route element={<RequireAuth kind="manager"><RequireRole allow={isStaff}><Layout /></RequireRole></RequireAuth>}>
         <Route index element={<RoleRouter />} />
-        <Route path="employees" element={<EmployeesPage />} />
-        <Route path="config" element={<SupportConfigPage />} />
-        <Route path="tips" element={<TipEntriesPage />} />
         <Route path="tips/new" element={<TipEntryFormPage />} />
-        <Route path="tips/:id" element={<TipEntryDetailPage />} />
-        <Route path="payroll" element={<RequireRole roles={MANAGEMENT_ROLES}><PayrollReportPage /></RequireRole>} />
-        <Route path="users" element={<UsersPage />} />
+
+        {/* Admin and manager only (shift leads and employees are sent to their home page) */}
+        <Route element={<RequireRole allow={isManagement}><Outlet /></RequireRole>}>
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="config" element={<SupportConfigPage />} />
+          <Route path="tips" element={<TipEntriesPage />} />
+          <Route path="tips/:id" element={<TipEntryDetailPage />} />
+          <Route path="payroll" element={<PayrollReportPage />} />
+          <Route path="users" element={<UsersPage />} />
+        </Route>
       </Route>
     </Routes>
   );

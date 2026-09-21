@@ -92,3 +92,39 @@
 
 **Prevention:**
 - Anything that shows numbers to staff or feeds payroll must be limited to published entries (as the payroll report is).
+
+### 🔴 Bug #4: Employee logins could reach staff features; staff pages were reachable by URL
+**Date Found:** 2026-09-20
+**Severity:** Critical (authorization)
+**Status:** ✅ RESOLVED
+**Found By:** Code Review (checking whether shift leads/employees could open manager pages by typing the URL)
+
+**Symptoms:**
+- A shift lead or employee could type `/<venue>/employees`, `/config`, `/users`, `/tips`, `/tips/<id>` and get the page
+  (only the menu was hidden). Employees with a token also got the manager menu on those pages.
+- An *employee* whose job role is Shift Lead, signing in through the employee magic-link login, received a token with
+  `role: SHIFT_LEAD`, indistinguishable from a staff shift lead, so the backend let them create tip entries and list
+  employees (including wages).
+
+**Root Cause:**
+- `verifyMagicLink` signed the employee's job role (SERVER/SHIFT_LEAD/BUSSER/EXPEDITOR) into the login token, and
+  SHIFT_LEAD is also a staff permission role. The frontend only checked "has a token" for the manager area, and only
+  hid menu items.
+
+**Fix:**
+- Employee login tokens now always carry `role: EMPLOYEE`.
+- Frontend routes are gated by role: manager area = admin/manager/shift lead; Employees, Config, Staff, Tips list/detail
+  and Payroll = admin/manager only; My Tips = non-staff only. Each role that hits a page it may not see is sent to its own
+  home page (`RequireRole` + `homePath` in `App.tsx`, helpers in `constants/roles.ts`).
+
+**Files Modified:**
+- `backend/src/services/auth.service.ts`, `frontend/src/App.tsx`, `frontend/src/constants/roles.ts`, `frontend/src/components/Layout.tsx`
+
+**Test Added:**
+- `backend/src/__tests__/api/employee-login-role.test.ts` (every job role signs in as EMPLOYEE)
+- Verified in a browser locally for admin, staff shift lead and a shift-lead employee (all pages, plus API 403s for the employee).
+
+**Prevention:**
+- Never put a job role in an auth token; permission roles and job roles are different things.
+- Gate pages by role positively, not by hiding menu items.
+- Note: employee tokens issued before this deploy keep their old role until they expire (8 hours).

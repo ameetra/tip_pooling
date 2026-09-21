@@ -11,15 +11,12 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import VenueBrand from './VenueBrand';
-import { MANAGEMENT_ROLES } from '../constants/roles';
 
 const DRAWER_WIDTH = 220;
 
-interface NavItem { label: string; path: string; icon: React.ReactNode; roles?: string[] }
-
-const managerNavItems: NavItem[] = [
+const managerNavItems = [
   { label: 'Tips', path: '/tips', icon: <ReceiptIcon /> },
-  { label: 'Payroll', path: '/payroll', icon: <PaymentsIcon />, roles: MANAGEMENT_ROLES },
+  { label: 'Payroll', path: '/payroll', icon: <PaymentsIcon /> },
   { label: 'Employees', path: '/employees', icon: <PeopleIcon /> },
   { label: 'Config', path: '/config', icon: <SettingsIcon /> },
   { label: 'Staff', path: '/users', icon: <AdminPanelSettingsIcon /> },
@@ -34,9 +31,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const { logout, user } = useAuth();
   const { slug } = useTenant();
-  const navItems = user?.role === 'SHIFT_LEAD'
-    ? shiftLeadNavItems
-    : managerNavItems.filter((item) => !item.roles || item.roles.includes(user?.role ?? ''));
+  const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : managerNavItems;
   const to = (path: string) => `/${slug}${path}`;
 
   return (
