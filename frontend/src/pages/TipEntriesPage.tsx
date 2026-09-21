@@ -10,6 +10,7 @@ import { useTipEntries, useOlderDrafts, useDeleteTipEntry, TIP_ENTRIES_LIMIT } f
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useTenant } from '../context/TenantContext';
 import { localDate } from '../utils/dates';
+import { deleteEntryMessage } from '../utils/tipEntry';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
@@ -106,7 +107,14 @@ export default function TipEntriesPage() {
         </Table>
       </TableContainer>
 
-      <ConfirmDialog open={!!deleteId} title="Delete Tip Entry" message="This will soft-delete the entry." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete Tip Entry"
+        message={deleteEntryMessage(entries.find((e) => e.id === deleteId))}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmLabel="Delete"
+      />
     </Box>
   );
 }
