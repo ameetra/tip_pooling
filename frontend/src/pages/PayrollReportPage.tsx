@@ -8,12 +8,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { usePayrollReport } from '../api/payroll';
 import { useTenant } from '../context/TenantContext';
 import { downloadCsv } from '../utils/csv';
+import { localDate } from '../utils/dates';
 
-const localDate = (daysAgo = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toLocaleDateString('en-CA');
-};
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
 export default function PayrollReportPage() {

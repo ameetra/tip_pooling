@@ -12,8 +12,9 @@ import EmployeeDialog from '../components/EmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Employee, EmployeeRole } from '../types';
 import { ROLE_OPTIONS, ROLE_VALUES, formatRole } from '../constants/roles';
+import { localDate } from '../utils/dates';
 
-const today = new Date().toISOString().slice(0, 10);
+const today = localDate();
 const emptyRates = () => Object.fromEntries(ROLE_VALUES.map((r) => [r, ''])) as Record<EmployeeRole, string>;
 
 const rateFor = (emp: Employee, role: EmployeeRole) =>

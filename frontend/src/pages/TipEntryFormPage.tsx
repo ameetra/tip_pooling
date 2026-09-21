@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import type { EmployeeRole, TipEntryInput, EmployeeResult } from '../types';
 import { ROLE_OPTIONS, formatRole } from '../constants/roles';
+import { localDate } from '../utils/dates';
 
 interface EmployeeRow {
   employeeId: string;
@@ -20,7 +21,7 @@ interface EmployeeRow {
   hoursWorked: string;
 }
 
-const today = new Date().toISOString().slice(0, 10);
+const today = localDate();
 
 // Digits with an optional decimal point and at most 2 decimal places.
 const MONEY = /^\d*\.?\d{0,2}$/;

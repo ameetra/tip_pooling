@@ -128,3 +128,23 @@
 - Never put a job role in an auth token; permission roles and job roles are different things.
 - Gate pages by role positively, not by hiding menu items.
 - Note: employee tokens issued before this deploy keep their old role until they expire (8 hours).
+
+### 🟠 Bug #5: Tip entry form defaulted to the UTC date, which is "tomorrow" on a US evening
+**Date Found:** 2026-09-20
+**Severity:** Medium (wrong default date on the entry form)
+**Status:** ✅ RESOLVED
+**Found By:** Code Review (while adding a date filter to the tips list)
+
+**Symptoms:**
+- After about 5pm Pacific, "New Tip Entry" pre-filled tomorrow's date; an entry saved without changing it landed on
+  the wrong day (and, with a "last 14 days" list filter, would have looked missing).
+
+**Root Cause:**
+- `TipEntryFormPage` built its default with `new Date().toISOString().slice(0, 10)`, which is UTC.
+
+**Fix:**
+- New `localDate()` in `frontend/src/utils/dates.ts` (browser-local calendar date), used by the entry form, the Tips
+  list, the Payroll page and the Employees page (wage-change effective date default).
+
+**Prevention:**
+- Never derive a calendar date with `toISOString()`; use `localDate()`.

@@ -1,19 +1,23 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Chip, IconButton, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Typography,
+  Alert, Box, Button, Chip, IconButton, Link, Paper, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useTipEntries, useDeleteTipEntry } from '../api/tips';
+import { useTipEntries, useOlderDrafts, useDeleteTipEntry, TIP_ENTRIES_LIMIT } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useTenant } from '../context/TenantContext';
+import { localDate } from '../utils/dates';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
   const { slug } = useTenant();
-  const { data: entries = [], isLoading } = useTipEntries();
+  // Default to the trailing 14 days: older entries have already been through payroll.
+  const [since, setSince] = useState(() => localDate(13));
+  const { data: entries = [], isFetching } = useTipEntries(since);
+  const { data: olderDrafts = [] } = useOlderDrafts(since);
   const deleteMut = useDeleteTipEntry();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -23,14 +27,41 @@ export default function TipEntriesPage() {
     setDeleteId(null);
   };
 
-  if (isLoading) return <Typography>Loading...</Typography>;
-
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5">Tip Entries</Typography>
         <Button variant="contained" onClick={() => navigate(`/${slug}/tips/new`)}>New Tip Entry</Button>
       </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <TextField
+          label="Show entries from" type="date" size="small" value={since}
+          onChange={(e) => setSince(e.target.value)} slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <Typography variant="body2" color="text.secondary">
+          Entries dated {since || '…'} or later, newest first. Change the date to look further back.
+        </Typography>
+      </Box>
+
+      {olderDrafts.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {olderDrafts.length} older {olderDrafts.length === 1 ? 'entry is' : 'entries are'} still not published:{' '}
+          {olderDrafts.slice(0, 6).map((d, i) => (
+            <span key={d.id}>
+              {i > 0 && ', '}
+              <Link component={RouterLink} to={`/${slug}/tips/${d.id}`}>{d.entryDate}</Link>
+            </span>
+          ))}
+          {olderDrafts.length > 6 && ', …'}
+        </Alert>
+      )}
+
+      {entries.length >= TIP_ENTRIES_LIMIT && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing the {TIP_ENTRIES_LIMIT} newest entries. Move the start date later to narrow the list.
+        </Alert>
+      )}
 
       <TableContainer component={Paper}>
         <Table>
@@ -65,7 +96,11 @@ export default function TipEntriesPage() {
               </TableRow>
             ))}
             {entries.length === 0 && (
-              <TableRow><TableCell colSpan={7} align="center">No tip entries yet. Create your first one!</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  {isFetching ? 'Loading...' : 'No tip entries in this date range.'}
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
