@@ -25,9 +25,13 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
     if (!dbEmp) throw new TipCalculationError(`Employee ${entry.employeeId} not found`, 'EMPLOYEE_NOT_FOUND');
 
     // Rate in force on the entry date; fall back to the current per-role rate, then (primary role only) the legacy single rate.
+    // Rates only apply to roles the employee currently has: after a reactivation the old roles are removed, and their
+    // history must not resurrect a stale rate.
+    const roleKey = `${entry.employeeId}:${entry.role}`;
     const roleHistory = rateHistory.filter((h) => h.employeeId === entry.employeeId && h.role === entry.role);
-    let rate = pickAsOf(roleHistory, input.entryDate, (h) => h.effectiveDate)?.hourlyRate
-      ?? rateByKey.get(`${entry.employeeId}:${entry.role}`);
+    let rate = rateByKey.has(roleKey)
+      ? pickAsOf(roleHistory, input.entryDate, (h) => h.effectiveDate)?.hourlyRate ?? rateByKey.get(roleKey)
+      : undefined;
     if (rate === undefined && entry.role === dbEmp.role) rate = dbEmp.hourlyRate;
     if (rate === undefined) {
       throw new TipCalculationError(`${dbEmp.name} has no base rate set for role ${entry.role}`, 'MISSING_ROLE_RATE');

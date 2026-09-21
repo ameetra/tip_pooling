@@ -44,7 +44,13 @@ export interface UpdateEmployeeInput {
   name?: string;
   email?: string;
   role?: EmployeeRole;
-  isActive?: boolean;
+}
+
+// Bringing a deactivated employee back: the role and every rate are entered again.
+export interface ReactivateEmployeeInput {
+  role: EmployeeRole;
+  rates: RoleRateInput[];
+  effectiveDate: string;
 }
 
 export interface SetRoleRatesInput {

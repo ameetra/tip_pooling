@@ -1,9 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, patch, del } from './client';
-import type { Employee, CreateEmployeeInput, UpdateEmployeeInput, SetRoleRatesInput } from '../types';
+import type { Employee, CreateEmployeeInput, UpdateEmployeeInput, SetRoleRatesInput, ReactivateEmployeeInput } from '../types';
 
-export const useEmployees = () =>
-  useQuery({ queryKey: ['employees'], queryFn: () => get<Employee[]>('/employees') });
+export type EmployeeStatus = 'active' | 'inactive';
+
+// 100 is the API's page maximum.
+export const useEmployees = (status: EmployeeStatus = 'active') =>
+  useQuery({ queryKey: ['employees', status], queryFn: () => get<Employee[]>(`/employees?status=${status}&limit=100`) });
 
 export const useCreateEmployee = () => {
   const qc = useQueryClient();
@@ -25,6 +28,14 @@ export const useSetRoleRates = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: SetRoleRatesInput }) => post<Employee>(`/employees/${id}/role-rates`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+};
+
+export const useReactivateEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ReactivateEmployeeInput }) => post<Employee>(`/employees/${id}/reactivate`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
   });
 };

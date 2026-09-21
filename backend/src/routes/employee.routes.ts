@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { employeeController } from '../controllers/employee.controller';
 import { validateBody } from '../middleware/validate';
-import { CreateEmployeeSchema, UpdateEmployeeSchema, SetRoleRatesSchema } from '../validation/employee.schema';
+import { CreateEmployeeSchema, UpdateEmployeeSchema, SetRoleRatesSchema, ReactivateEmployeeSchema } from '../validation/employee.schema';
 
 const router = Router();
 
@@ -12,5 +12,6 @@ router.patch('/:id', validateBody(UpdateEmployeeSchema), employeeController.upda
 router.delete('/:id', employeeController.remove);
 router.get('/:id/rate-history', employeeController.getRateHistory);
 router.post('/:id/role-rates', validateBody(SetRoleRatesSchema), employeeController.setRoleRates);
+router.post('/:id/reactivate', validateBody(ReactivateEmployeeSchema), employeeController.reactivate);
 
 export default router;

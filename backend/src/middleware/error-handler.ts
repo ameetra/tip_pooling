@@ -38,6 +38,12 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  if (['EMPLOYEE_EXISTS', 'ALREADY_ACTIVE'].includes((err as any).code)) {
+    response.error = { code: (err as any).code, message: err.message };
+    res.status(409).json(response);
+    return;
+  }
+
   // Prisma unique constraint violation
   if (err.constructor?.name === 'PrismaClientKnownRequestError' && (err as any).code === 'P2002') {
     response.error = { code: 'DUPLICATE_ENTRY', message: 'A record with this value already exists' };

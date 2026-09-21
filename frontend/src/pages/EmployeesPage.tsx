@@ -2,15 +2,17 @@ import { useState } from 'react';
 import {
   Box, Button, IconButton, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Typography, Alert, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField,
+  DialogActions, TextField, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, useDeleteEmployee } from '../api/employees';
+import RestoreIcon from '@mui/icons-material/Restore';
+import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, useDeleteEmployee, useReactivateEmployee, type EmployeeStatus } from '../api/employees';
 import EmployeeDialog from '../components/EmployeeDialog';
+import ReactivateEmployeeDialog from '../components/ReactivateEmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Employee, EmployeeRole } from '../types';
+import type { Employee, EmployeeRole, ReactivateEmployeeInput } from '../types';
 import { ROLE_OPTIONS, ROLE_VALUES, formatRole } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
@@ -24,12 +26,16 @@ const ratesLabel = (emp: Employee) =>
   (emp.roleRates ?? []).map((r) => `${formatRole(r.role)} $${r.hourlyRate.toFixed(2)}`).join(', ') || '—';
 
 export default function EmployeesPage() {
-  const { data: employees = [], isLoading } = useEmployees();
+  const [status, setStatus] = useState<EmployeeStatus>('active');
+  const { data: employees = [], isFetching } = useEmployees(status);
   const createMut = useCreateEmployee();
   const updateMut = useUpdateEmployee();
   const setRatesMut = useSetRoleRates();
   const deleteMut = useDeleteEmployee();
+  const reactivateMut = useReactivateEmployee();
 
+  const [reactivating, setReactivating] = useState<Employee | null>(null);
+  const [notice, setNotice] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -56,6 +62,17 @@ export default function EmployeesPage() {
     setDeleteId(null);
   };
 
+  const handleReactivate = async (data: ReactivateEmployeeInput) => {
+    if (!reactivating) return;
+    try {
+      await reactivateMut.mutateAsync({ id: reactivating.id, data });
+      setNotice(`${reactivating.name} is active again.`);
+      setReactivating(null);
+      setStatus('active');
+      setError('');
+    } catch (e: any) { setError(e.message); }
+  };
+
   const openRateDialog = (emp: Employee) => {
     setRateEmployee(emp);
     setRateInputs(Object.fromEntries(
@@ -77,8 +94,6 @@ export default function EmployeesPage() {
     } catch (e: any) { setError(e.message); }
   };
 
-  if (isLoading) return <Typography>Loading...</Typography>;
-
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -86,6 +101,15 @@ export default function EmployeesPage() {
         <Button variant="contained" onClick={handleCreate}>Add Employee</Button>
       </Box>
 
+      <ToggleButtonGroup
+        exclusive size="small" value={status} sx={{ mb: 2 }}
+        onChange={(_, next: EmployeeStatus | null) => { if (next) { setStatus(next); setNotice(''); } }}
+      >
+        <ToggleButton value="active">Active</ToggleButton>
+        <ToggleButton value="inactive">Inactive</ToggleButton>
+      </ToggleButtonGroup>
+
+      {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <TableContainer component={Paper}>
@@ -94,8 +118,8 @@ export default function EmployeesPage() {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Primary Role</TableCell>
-              <TableCell>Base Rates (per role)</TableCell>
+              <TableCell>{status === 'active' ? 'Primary Role' : 'Last Role'}</TableCell>
+              {status === 'active' ? <TableCell>Base Rates (per role)</TableCell> : <TableCell>Deactivated</TableCell>}
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -105,23 +129,38 @@ export default function EmployeesPage() {
                 <TableCell>{emp.name}</TableCell>
                 <TableCell>{emp.email}</TableCell>
                 <TableCell>{formatRole(emp.role)}</TableCell>
-                <TableCell>{ratesLabel(emp)}</TableCell>
+                {status === 'active' ? <TableCell>{ratesLabel(emp)}</TableCell> : <TableCell>{new Date(emp.updatedAt).toLocaleDateString()}</TableCell>}
                 <TableCell align="right">
-                  <IconButton size="small" onClick={() => openRateDialog(emp)} title="Edit Rates"><AttachMoneyIcon /></IconButton>
-                  <IconButton size="small" onClick={() => handleEdit(emp)} title="Edit"><EditIcon /></IconButton>
-                  <IconButton size="small" onClick={() => setDeleteId(emp.id)} title="Delete"><DeleteIcon /></IconButton>
+                  {status === 'active' ? (
+                    <>
+                      <IconButton size="small" onClick={() => openRateDialog(emp)} title="Edit Rates"><AttachMoneyIcon /></IconButton>
+                      <IconButton size="small" onClick={() => handleEdit(emp)} title="Edit"><EditIcon /></IconButton>
+                      <IconButton size="small" onClick={() => setDeleteId(emp.id)} title="Delete"><DeleteIcon /></IconButton>
+                    </>
+                  ) : (
+                    <Button size="small" startIcon={<RestoreIcon />} onClick={() => setReactivating(emp)}>Reactivate</Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
             {employees.length === 0 && (
-              <TableRow><TableCell colSpan={5} align="center">No employees yet</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  {isFetching ? 'Loading...' : status === 'active' ? 'No employees yet' : 'No inactive employees'}
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
       <EmployeeDialog open={dialogOpen} employee={editing} onSubmit={handleSubmit} onClose={() => setDialogOpen(false)} />
-      <ConfirmDialog open={!!deleteId} title="Delete Employee" message="This will deactivate the employee." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+      <ConfirmDialog open={!!deleteId} title="Delete Employee" message="This will deactivate the employee. You can bring them back later from the Inactive list." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+
+      <ReactivateEmployeeDialog
+        open={!!reactivating} employee={reactivating} pending={reactivateMut.isPending}
+        onSubmit={handleReactivate} onClose={() => setReactivating(null)}
+      />
 
       {/* Edit Rates Dialog — one base rate per role this person can work */}
       <Dialog open={!!rateEmployee} onClose={() => setRateEmployee(null)} maxWidth="xs" fullWidth>

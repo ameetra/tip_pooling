@@ -148,3 +148,36 @@
 
 **Prevention:**
 - Never derive a calendar date with `toISOString()`; use `localDate()`.
+
+### 🟠 Bug #6: A deactivated employee could not be added again or reactivated
+**Date Found:** 2026-09-20
+**Severity:** Medium (blocked re-hiring; workaround created duplicate people)
+**Status:** ✅ RESOLVED
+**Found By:** Product owner question ("can I add them again after six months?")
+
+**Symptoms:**
+- Deleting an employee hid them, and adding them again with the same email failed with a generic
+  "A record with this value already exists" (409). Nothing on screen could bring them back.
+
+**Root Cause:**
+- "Delete" only sets `isActive = false`; the row keeps its email, and `(tenantId, email)` is unique. The list only
+  showed active employees, so there was no way to find or reactivate the record. (`PATCH /employees/:id` accepted
+  `isActive: true`, which would also have reactivated someone with their old role and rates untouched.)
+
+**Fix:**
+- Employees screen: Active / Inactive toggle; Inactive rows have a Reactivate button.
+- `POST /employees/:id/reactivate` requires the role and rates again (nothing carries over); the old current rates
+  are dropped, rate history is kept. `PATCH` can no longer set `isActive`.
+- The calculation only uses a rate for a role the employee currently has, so old history can't resurrect a stale rate.
+- Adding a duplicate email now says whether the person is active or was deactivated.
+
+**Files Modified:**
+- `backend/src/{validation/employee.schema,services/employee.service,services/tip-entry.service,controllers/employee.controller,routes/employee.routes,middleware/error-handler}.ts`
+- `frontend/src/pages/EmployeesPage.tsx`, `frontend/src/components/ReactivateEmployeeDialog.tsx`, `frontend/src/api/employees.ts`
+
+**Test Added:**
+- `backend/src/__tests__/api/employee-reactivate.test.ts` (listing, reactivation rules, plain PATCH refused, stale-rate
+  guard, other-venue 404, duplicate-email messages)
+
+**Prevention:**
+- Any "delete" that is really a deactivation needs a way back; unique keys must be considered when re-adding.

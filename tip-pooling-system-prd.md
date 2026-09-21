@@ -86,7 +86,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Admin can add new employees (name, email, role, hourly rate) *(each role can have its own rate)*
 - [x] Admin can edit employee information
 - [x] Admin can soft-delete/deactivate employees
-- [ ] Admin can reactivate deactivated employees - *Not built: deactivated employees are hidden from the list, so there is no way to find and reactivate one*
+- [x] Admin can reactivate deactivated employees *(Employees screen: Active/Inactive toggle; reactivating requires the role and every hourly rate to be entered again, nothing carries over)*
 - [x] System maintains employee history (all versions) *(through the audit log)*
 
 #### 3.2.2 Employee Roles
@@ -327,6 +327,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] **Shift Lead role:** a staff login that can only enter tips (the app shows them no wage or pay figures)
 - [x] Shift leads are also a tipped role: they pool tips with servers by hours
 - [x] Several roles per employee, each with its own hourly rate and effective-dated rate history
+- [x] Deactivated employees are listed under **Inactive** on the Employees screen and can be reactivated (role and rates re-entered); adding a duplicate email explains where the existing record is
 - [x] Tip entry by day (shifts removed) with Cash in Register, Cash Sales, Cash Tips (jar) and POS Tips inputs
 - [x] **Draft and Published entries:** publishing locks the entry and emails each employee their summary
 - [x] Corrections: delete an entry (with a warning when it is published) and enter it again for the same date

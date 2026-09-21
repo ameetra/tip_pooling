@@ -1,5 +1,5 @@
 import prisma from '../database/client';
-import { CreateEmployeeInput, EmployeeQuery, SetRoleRatesInput, UpdateEmployeeInput } from '../validation/employee.schema';
+import { CreateEmployeeInput, EmployeeQuery, ReactivateEmployeeInput, SetRoleRatesInput, UpdateEmployeeInput } from '../validation/employee.schema';
 import { auditService } from './audit.service';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -11,6 +11,13 @@ const withRates = {
 
 export const employeeService = {
   async create(tenantId: string, data: CreateEmployeeInput) {
+    const existing = await prisma.employee.findFirst({ where: { tenantId, email: data.email } });
+    if (existing) {
+      throw Object.assign(new Error(existing.isActive
+        ? 'An employee with this email already exists.'
+        : 'An employee with this email was deactivated. Open the Inactive list and reactivate them instead.'), { code: 'EMPLOYEE_EXISTS' });
+    }
+
     // Build the per-role rate map: legacy single hourlyRate (primary role) + any explicit rates.
     const rateMap = new Map<string, number>();
     if (data.hourlyRate != null) rateMap.set(data.role, data.hourlyRate);
@@ -36,7 +43,7 @@ export const employeeService = {
     const limit = query?.limit ?? 50;
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId, isActive: true };
+    const where: any = { tenantId, isActive: query?.status !== 'inactive' };
     if (query?.search) where.name = { contains: query.search };
 
     const [data, total] = await Promise.all([
@@ -84,6 +91,33 @@ export const employeeService = {
       tenantId, entityType: 'EMPLOYEE', entityId: id, action: 'UPDATE_RATE',
       oldValues: { hourlyRate: employee.hourlyRate },
       newValues: { rates: data.rates, effectiveDate: eff },
+    });
+    return prisma.employee.findFirst({ where: { id, tenantId }, include: withRates });
+  },
+
+  // Returns a deactivated employee to work. The previous role and rates are dropped (their history is kept
+  // for the entries already calculated), so nothing stale can be used by accident.
+  async reactivate(tenantId: string, id: string, data: ReactivateEmployeeInput) {
+    const employee = await prisma.employee.findFirst({ where: { id, tenantId } });
+    if (!employee) return null;
+    if (employee.isActive) throw Object.assign(new Error('This employee is already active.'), { code: 'ALREADY_ACTIVE' });
+
+    const eff = data.effectiveDate || today();
+    const primaryRate = data.rates.find((r) => r.role === data.role)!.hourlyRate;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.employee.update({ where: { id }, data: { isActive: true, role: data.role, hourlyRate: primaryRate } });
+      await tx.employeeRoleRate.deleteMany({ where: { employeeId: id } });
+      for (const r of data.rates) {
+        await tx.employeeRoleRate.create({ data: { employeeId: id, role: r.role, hourlyRate: r.hourlyRate } });
+        await tx.employeeRateHistory.create({ data: { employeeId: id, role: r.role, hourlyRate: r.hourlyRate, effectiveDate: eff } });
+      }
+    });
+
+    await auditService.log({
+      tenantId, entityType: 'EMPLOYEE', entityId: id, action: 'REACTIVATE',
+      oldValues: { role: employee.role, hourlyRate: employee.hourlyRate },
+      newValues: { role: data.role, rates: data.rates, effectiveDate: eff },
     });
     return prisma.employee.findFirst({ where: { id, tenantId }, include: withRates });
   },
