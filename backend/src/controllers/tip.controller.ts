@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
-import { TipEntryQuerySchema } from '../validation/tip.schema';
+import { payrollReportService } from '../services/payroll-report.service';
+import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
 
 function performer(req: Request) {
@@ -57,6 +58,13 @@ export const tipController = {
       const entry = await tipEntryService.findById(req.tenantId, id);
       if (!entry) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.json({ success: true, data: entry });
+    } catch (err) { next(err); }
+  },
+
+  async payrollReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { start_date, end_date } = PayrollReportQuerySchema.parse(req.query);
+      res.json({ success: true, data: await payrollReportService.build(req.tenantId, start_date, end_date) });
     } catch (err) { next(err); }
   },
 

@@ -284,7 +284,13 @@ A cloud-based tip pooling management system that automates the calculation and d
 
 ### 3.7 Reporting & Exports
 
-#### 3.7.1 Export Functionality
+#### 3.7.0 Payroll Report (built)
+- [x] Admin/Manager picks a start and end date (max 1 year) on the Payroll page
+- [x] Shows total tips per employee (cash + card combined) from **published** entries only, with days worked and hours
+- [x] Warns about unpublished entries in the range (excluded from totals)
+- [x] Download CSV: Employee, Email, Days Worked, Hours, Total Tips
+
+#### 3.7.1 Export Functionality (per-day detail export, not built)
 - [ ] Manager can export tip data to CSV format
 - [ ] Manager can specify date range for export
 - [ ] Export includes all employee tip details for selected range

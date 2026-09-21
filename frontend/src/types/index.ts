@@ -143,3 +143,21 @@ export interface TipEntryDetail extends TipEntry {
     employee: { id: string; name: string; email: string; role: string };
   }[];
 }
+
+export interface PayrollRow {
+  employeeId: string;
+  name: string;
+  email: string;
+  daysWorked: number;
+  hours: number;
+  totalTips: number;
+}
+
+export interface PayrollReport {
+  startDate: string;
+  endDate: string;
+  publishedEntries: number;
+  employees: PayrollRow[];
+  totalTips: number;
+  unpublished: { id: string; entryDate: string }[];
+}

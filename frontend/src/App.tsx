@@ -16,6 +16,7 @@ import TipEntryFormPage from './pages/TipEntryFormPage';
 import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
+import PayrollReportPage from './pages/PayrollReportPage';
 
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'SHIFT_LEAD'];
 
@@ -76,6 +77,7 @@ function VenueRoutes() {
         <Route path="tips" element={<TipEntriesPage />} />
         <Route path="tips/new" element={<TipEntryFormPage />} />
         <Route path="tips/:id" element={<TipEntryDetailPage />} />
+        <Route path="payroll" element={<PayrollReportPage />} />
         <Route path="users" element={<UsersPage />} />
       </Route>
     </Routes>

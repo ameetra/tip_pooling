@@ -12,5 +12,6 @@ router.get('/entries/:id', tipController.findById);
 router.post('/entries/:id/publish', tipController.publish);
 router.patch('/entries/:id', validateBody(EditTipEntrySchema), tipController.edit);
 router.delete('/entries/:id', tipController.remove);
+router.get('/payroll-report', tipController.payrollReport);
 
 export default router;

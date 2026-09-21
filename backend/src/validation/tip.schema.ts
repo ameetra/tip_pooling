@@ -59,6 +59,17 @@ export const TipEntryQuerySchema = PaginationSchema.extend({
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+const MAX_REPORT_DAYS = 366;
+
+export const PayrollReportQuerySchema = z.object({
+  start_date: calendarDate,
+  end_date: calendarDate,
+})
+  .refine((q) => q.start_date <= q.end_date, { message: 'Start date must be on or before end date', path: ['end_date'] })
+  .refine((q) => (Date.parse(q.end_date) - Date.parse(q.start_date)) / 86_400_000 <= MAX_REPORT_DAYS, {
+    message: 'Date range cannot exceed 1 year', path: ['end_date'],
+  });
+
 export type PaginationQuery = z.infer<typeof PaginationSchema>;
 
 export type TipPreviewInput = z.infer<typeof TipPreviewSchema>;
