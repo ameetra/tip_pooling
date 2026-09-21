@@ -7,7 +7,6 @@ interface TipRecord {
   date: string;
   role: string;
   hours: number;
-  hourlyPay: number;
   tips: number;
   totalPay: number;
   effectiveHourlyRate: number;
@@ -21,6 +20,17 @@ interface MyHistoryResponse {
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 const fmtDate = (d: string) =>
   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+function Line({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <Stack direction="row" sx={{ justifyContent: 'space-between', py: 0.5 }}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: highlight ? 600 : 400, color: highlight ? 'success.main' : 'text.primary' }}>
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
 
 export default function EmployeeTipHistoryPage() {
   const { data, isLoading } = useQuery<MyHistoryResponse>({
@@ -40,7 +50,10 @@ export default function EmployeeTipHistoryPage() {
         </Typography>
       )}
       <Typography variant="h5" sx={{ fontWeight: 600 }} gutterBottom>My Tip History</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Last 90 days</Typography>
+      <Typography variant="body2" color="text.secondary">Last 90 days</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
+        Effective hourly rate = total pay (wages + tips) ÷ hours worked.
+      </Typography>
 
       {isLoading && <CircularProgress />}
 
@@ -72,27 +85,18 @@ export default function EmployeeTipHistoryPage() {
             {records.map((r) => (
               <Card key={r.date} variant="outlined">
                 <CardContent>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box>
-                      <Typography sx={{ fontWeight: 600 }}>{fmtDate(r.date)}</Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                        <Chip label={r.role} size="small" variant="outlined" />
-                      </Stack>
-                    </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography sx={{ fontWeight: 600, color: 'success.main' }}>{fmt(r.tips)} tips</Typography>
-                      <Typography variant="body2" color="text.secondary">{fmt(r.totalPay)} total</Typography>
-                    </Box>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ fontWeight: 600 }}>{fmtDate(r.date)}</Typography>
+                    <Chip label={r.role} size="small" variant="outlined" />
                   </Stack>
 
-                  <Divider sx={{ my: 1.5 }} />
+                  <Divider sx={{ my: 1 }} />
 
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {r.hours}h × {fmt(r.effectiveHourlyRate)}/hr effective
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">{fmt(r.hourlyPay)} wages</Typography>
-                  </Stack>
+                  {/* Same rows and labels as the tip email. */}
+                  <Line label="Hours worked" value={r.hours.toFixed(1)} />
+                  <Line label="Tips earned" value={fmt(r.tips)} highlight />
+                  <Line label="Total pay (wages + tips)" value={fmt(r.totalPay)} />
+                  <Line label="Effective hourly rate" value={`${fmt(r.effectiveHourlyRate)}/hr`} />
                 </CardContent>
               </Card>
             ))}

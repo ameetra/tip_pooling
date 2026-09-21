@@ -3,7 +3,7 @@ import { formatRole } from '../types/tip-calculation.types';
 
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@usegratify.com';
-const FROM_NAME = process.env.FROM_NAME || 'Tip Pooling';
+const FROM_NAME = process.env.FROM_NAME || 'Gratify';
 const APP_URL = process.env.APP_URL || 'https://usegratify.com';
 
 // Escape user-controlled values before interpolating into email HTML (employee/venue names, etc.)
