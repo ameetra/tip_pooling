@@ -7,6 +7,7 @@ interface TipRecord {
   date: string;
   role: string;
   hours: number;
+  hourlyPay: number;
   tips: number;
   totalPay: number;
   effectiveHourlyRate: number;
@@ -94,6 +95,7 @@ export default function EmployeeTipHistoryPage() {
 
                   {/* Same rows and labels as the tip email. */}
                   <Line label="Hours worked" value={r.hours.toFixed(1)} />
+                  <Line label="Wages" value={fmt(r.hourlyPay)} />
                   <Line label="Tips earned" value={fmt(r.tips)} highlight />
                   <Line label="Total pay (wages + tips)" value={fmt(r.totalPay)} />
                   <Line label="Effective hourly rate" value={`${fmt(r.effectiveHourlyRate)}/hr`} />

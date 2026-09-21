@@ -40,6 +40,9 @@ export async function sendTipEmail(data: TipEmailData): Promise<void> {
   }));
 }
 
+// Total pay is wages + tips, so wages is what's left after tips.
+const wagesOf = (d: TipEmailData) => d.totalPay - d.finalTips;
+
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
   const roles = esc(d.roles.map(formatRole).join(', ')) || '—';
   const name = esc(d.restaurantName);
@@ -62,14 +65,18 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
       <td style="padding: 8px 12px; text-align:right;">${d.hours.toFixed(1)}</td>
     </tr>
     <tr style="background:#f5f5f5;">
+      <td style="padding: 8px 12px;">Wages</td>
+      <td style="padding: 8px 12px; text-align:right;">$${wagesOf(d).toFixed(2)}</td>
+    </tr>
+    <tr>
       <td style="padding: 8px 12px;">Tips earned</td>
       <td style="padding: 8px 12px; text-align:right;"><strong>$${d.finalTips.toFixed(2)}</strong></td>
     </tr>
-    <tr>
+    <tr style="background:#f5f5f5;">
       <td style="padding: 8px 12px;">Total pay (wages + tips)</td>
       <td style="padding: 8px 12px; text-align:right;">$${d.totalPay.toFixed(2)}</td>
     </tr>
-    <tr style="background:#f5f5f5;">
+    <tr>
       <td style="padding: 8px 12px;">Effective hourly rate</td>
       <td style="padding: 8px 12px; text-align:right;">$${d.effectiveHourlyRate.toFixed(2)}/hr</td>
     </tr>
@@ -123,6 +130,7 @@ Hi ${d.employeeName},
 
 Role(s): ${d.roles.map(formatRole).join(', ') || '—'}
 Hours worked: ${d.hours.toFixed(1)}
+Wages: $${wagesOf(d).toFixed(2)}
 Tips earned: $${d.finalTips.toFixed(2)}
 Total pay (wages + tips): $${d.totalPay.toFixed(2)}
 Effective hourly rate: $${d.effectiveHourlyRate.toFixed(2)}/hr
