@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Link as RouterLink, Navigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert, Box, Button, CircularProgress, Link, Paper, Stack, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { usePayrollReport } from '../api/payroll';
-import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { downloadCsv } from '../utils/csv';
 
@@ -18,15 +17,12 @@ const localDate = (daysAgo = 0) => {
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
 export default function PayrollReportPage() {
-  const { user } = useAuth();
   const { slug } = useTenant();
   const [startDate, setStartDate] = useState(() => localDate(13));
   const [endDate, setEndDate] = useState(() => localDate());
 
   const validRange = !!startDate && !!endDate && startDate <= endDate;
   const { data: report, isFetching, error } = usePayrollReport(validRange ? startDate : '', validRange ? endDate : '');
-
-  if (user?.role === 'SHIFT_LEAD') return <Navigate to={`/${slug}/tips/new`} replace />;
 
   const handleDownload = () => {
     if (!report) return;

@@ -17,6 +17,7 @@ import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
 import PayrollReportPage from './pages/PayrollReportPage';
+import { MANAGEMENT_ROLES } from './constants/roles';
 
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'SHIFT_LEAD'];
 
@@ -33,6 +34,13 @@ function RequireToken({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const { slug } = useTenant();
   return token ? <>{children}</> : <Navigate to={`/${slug}/manager-login`} replace />;
+}
+
+// Only the listed roles see the page; everyone else is sent to their own home via RoleRouter.
+function RequireRole({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  const { user } = useAuth();
+  const { slug } = useTenant();
+  return user && roles.includes(user.role) ? <>{children}</> : <Navigate to={`/${slug}`} replace />;
 }
 
 function RoleRouter() {
@@ -77,7 +85,7 @@ function VenueRoutes() {
         <Route path="tips" element={<TipEntriesPage />} />
         <Route path="tips/new" element={<TipEntryFormPage />} />
         <Route path="tips/:id" element={<TipEntryDetailPage />} />
-        <Route path="payroll" element={<PayrollReportPage />} />
+        <Route path="payroll" element={<RequireRole roles={MANAGEMENT_ROLES}><PayrollReportPage /></RequireRole>} />
         <Route path="users" element={<UsersPage />} />
       </Route>
     </Routes>

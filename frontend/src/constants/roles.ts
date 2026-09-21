@@ -2,6 +2,9 @@ import type { EmployeeRole } from '../types';
 
 export const ROLE_VALUES = ['SERVER', 'SHIFT_LEAD', 'BUSSER', 'EXPEDITOR'] as const;
 
+// Login roles that may see management-only pages (e.g. Payroll). Shift leads and employees may not.
+export const MANAGEMENT_ROLES = ['ADMIN', 'MANAGER'];
+
 // Underscore-aware title case: 'SHIFT_LEAD' -> 'Shift Lead', 'SERVER' -> 'Server'.
 export const formatRole = (role: string): string =>
   role.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
