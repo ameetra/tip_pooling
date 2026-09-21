@@ -116,7 +116,9 @@ export async function verifyMagicLink(rawToken: string): Promise<{ jwt: string }
   });
   if (!employee) throw Object.assign(new Error('Employee account no longer active.'), { code: 'EMPLOYEE_NOT_FOUND' });
 
-  return { jwt: signJwt({ sub: employee.id, tenantId: employee.tenantId, role: employee.role, email: employee.email }) };
+  // Employees always sign in as EMPLOYEE, never with their job role: SHIFT_LEAD is also a staff permission
+  // role, so carrying it over would hand a shift-lead employee staff access (tip entry, employee list).
+  return { jwt: signJwt({ sub: employee.id, tenantId: employee.tenantId, role: 'EMPLOYEE', email: employee.email }) };
 }
 
 export function verifyJwtToken(token: string): JwtPayload {
