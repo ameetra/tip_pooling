@@ -67,3 +67,28 @@
 **Prevention:**
 - Any effective-dated setting must be resolved through `pickAsOf` with the entry date, never "latest row".
 - Known nuance: the Employees page lists the most recently *entered* rate, even if it is future-dated; the calculation uses the dated history.
+
+### 🟡 Bug #3: Employee "My Tips" history included unpublished (draft) entries
+**Date Found:** 2026-09-20
+**Severity:** High (staff could see tip amounts before the manager published them)
+**Status:** ✅ RESOLVED
+**Found By:** Code Review (while planning the payroll report)
+
+**Symptoms:**
+- `GET /api/v1/tips/my-history` returned an employee's tips for every non-deleted entry, including drafts that the
+  manager had not yet published (drafts can still be corrected or deleted, and no email has been sent for them).
+
+**Root Cause:**
+- The query filtered on tenant, `isDeleted` and date only; it never checked `publishedAt`.
+
+**Fix:**
+- `tipController.myHistory` now requires `publishedAt: { not: null }`.
+
+**Files Modified:**
+- `backend/src/controllers/tip.controller.ts`
+
+**Test Added:**
+- `backend/src/__tests__/api/my-history.test.ts` (only published entries appear; nothing shown while all are drafts)
+
+**Prevention:**
+- Anything that shows numbers to staff or feeds payroll must be limited to published entries (as the payroll report is).

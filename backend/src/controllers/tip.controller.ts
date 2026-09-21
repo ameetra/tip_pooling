@@ -78,7 +78,8 @@ export const tipController = {
       const calcs = await (prisma as any).tipCalculation.findMany({
         where: {
           employeeId,
-          tipEntry: { tenantId: req.tenantId, isDeleted: false, entryDate: { gte: sinceStr } },
+          // Drafts aren't final and haven't been shared with staff yet, so only published entries count.
+          tipEntry: { tenantId: req.tenantId, isDeleted: false, publishedAt: { not: null }, entryDate: { gte: sinceStr } },
         },
         include: { tipEntry: { select: { entryDate: true } } },
         orderBy: { tipEntry: { entryDate: 'desc' } },
