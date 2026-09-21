@@ -10,9 +10,8 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, useDeleteEmployee, useReactivateEmployee, type EmployeeStatus } from '../api/employees';
 import EmployeeDialog from '../components/EmployeeDialog';
-import ReactivateEmployeeDialog from '../components/ReactivateEmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Employee, EmployeeRole, ReactivateEmployeeInput } from '../types';
+import type { Employee, EmployeeRole, RoleRateInput } from '../types';
 import { ROLE_OPTIONS, ROLE_VALUES, formatRole } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
@@ -62,10 +61,10 @@ export default function EmployeesPage() {
     setDeleteId(null);
   };
 
-  const handleReactivate = async (data: ReactivateEmployeeInput) => {
+  const handleReactivate = async (data: { role: EmployeeRole; rates: RoleRateInput[] }) => {
     if (!reactivating) return;
     try {
-      await reactivateMut.mutateAsync({ id: reactivating.id, data });
+      await reactivateMut.mutateAsync({ id: reactivating.id, data: { ...data, effectiveDate: localDate() } });
       setNotice(`${reactivating.name} is active again.`);
       setReactivating(null);
       setStatus('active');
@@ -157,9 +156,9 @@ export default function EmployeesPage() {
       <EmployeeDialog open={dialogOpen} employee={editing} onSubmit={handleSubmit} onClose={() => setDialogOpen(false)} />
       <ConfirmDialog open={!!deleteId} title="Delete Employee" message="This will deactivate the employee. You can bring them back later from the Inactive list." onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
 
-      <ReactivateEmployeeDialog
-        open={!!reactivating} employee={reactivating} pending={reactivateMut.isPending}
-        onSubmit={handleReactivate} onClose={() => setReactivating(null)}
+      <EmployeeDialog
+        open={!!reactivating} employee={reactivating} mode="reactivate" pending={reactivateMut.isPending}
+        onSubmit={(data) => handleReactivate(data as { role: EmployeeRole; rates: RoleRateInput[] })} onClose={() => setReactivating(null)}
       />
 
       {/* Edit Rates Dialog — one base rate per role this person can work */}

@@ -181,3 +181,29 @@
 
 **Prevention:**
 - Any "delete" that is really a deactivation needs a way back; unique keys must be considered when re-adding.
+
+### 🟡 Bug #7: The Edit Employee form could not be saved
+**Date Found:** 2026-09-20
+**Severity:** High (managers could not rename or re-role an employee from the screen)
+**Status:** ✅ RESOLVED
+**Found By:** Code review while making the reactivation dialog match the Add form; reproduced in a browser
+
+**Symptoms:**
+- Editing an employee and clicking Save did nothing: the dialog stayed open, showed no error, and no request was sent.
+
+**Root Cause:**
+- One validation schema served Add and Edit. It required a base rate for the primary role, but Edit doesn't show the
+  rate fields, so validation failed on a field that wasn't on screen and blocked the save silently.
+  (Introduced when per-role rates were added.)
+
+**Fix:**
+- `EmployeeDialog` now has three modes (Add, Edit, Reactivate), each validating only the fields it shows. The
+  primary-rate message appears under the chosen role's own rate field. Reactivation reuses the same dialog, so it has
+  the same fields as Add (minus name and email) and starts blank.
+
+**Files Modified:**
+- `frontend/src/components/EmployeeDialog.tsx`, `frontend/src/pages/EmployeesPage.tsx`
+  (`ReactivateEmployeeDialog.tsx` removed)
+
+**Prevention:**
+- A form whose validation can fail on a hidden field needs a schema per mode; check that Save actually sends a request.
