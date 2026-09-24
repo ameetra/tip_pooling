@@ -12,6 +12,16 @@ Management sign-in at `/<slug>/manager-login`; employees use a magic-link at `/<
 > Operator docs: see **SUPER_ADMIN_GUIDE.md** (running the platform) and **RUNBOOK_ADD_TENANT.md**
 > (adding a new venue). Credentials live in `CREDENTIALS.local.md` (gitignored).
 
+## Screenshots
+
+Filling in a tip entry and previewing the pooled, prorated distribution live, before saving:
+
+![Live tip calculation preview](frontend/public/landing/tip-preview.gif)
+
+| Tip Entries | Payroll Report | Employees |
+|---|---|---|
+| ![Tip entries list](frontend/public/landing/tip-entries.png) | ![Payroll report](frontend/public/landing/payroll-report.png) | ![Employees with per-role rates](frontend/public/landing/employees.png) |
+
 ## Features
 
 - **Multi-tenant venues** — fully isolated data per establishment; path-based routing; per-venue logo + name
