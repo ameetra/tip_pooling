@@ -1,13 +1,20 @@
 import { calculateTips, computeCashTips, TipCalculationError } from '../tip-calculation.service';
-import { StintInput, SupportStaffConfig, TipCalculationInput, TipCalculationResult } from '../../types/tip-calculation.types';
+import { StintInput, SupportStaffConfig, SupportSplitMode, TipCalculationInput, TipCalculationResult } from '../../types/tip-calculation.types';
 
 const server = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 's1', name: 'Server A', role: 'SERVER', hours: 8, hourlyRate: 15, ...o });
 const shiftLead = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'sl1', name: 'Lead A', role: 'SHIFT_LEAD', hours: 8, hourlyRate: 17, ...o });
 const busser = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'b1', name: 'Busser A', role: 'BUSSER', hours: 6, hourlyRate: 12, ...o });
 const expeditor = (o: Partial<StintInput> = {}): StintInput => ({ employeeId: 'e1', name: 'Expeditor A', role: 'EXPEDITOR', hours: 4, hourlyRate: 13, ...o });
 
-const run = (totalTipPool: number, stints: StintInput[], supportStaffConfig: SupportStaffConfig[] = []) =>
-  calculateTips({ totalTipPool, stints, supportStaffConfig });
+// shiftHours defaults to total tipped hours (server + shift lead) so PER_PERSON tests that don't
+// care about the shift-hours/tipped-hours distinction can omit it.
+const run = (
+  totalTipPool: number, stints: StintInput[], supportStaffConfig: SupportStaffConfig[] = [],
+  supportSplitMode: SupportSplitMode = 'POOLED', shiftHours?: number,
+) => {
+  const defaultShiftHours = stints.filter((s) => s.role === 'SERVER' || s.role === 'SHIFT_LEAD').reduce((sum, s) => sum + s.hours, 0);
+  return calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours: shiftHours ?? defaultShiftHours });
+};
 
 const sumTips = (r: TipCalculationResult) => Number(r.stints.reduce((s, x) => s + x.finalTips, 0).toFixed(2));
 const emp = (r: TipCalculationResult, id: string) => r.employees.find((e) => e.employeeId === id)!;
@@ -177,6 +184,84 @@ describe('Tip Calculation Service (prorated hours, per-role pool)', () => {
       expect(emp(r, 'b1').totalTips).toBe(0);
       expect(emp(r, 's1').totalTips).toBe(1000);
       expect(sumTips(r)).toBe(1000);
+    });
+  });
+
+  describe('PER_PERSON support split (each worker gets the full role %, prorated by their own hours)', () => {
+    it('single busser, full tipped hours: same result as POOLED', () => {
+      const r = run(1000, [server({ employeeId: 's1', hours: 8 }), busser({ hours: 8 })], [{ role: 'BUSSER', percentage: 20 }], 'PER_PERSON');
+      expect(emp(r, 'b1').totalTips).toBe(200);   // 20% of 1000
+      expect(emp(r, 's1').totalTips).toBe(800);
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('two bussers each working full tipped hours each get the full %, doubling the POOLED payout', () => {
+      const r = run(1000, [
+        server({ employeeId: 's1', hours: 8 }),
+        busser({ employeeId: 'carol', name: 'Carol', hours: 8 }),
+        busser({ employeeId: 'dave', name: 'Dave', hours: 8 }),
+      ], [{ role: 'BUSSER', percentage: 20 }], 'PER_PERSON');
+      expect(emp(r, 'carol').totalTips).toBe(200); // 20% of 1000, not split with Dave
+      expect(emp(r, 'dave').totalTips).toBe(200);
+      expect(emp(r, 's1').totalTips).toBe(600);    // 1000 - 200 - 200
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('a partial-shift busser (half the tipped hours) gets half the role %', () => {
+      const r = run(1000, [server({ employeeId: 's1', hours: 8 }), busser({ hours: 4 })], [{ role: 'BUSSER', percentage: 20 }], 'PER_PERSON');
+      expect(emp(r, 'b1').totalTips).toBe(100);    // 20% * (4/8)
+      expect(emp(r, 's1').totalTips).toBe(900);
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('busser and expo each take their own % independently, per person', () => {
+      const r = run(1000, [server({ employeeId: 's1', hours: 8 }), busser({ hours: 8 }), expeditor({ hours: 8 })],
+        [{ role: 'BUSSER', percentage: 20 }, { role: 'EXPEDITOR', percentage: 15 }], 'PER_PERSON');
+      expect(emp(r, 'b1').totalTips).toBe(200);
+      expect(emp(r, 'e1').totalTips).toBe(150);
+      expect(emp(r, 's1').totalTips).toBe(650);
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('day-wide cap still applies and refunds excess to tipped stints', () => {
+      const servers = Array.from({ length: 10 }, (_, i) => server({ employeeId: `s${i}`, hours: 1 }));
+      const r = run(1000, [...servers, busser({ employeeId: 'b1', hours: 10 })], [{ role: 'BUSSER', percentage: 50 }], 'PER_PERSON');
+      // Uncapped the busser would take 50% x 1000 = 500 (single busser at full coverage), leaving
+      // $500 for 10 servers ($50 each) — the busser's uncapped share exceeds that, so it caps at $50
+      // and the $450 excess returns to the servers ($45 each on top of their $50).
+      expect(emp(r, 'b1').totalTips).toBe(50);
+      r.employees.filter((e) => e.employeeId !== 'b1').forEach((e) => expect(e.totalTips).toBe(95));
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('throws when per-person support payouts meet or exceed the tip pool', () => {
+      expect(() => run(1000, [
+        server({ employeeId: 's1', hours: 8 }),
+        busser({ employeeId: 'b1', hours: 8 }),
+        busser({ employeeId: 'b2', hours: 8 }),
+        busser({ employeeId: 'b3', hours: 8 }),
+        busser({ employeeId: 'b4', hours: 8 }),
+        busser({ employeeId: 'b5', hours: 8 }),
+      ], [{ role: 'BUSSER', percentage: 20 }], 'PER_PERSON')).toThrow('exceed the tip pool');
+    });
+
+    it('prorates by shift hours, not by server headcount: adding more servers does not shrink the busser\'s cut', () => {
+      // Real bug this fixes: the denominator must be how long the shift was open (shiftHours),
+      // not the sum of every server's hours — otherwise a busy night with more servers pays the
+      // same busser less for the same coverage.
+      const busyNight = Array.from({ length: 11 }, (_, i) => server({ employeeId: `s${i}`, hours: 9 })); // 99 tipped-hours
+      const r = run(1000, [...busyNight, busser({ employeeId: 'b1', hours: 9.35 })], [{ role: 'BUSSER', percentage: 10 }], 'PER_PERSON', 15);
+      expect(emp(r, 'b1').totalTips).toBe(62.33); // 10% * 1000 * (9.35/15), independent of the 11 servers' hours
+      expect(sumTips(r)).toBe(1000);
+    });
+
+    it('throws MISSING_SHIFT_HOURS when shift hours is missing or zero', () => {
+      expect(() => calculateTips({
+        totalTipPool: 1000, stints: [server(), busser()], supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }], supportSplitMode: 'PER_PERSON',
+      })).toThrow('Total shift hours is required');
+      expect(() => calculateTips({
+        totalTipPool: 1000, stints: [server(), busser()], supportStaffConfig: [{ role: 'BUSSER', percentage: 20 }], supportSplitMode: 'PER_PERSON', shiftHours: 0,
+      })).toThrow(TipCalculationError);
     });
   });
 

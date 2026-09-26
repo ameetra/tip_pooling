@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, IconButton, MenuItem, Paper, Table, TableBody, TableCell, TableContainer,
@@ -9,11 +9,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useEmployees } from '../api/employees';
 import { useTipPreview, useCreateTipEntry } from '../api/tips';
+import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
-import type { EmployeeRole, TipEntryInput, EmployeeResult } from '../types';
+import type { EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
 import { ROLE_OPTIONS, formatRole } from '../constants/roles';
 import { localDate } from '../utils/dates';
+
+const SHIFT_HOURS_DAYS: ShiftHoursDay[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+// entryDate is a plain YYYY-MM-DD string; parsing at noon UTC avoids the date shifting a day
+// backward in timezones behind UTC when just `new Date(entryDate)` is used.
+const dayOfWeek = (entryDate: string): ShiftHoursDay => SHIFT_HOURS_DAYS[new Date(`${entryDate}T12:00:00Z`).getUTCDay()];
 
 interface EmployeeRow {
   employeeId: string;
@@ -45,6 +51,8 @@ export default function TipEntryFormPage() {
   const { slug } = useTenant();
   const isShiftLead = user?.role === 'SHIFT_LEAD';
   const { data: employees = [] } = useEmployees();
+  const { data: shiftHoursConfig } = useShiftHoursConfig();
+  const isPerPerson = shiftHoursConfig?.supportSplitMode === 'PER_PERSON';
   const preview = useTipPreview();
   const createEntry = useCreateTipEntry();
 
@@ -53,9 +61,19 @@ export default function TipEntryFormPage() {
   const [cashSales, setCashSales] = useState('');
   const [cashTips, setCashTips] = useState('');
   const [posTips, setPosTips] = useState('');
+  const [shiftHours, setShiftHours] = useState('');
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Auto-fill from the venue's day-of-week default whenever the date changes; still editable
+  // afterward for early closes, same as the old paper form's instructions.
+  useEffect(() => {
+    if (!isPerPerson || !shiftHoursConfig) return;
+    const def = shiftHoursConfig.defaults[dayOfWeek(entryDate)];
+    setShiftHours(def != null ? String(def) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryDate, isPerPerson, shiftHoursConfig]);
 
   const resetForm = () => {
     setEntryDate(today);
@@ -63,6 +81,7 @@ export default function TipEntryFormPage() {
     setCashSales('');
     setCashTips('');
     setPosTips('');
+    setShiftHours('');
     setRows([]);
     preview.reset();
   };
@@ -86,15 +105,17 @@ export default function TipEntryFormPage() {
   const buildInput = useCallback((): TipEntryInput | null => {
     const emps = rows.filter((r) => r.employeeId && Number(r.hoursWorked) > 0);
     if (!emps.length || cashInRegister === '' || posTips === '') return null;
+    if (isPerPerson && !(Number(shiftHours) > 0)) return null;
     return {
       entryDate,
       cashInRegister: amount(cashInRegister),
       cashSales: amount(cashSales),
       cashTips: amount(cashTips),
       posTips: amount(posTips),
+      ...(isPerPerson ? { shiftHours: Number(shiftHours) } : {}),
       employees: emps.map((r) => ({ employeeId: r.employeeId, role: r.role, hoursWorked: Number(r.hoursWorked) })),
     };
-  }, [entryDate, cashInRegister, cashSales, cashTips, posTips, rows]);
+  }, [entryDate, cashInRegister, cashSales, cashTips, posTips, shiftHours, isPerPerson, rows]);
 
   const handlePreview = () => {
     const input = buildInput();
@@ -125,6 +146,14 @@ export default function TipEntryFormPage() {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
           <TextField label="Date" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          {isPerPerson && (
+            <TextField
+              label="Total Shift Hours" type="number" value={shiftHours} required
+              onChange={(e) => setShiftHours(e.target.value)}
+              helperText="Hours the shift was open — override for an early close"
+              slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }} sx={{ width: 160 }}
+            />
+          )}
           <MoneyField label="Cash in Register" value={cashInRegister} onChange={setCashInRegister} required helperText="After removing the starting float" />
           <MoneyField label="Cash Sales (POS)" value={cashSales} onChange={setCashSales} />
           <MoneyField label="Cash Tips (jar)" value={cashTips} onChange={setCashTips} />

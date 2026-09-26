@@ -71,42 +71,68 @@ function validate(input: TipCalculationInput): void {
 export function calculateTips(input: TipCalculationInput): TipCalculationResult {
   validate(input);
 
-  const { totalTipPool, stints, supportStaffConfig } = input;
+  const { totalTipPool, stints, supportStaffConfig, supportSplitMode = 'POOLED', shiftHours } = input;
   const pctByRole = new Map<string, number>(supportStaffConfig.map((c) => [c.role, c.percentage / 100]));
 
   const tippedStints = stints.filter((s) => isTipped(s.role));
   const supportStints = stints.filter((s) => !isTipped(s.role));
   const totalTippedHours = tippedStints.reduce((sum, s) => sum + s.hours, 0);
 
-  // Support roles actually present today, and their share of the pool.
-  const presentSupportRoles = [...new Set(supportStints.map((s) => s.role))];
-  const totalSupportPct = presentSupportRoles.reduce((sum, role) => sum + (pctByRole.get(role) ?? 0), 0);
-  if (totalSupportPct >= 1) {
-    throw new TipCalculationError(
-      'Support percentages total 100% or more, leaving nothing for servers',
-      'SUPPORT_PERCENT_TOO_HIGH',
-    );
+  let supportTotal: number;
+  let supportResults: StintResult[];
+
+  if (supportSplitMode === 'PER_PERSON') {
+    // Each support worker gets the full role % individually, prorated by their own hours against
+    // "Total Shift Hours" — how long the shift was open, not the sum of everyone's hours — so a
+    // busser covering the whole shift always gets the full %, regardless of server headcount
+    // (Pieces' "10% to each busser" rule).
+    if (!shiftHours || shiftHours <= 0) {
+      throw new TipCalculationError('Total shift hours is required for this venue', 'MISSING_SHIFT_HOURS');
+    }
+    supportResults = supportStints.map((s) => {
+      const pct = pctByRole.get(s.role) ?? 0;
+      const received = round2(pct * totalTipPool * (s.hours / shiftHours));
+      return buildStint(s, { baseTips: 0, supportTipsGiven: 0, supportTipsReceived: received, finalTips: received, supportPct: pct });
+    });
+    supportTotal = round2(supportResults.reduce((sum, r) => sum + r.finalTips, 0));
+    if (supportTotal >= totalTipPool) {
+      throw new TipCalculationError(
+        `Support payouts ($${supportTotal.toFixed(2)}) meet or exceed the tip pool, leaving nothing for servers`,
+        'SUPPORT_AMOUNT_TOO_HIGH',
+      );
+    }
+  } else {
+    // Support roles actually present today, and their share of the pool.
+    const presentSupportRoles = [...new Set(supportStints.map((s) => s.role))];
+    const totalSupportPct = presentSupportRoles.reduce((sum, role) => sum + (pctByRole.get(role) ?? 0), 0);
+    if (totalSupportPct >= 1) {
+      throw new TipCalculationError(
+        'Support percentages total 100% or more, leaving nothing for servers',
+        'SUPPORT_PERCENT_TOO_HIGH',
+      );
+    }
+
+    // Each role's pool (pct x total) split among that role's stints by hours.
+    supportResults = supportStints.map((s) => {
+      const pct = pctByRole.get(s.role) ?? 0;
+      const roleHours = supportStints.filter((x) => x.role === s.role).reduce((sum, x) => sum + x.hours, 0);
+      const rolePool = totalTipPool * pct;
+      const received = round2((s.hours / roleHours) * rolePool);
+      return buildStint(s, { baseTips: 0, supportTipsGiven: 0, supportTipsReceived: received, finalTips: received, supportPct: pct });
+    });
+    supportTotal = round2(totalTipPool * totalSupportPct);
   }
 
-  const tippedPool = round2(totalTipPool * (1 - totalSupportPct));
+  const tippedPool = round2(totalTipPool - supportTotal);
 
   // Tipped earners (servers + shift leads): gross prorated share, then deduct the support take
   // (off the top, prorated by hours). Tip share ignores base wage, so shift leads split exactly like servers.
   const tippedResults = tippedStints.map((s) => {
     const gross = (s.hours / totalTippedHours) * totalTipPool;
     const baseTips = round2(gross);
-    const finalTips = round2(gross * (1 - totalSupportPct));
+    const finalTips = round2((s.hours / totalTippedHours) * tippedPool);
     const supportTipsGiven = round2(baseTips - finalTips);
     return buildStint(s, { baseTips, supportTipsGiven, supportTipsReceived: 0, finalTips });
-  });
-
-  // Support: each role's pool (pct x total) split among that role's stints by hours.
-  const supportResults = supportStints.map((s) => {
-    const pct = pctByRole.get(s.role) ?? 0;
-    const roleHours = supportStints.filter((x) => x.role === s.role).reduce((sum, x) => sum + x.hours, 0);
-    const rolePool = totalTipPool * pct;
-    const received = round2((s.hours / roleHours) * rolePool);
-    return buildStint(s, { baseTips: 0, supportTipsGiven: 0, supportTipsReceived: received, finalTips: received, supportPct: pct });
   });
 
   // Day-wide cap: no support stint earns more in tips than the top-earning tipped stint.
@@ -122,8 +148,6 @@ export function calculateTips(input: TipCalculationInput): TipCalculationResult 
     top.finalTips = round2(top.finalTips + diff);
     top.totalPay = round2(top.wage + top.finalTips);
   }
-
-  void tippedPool; // tippedPool is implied by the per-stint math above; kept for clarity
 
   return { stints: all, employees: aggregateByEmployee(all) };
 }

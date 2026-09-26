@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Alert, Box, Button, Card, CardContent, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useSupportConfig, useSupportConfigHistory, useSetSupportConfig } from '../api/support-config';
-import type { SupportStaffConfig } from '../types';
+import { useShiftHoursConfig, useSetShiftHoursDefaults } from '../api/shift-hours';
+import type { ShiftHoursDay, SupportStaffConfig } from '../types';
 
 type Role = SupportStaffConfig['role'];
 
@@ -9,6 +10,75 @@ const ROLES: { role: Role; title: string }[] = [
   { role: 'BUSSER', title: 'Busser' },
   { role: 'EXPEDITOR', title: 'Expeditor' },
 ];
+
+const SHIFT_HOURS_DAYS: { day: ShiftHoursDay; label: string }[] = [
+  { day: 'sun', label: 'Sun' }, { day: 'mon', label: 'Mon' }, { day: 'tue', label: 'Tue' }, { day: 'wed', label: 'Wed' },
+  { day: 'thu', label: 'Thu' }, { day: 'fri', label: 'Fri' }, { day: 'sat', label: 'Sat' },
+];
+
+// Default "Total Shift Hours" per day of week — auto-fills the tip entry form (still overridable
+// there for early closes). Only shown for PER_PERSON venues, where it's the busser/expo denominator.
+function ShiftHoursCard() {
+  const { data } = useShiftHoursConfig();
+  const setDefaults = useSetShiftHoursDefaults();
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState<Record<ShiftHoursDay, string>>({ sun: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '' });
+  const [error, setError] = useState('');
+
+  if (!data || data.supportSplitMode !== 'PER_PERSON') return null;
+
+  const startEdit = () => {
+    setValues(Object.fromEntries(SHIFT_HOURS_DAYS.map(({ day }) => [day, data.defaults[day] != null ? String(data.defaults[day]) : ''])) as Record<ShiftHoursDay, string>);
+    setError('');
+    setEditing(true);
+  };
+
+  const save = async () => {
+    try {
+      const defaults = Object.fromEntries(SHIFT_HOURS_DAYS.map(({ day }) => [day, values[day] === '' ? null : Number(values[day])])) as Record<ShiftHoursDay, number | null>;
+      await setDefaults.mutateAsync(defaults);
+      setEditing(false);
+    } catch (e: any) { setError(e.message); }
+  };
+
+  return (
+    <Card sx={{ minWidth: 280 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>Total Shift Hours</Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          Default hours the shift is open, by day of week. Auto-fills the tip entry form; can still be overridden there for early closes.
+        </Typography>
+        {editing ? (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
+              {SHIFT_HOURS_DAYS.map(({ day, label }) => (
+                <TextField
+                  key={day} label={label} type="number" size="small" value={values[day]} sx={{ width: 90 }}
+                  onChange={(e) => setValues({ ...values, [day]: e.target.value })}
+                  slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }}
+                />
+              ))}
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <Button variant="contained" onClick={save} disabled={setDefaults.isPending}>Save</Button>
+              <Button onClick={() => setEditing(false)}>Cancel</Button>
+            </Stack>
+          </Stack>
+        ) : (
+          <>
+            <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', mt: 1 }} useFlexGap>
+              {SHIFT_HOURS_DAYS.map(({ day, label }) => (
+                <Chip key={day} label={`${label}: ${data.defaults[day] != null ? `${data.defaults[day]}h` : '—'}`} variant="outlined" />
+              ))}
+            </Stack>
+            <Box sx={{ mt: 2 }}><Button variant="outlined" onClick={startEdit}>Change</Button></Box>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const localToday = () => new Date().toLocaleDateString('en-CA');
 const day = (c: SupportStaffConfig) => c.effectiveDate.slice(0, 10);
@@ -85,6 +155,7 @@ export default function SupportConfigPage() {
         {ROLES.map(({ role, title }) => (
           <RoleCard key={role} role={role} title={title} current={current.find((c) => c.role === role)} scheduled={nextScheduled(role)} />
         ))}
+        <ShiftHoursCard />
       </Stack>
 
       {history.length > 0 && (

@@ -22,6 +22,9 @@ const poolError = { message: 'Total tips cannot be negative', path: ['cashInRegi
 export const TipPreviewSchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   ...cashFields,
+  // "Total Shift Hours" — the PER_PERSON support-split denominator. Optional here: whether it's
+  // actually required depends on the tenant's supportSplitMode, enforced in the calculation engine.
+  shiftHours: z.number().positive().max(24).optional(),
   employees: z.array(EmployeeStintEntry).min(1),
 }).refine(poolNonNegative, poolError);
 
@@ -41,11 +44,19 @@ export const SupportStaffConfigSchema = z.object({
   effectiveDate: calendarDate.optional(),
 });
 
+// Day-of-week default "Total Shift Hours", used to auto-fill the tip entry form. Null = no
+// default for that day (e.g. the venue is normally closed).
+const dayHours = z.number().positive().max(24).nullable();
+export const ShiftHoursDefaultsSchema = z.object({
+  sun: dayHours, mon: dayHours, tue: dayHours, wed: dayHours, thu: dayHours, fri: dayHours, sat: dayHours,
+});
+
 export const EditTipEntrySchema = z.object({
   cashInRegister: z.number().min(0).optional(),
   cashSales: z.number().min(0).optional(),
   cashTips: z.number().min(0).optional(),
   posTips: z.number().min(0).optional(),
+  shiftHours: z.number().positive().max(24).optional(),
   employees: z.array(EmployeeStintEntry).min(1),
 });
 
@@ -76,4 +87,5 @@ export type TipPreviewInput = z.infer<typeof TipPreviewSchema>;
 export type CreateTipEntryInput = z.infer<typeof CreateTipEntrySchema>;
 export type EditTipEntryInput = z.infer<typeof EditTipEntrySchema>;
 export type SupportStaffConfigInput = z.infer<typeof SupportStaffConfigSchema>;
+export type ShiftHoursDefaultsInput = z.infer<typeof ShiftHoursDefaultsSchema>;
 export type TipEntryQuery = z.infer<typeof TipEntryQuerySchema>;

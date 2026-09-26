@@ -32,6 +32,14 @@ beforeAll(async () => {
       logoUrl TEXT,
       address TEXT,
       timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+      supportSplitMode TEXT NOT NULL DEFAULT 'POOLED',
+      shiftHoursSun REAL,
+      shiftHoursMon REAL,
+      shiftHoursTue REAL,
+      shiftHoursWed REAL,
+      shiftHoursThu REAL,
+      shiftHoursFri REAL,
+      shiftHoursSat REAL,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -87,6 +95,7 @@ beforeAll(async () => {
       cashSales REAL NOT NULL DEFAULT 0,
       cashTips REAL NOT NULL DEFAULT 0,
       posTips REAL NOT NULL DEFAULT 0,
+      shiftHours REAL,
       startingDrawer REAL,
       closingDrawer REAL,
       electronicTips REAL NOT NULL DEFAULT 0,

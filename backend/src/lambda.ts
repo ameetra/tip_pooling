@@ -19,6 +19,9 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'provision' && Array.isArray(event.venues)) return runProvision(event.venues);
     if (event.action === 'importEmployees' && event.tenantSlug && Array.isArray(event.employees)) return runImportEmployees(event.tenantSlug, event.employees);
     if (event.action === 'getEmployees' && event.tenantSlug) return runGetEmployees(event.tenantSlug, event.email);
+    if (event.action === 'setSupportSplitMode' && event.tenantSlug && ['POOLED', 'PER_PERSON'].includes(event.mode)) {
+      return runSetSupportSplitMode(event.tenantSlug, event.mode);
+    }
     if (event.action === 'updatePasswordHash' && event.email && event.hash) {
       return updatePasswordHash(event.email, event.hash);
     }
@@ -106,6 +109,22 @@ async function runMigrations() {
       INSERT INTO "employee_role_rates" ("id", "employeeId", "role", "hourlyRate")
         SELECT 'err_' || e."id", e."id", e."role", e."hourlyRate" FROM "employees" e
         ON CONFLICT ("employeeId", "role") DO NOTHING;
+
+      -- Per-tenant support-split behavior: POOLED (default, shared role %) or PER_PERSON (each
+      -- support worker gets the full role %, e.g. Pieces' "10% to each busser" rule)
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "supportSplitMode" TEXT NOT NULL DEFAULT 'POOLED';
+
+      -- PER_PERSON support split needs a "Total Shift Hours" denominator (how long the shift was
+      -- open), not the sum of server hours. Day-of-week defaults per tenant, auto-fill the entry
+      -- form; the actual value used per day is stored on the tip entry itself.
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursSun" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursMon" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursTue" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursWed" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursThu" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursFri" DOUBLE PRECISION;
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursSat" DOUBLE PRECISION;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "shiftHours" DOUBLE PRECISION;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
@@ -189,6 +208,16 @@ async function runGetEmployees(tenantSlug: string, email?: string) {
       rates: e.roleRates.map((r) => ({ role: r.role, hourlyRate: r.hourlyRate })),
     })),
   };
+}
+
+// Switch a venue's support-staff split behavior. POOLED (default) shares each role's % among that
+// role's workers by hours; PER_PERSON gives each worker the full role % individually.
+async function runSetSupportSplitMode(tenantSlug: string, mode: 'POOLED' | 'PER_PERSON') {
+  const { getTenantBySlug, setSupportSplitMode } = require('./services/tenant.service');
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
+  await setSupportSplitMode(tenantSlug, mode);
+  return { success: true, tenant: tenant.slug, supportSplitMode: mode };
 }
 
 async function runSeed() {

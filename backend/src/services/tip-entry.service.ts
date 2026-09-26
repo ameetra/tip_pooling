@@ -12,6 +12,9 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const cashTips = computeCashTips(input.cashInRegister, input.cashSales, input.cashTips);
   const totalTipPool = Number((cashTips + input.posTips).toFixed(2));
 
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { supportSplitMode: true } });
+  const supportSplitMode = ((tenant as any)?.supportSplitMode ?? 'POOLED') as 'POOLED' | 'PER_PERSON';
+
   const employeeIds = [...new Set(input.employees.map((e) => e.employeeId))];
   const dbEmployees = await prisma.employee.findMany({ where: { id: { in: employeeIds }, tenantId } });
   const empById = new Map(dbEmployees.map((e) => [e.id, e]));
@@ -43,7 +46,7 @@ async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const supportStaffConfig: SupportStaffConfig[] = (await supportConfigService.getAsOf(tenantId, input.entryDate))
     .map((c) => ({ role: c.role as SupportStaffConfig['role'], percentage: c.percentage }));
 
-  return { totalTipPool, stints, supportStaffConfig, cashTips, posTips: input.posTips };
+  return { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours: input.shiftHours, cashTips, posTips: input.posTips };
 }
 
 async function saveCalculations(tx: any, entryId: string, stints: StintResult[]) {
@@ -68,17 +71,18 @@ async function saveCalculations(tx: any, entryId: string, stints: StintResult[])
   }
 }
 
-const cashColumns = (input: { cashInRegister: number; cashSales: number; cashTips: number; posTips: number }) => ({
+const cashColumns = (input: { cashInRegister: number; cashSales: number; cashTips: number; posTips: number; shiftHours?: number }) => ({
   cashInRegister: input.cashInRegister,
   cashSales: input.cashSales,
   cashTips: input.cashTips,
   posTips: input.posTips,
+  shiftHours: input.shiftHours ?? null,
 });
 
 export const tipEntryService = {
   async preview(tenantId: string, input: TipPreviewInput) {
-    const { totalTipPool, stints, supportStaffConfig, cashTips, posTips } = await buildCalcInput(tenantId, input);
-    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
+    const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips, posTips } = await buildCalcInput(tenantId, input);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
     return { entryDate: input.entryDate, cashTips, posTips, totalTipPool, results: calc.employees };
   },
 
@@ -92,8 +96,8 @@ export const tipEntryService = {
       }
     }
 
-    const { totalTipPool, stints, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, input);
-    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
+    const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, input);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
 
     const tipEntry = await prisma.$transaction(async (tx) => {
       const entry = await tx.tipEntry.create({
@@ -180,11 +184,12 @@ export const tipEntryService = {
       cashSales: input.cashSales ?? existing.cashSales,
       cashTips: input.cashTips ?? existing.cashTips,
       posTips: input.posTips ?? existing.posTips,
+      shiftHours: input.shiftHours ?? (existing as any).shiftHours ?? undefined,
       employees: input.employees,
     };
 
-    const { totalTipPool, stints, supportStaffConfig, cashTips } = await buildCalcInput(tenantId, merged);
-    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig });
+    const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, merged);
+    const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
 
     const newEntry = await prisma.$transaction(async (tx) => {
       const entry = await tx.tipEntry.create({

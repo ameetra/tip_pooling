@@ -67,6 +67,13 @@ export interface SupportStaffConfig {
   createdAt: string;
 }
 
+export type ShiftHoursDay = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+export interface ShiftHoursConfig {
+  supportSplitMode: 'POOLED' | 'PER_PERSON';
+  defaults: Record<ShiftHoursDay, number | null>;
+}
+
 export interface TipEntry {
   id: string;
   tenantId: string;
@@ -130,6 +137,7 @@ export interface TipEntryInput {
   cashSales: number;
   cashTips: number;
   posTips: number;
+  shiftHours?: number;
   employees: EmployeeStintEntry[];
 }
 

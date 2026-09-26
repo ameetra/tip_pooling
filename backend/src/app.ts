@@ -12,8 +12,10 @@ import supportConfigRoutes from './routes/support-config.routes';
 import tipRoutes from './routes/tip.routes';
 import auditRoutes from './routes/audit.routes';
 import userRoutes from './routes/user.routes';
+import shiftHoursRoutes from './routes/shift-hours.routes';
 import { tipController } from './controllers/tip.controller';
 import { employeeController } from './controllers/employee.controller';
+import { shiftHoursController } from './controllers/shift-hours.controller';
 import { validateBody } from './middleware/validate';
 import { TipPreviewSchema, CreateTipEntrySchema } from './validation/tip.schema';
 
@@ -64,11 +66,15 @@ export function createApp() {
   app.post('/api/v1/tips/preview', ...tipCreator, validateBody(TipPreviewSchema), tipController.preview);
   app.post('/api/v1/tips/entries', ...tipCreator, validateBody(CreateTipEntrySchema), tipController.create);
   app.get('/api/v1/employees', ...tipCreator, employeeController.findAll);
+  // Shift leads need to read the PER_PERSON "Total Shift Hours" defaults to fill out the entry
+  // form, but only Admin/Manager can change them (mounted below with the other config routes).
+  app.get('/api/v1/config/shift-hours', ...tipCreator, shiftHoursController.get);
 
   // Protected routes — require Admin or Manager role
   const adminOrManager = [verifyJWT, requireRole('ADMIN', 'MANAGER')];
   app.use('/api/v1/employees', ...adminOrManager, employeeRoutes);
   app.use('/api/v1/config/support-staff', ...adminOrManager, supportConfigRoutes);
+  app.use('/api/v1/config/shift-hours', ...adminOrManager, shiftHoursRoutes);
   app.use('/api/v1/tips', ...adminOrManager, tipRoutes);
   app.use('/api/v1/audit', ...adminOrManager, auditRoutes);
 

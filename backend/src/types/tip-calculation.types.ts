@@ -28,10 +28,17 @@ export interface SupportStaffConfig {
   percentage: number; // 0-50, whole number (20 = 20%)
 }
 
+// POOLED (default): a role's % of the pool is split among that role's workers by hours.
+// PER_PERSON: each worker in the role gets the full % individually, prorated by their hours
+// against total tipped hours (e.g. Pieces' "10% to each busser" rule).
+export type SupportSplitMode = 'POOLED' | 'PER_PERSON';
+
 export interface TipCalculationInput {
   totalTipPool: number;
   stints: StintInput[];
   supportStaffConfig: SupportStaffConfig[];
+  supportSplitMode?: SupportSplitMode; // defaults to POOLED
+  shiftHours?: number; // "Total Shift Hours" — PER_PERSON support-split denominator; required when supportSplitMode is PER_PERSON
 }
 
 // Per-stint result (one per employee+role). Persisted as a tip_calculations row.
