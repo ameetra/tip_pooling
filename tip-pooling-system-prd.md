@@ -57,7 +57,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 #### 3.1.1 Admin Role
 - [x] Admin can create username and password for their account *(the account is provisioned for them and they set their own password at first sign-in)*
 - [x] Admin can perform all Manager functions
-- [ ] Admin can access all tenants/locations they manage - *Partial: one account per venue with the same email; no cross-venue switcher*
+- [ ] Admin can access all tenants/locations they manage - *Partial: one account per venue with the same email; no cross-venue switcher. **Deprioritized 2026-09-24**: this was scoped for the owner running several venues personally. Once venues belong to other establishments, their admins shouldn't have (or want) cross-venue access to each other's data, and the owner/vendor shouldn't hold standing access into customer data either. What may still be worth building later is a much thinner platform-support layer (tenant provisioning, resetting a locked-out customer admin) — and only once the current manual flow (Lambda admin action + shared secret, see RUNBOOK_ADD_TENANT.md) becomes a bottleneck.*
 - [x] Admin can create and manage Manager accounts *(Staff page: create, reset password and remove managers and shift leads)*
 - [ ] Admin session timeout after 30 minutes of inactivity - *Sessions expire after 8 hours; there is no inactivity timeout*
 
@@ -118,7 +118,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 #### 3.3.3 Multi-Tenant Configuration
 - [x] System supports multiple independent tenants (restaurants/locations)
 - [x] Each tenant has isolated data (no cross-tenant data access)
-- [ ] Admin can be assigned to multiple tenants - *Same as above: one account per venue*
+- [ ] Admin can be assigned to multiple tenants - *Same as above: one account per venue. Deprioritized, see 3.1.1.*
 - [x] Manager can only be assigned to one tenant
 - [x] Tenant configuration includes: name, address, timezone *(name, address and timezone are stored; dates are shown in the browser's local time)*
 
@@ -190,6 +190,10 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] If cap exceeded, system adjusts support staff tip to equal highest server tip
 - [x] System supports up to 2 Bussers and 2 Expeditors per shift *(there is no fixed limit)*
 - [x] **Built (owner decision, 2026-09-20):** each support role receives its configured percentage of the whole day's tip pool, split by hours among that role's staff; servers and shift leads share the remainder by hours. Because there are no shifts, support staff are not tied to particular servers.
+- [x] **Per-tenant fork (2026-09-26): `supportSplitMode`.** The 2026-09-20 behavior above (now called `POOLED`) remains the default for every tenant except Pieces. Real Pieces data showed their actual rule is "each server gives 10% to *each* busser, 3% to each expo" — i.e. two bussers get 20% of the pool between them, not a shared 10% — so a `PER_PERSON` mode was added, scoped to Pieces via a `Tenant.supportSplitMode` flag:
+  - `POOLED` *(baseline, all other tenants, unchanged)*: a role's % of the pool is split among that role's staff by hours.
+  - `PER_PERSON` *(Pieces only)*: each support worker gets the *full* role % individually, prorated by their own hours against a manually-entered **"Total Shift Hours"** value for that entry (not total tipped hours — validated against 37 real Pieces shifts, ties to the penny). Added `TipEntry.shiftHours` (entry-form field, auto-filled from a per-day-of-week default) and `Tenant.shiftHours{Sun..Sat}` (defaults, editable on the Support Config page — only rendered for `PER_PERSON` tenants).
+  - **Status:** code deployed to prod, migrated, and Pieces flipped to `PER_PERSON` (2026-09-26). Pieces's day-of-week shift-hours defaults are **not yet set** — until they are, a new Pieces tip entry will fail with `MISSING_SHIFT_HOURS` unless the manager enters "Total Shift Hours" by hand on that entry. Baseline (`POOLED`) tenants are fully unaffected and need no follow-up.
 
 #### 3.4.5 Total Compensation Calculation
 - [x] System calculates hourly wages: `Hourly Pay = Hourly Rate × Hours Worked`
