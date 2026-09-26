@@ -10,12 +10,13 @@ import { useTipEntry, useDeleteTipEntry, usePublishTipEntry } from '../api/tips'
 import ConfirmDialog from '../components/ConfirmDialog';
 import { deleteEntryMessage } from '../utils/tipEntry';
 import { useTenant } from '../context/TenantContext';
-import { formatRole } from '../constants/roles';
+import { useRoleLabels } from '../constants/roles';
 
 export default function TipEntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { slug } = useTenant();
+  const { formatRole } = useRoleLabels();
   const { data: entry, isLoading } = useTipEntry(id!);
   const deleteMut = useDeleteTipEntry();
   const publishMut = usePublishTipEntry();

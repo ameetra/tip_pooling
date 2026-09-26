@@ -13,7 +13,7 @@ import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import type { EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
-import { ROLE_OPTIONS, formatRole } from '../constants/roles';
+import { useRoleLabels } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
 const SHIFT_HOURS_DAYS: ShiftHoursDay[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -49,6 +49,7 @@ export default function TipEntryFormPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { slug } = useTenant();
+  const { roleOptions } = useRoleLabels();
   const isShiftLead = user?.role === 'SHIFT_LEAD';
   const { data: employees = [] } = useEmployees();
   const { data: shiftHoursConfig } = useShiftHoursConfig();
@@ -178,7 +179,7 @@ export default function TipEntryFormPage() {
               {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
             </TextField>
             <TextField select label="Role" value={row.role} onChange={(e) => updateRow(i, 'role', e.target.value)} sx={{ width: 140 }}>
-              {ROLE_OPTIONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
+              {roleOptions.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
             </TextField>
             <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }} sx={{ width: 110 }} />
             <IconButton onClick={() => removeRow(i)}><DeleteIcon /></IconButton>
@@ -211,6 +212,7 @@ export default function TipEntryFormPage() {
 
 function PreviewTable({ results, showPay }: { results: EmployeeResult[]; showPay: boolean }) {
   const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const { formatRole } = useRoleLabels();
   return (
     <TableContainer>
       <Table size="small">

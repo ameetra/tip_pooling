@@ -2,11 +2,13 @@ import bcrypt from 'bcrypt';
 import prisma from '../database/client';
 import { auditService } from './audit.service';
 import { ShiftHoursDefaultsInput } from '../validation/tip.schema';
+import { ROLE_VALUES, RoleLabels, parseRoleLabels } from '../types/tip-calculation.types';
 
 export interface Branding {
   slug: string;
   name: string;
   logoUrl: string | null;
+  roleLabels?: RoleLabels;
 }
 
 export async function getTenantBySlug(slug: string) {
@@ -15,7 +17,27 @@ export async function getTenantBySlug(slug: string) {
 
 export async function getBranding(slug: string): Promise<Branding | null> {
   const t = await getTenantBySlug(slug);
-  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null } : null;
+  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels) } : null;
+}
+
+export async function getRoleLabels(tenantId: string): Promise<RoleLabels> {
+  const t = await (prisma as any).tenant.findUnique({ where: { id: tenantId }, select: { roleLabels: true } });
+  return parseRoleLabels(t?.roleLabels);
+}
+
+/** Set a venue's role display names (e.g. { SERVER: 'Barista' }). Blank labels are dropped; `{}` resets to defaults. */
+export async function setRoleLabels(slug: string, labels: Record<string, string>) {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  const unknown = Object.keys(labels).filter((role) => !(ROLE_VALUES as readonly string[]).includes(role));
+  if (unknown.length) throw new Error(`Unknown role(s): ${unknown.join(', ')}`);
+  const cleaned = Object.fromEntries(
+    Object.entries(labels).map(([role, label]) => [role, String(label ?? '').trim()]).filter(([, label]) => label),
+  );
+  const roleLabels = Object.keys(cleaned).length ? JSON.stringify(cleaned) : null;
+  await (prisma as any).tenant.update({ where: { slug }, data: { roleLabels } });
+  await auditService.log({ tenantId: tenant.id, entityType: 'ROLE_LABELS', entityId: tenant.id, action: 'UPDATE', oldValues: parseRoleLabels(tenant.roleLabels), newValues: cleaned });
+  return cleaned;
 }
 
 export async function listBranding(): Promise<Branding[]> {

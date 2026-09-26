@@ -46,4 +46,12 @@ describe('sendTipEmail', () => {
     expect(Message.Body.Html.Data).toContain('Server · 4.0h');
     expect(Message.Body.Html.Data).toContain('$100.00');
   });
+
+  it("names the role the way the venue does (a coffee shop's Server is a Barista)", async () => {
+    await sendTipEmail({ ...base, roleLabels: { SERVER: 'Barista' } });
+    const { Message } = sentMessage();
+
+    expect(Message.Body.Text.Data).toContain('Role(s): Barista');
+    expect(Message.Body.Html.Data).toContain('Barista');
+  });
 });

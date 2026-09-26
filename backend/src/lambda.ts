@@ -22,6 +22,9 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'setSupportSplitMode' && event.tenantSlug && ['POOLED', 'PER_PERSON'].includes(event.mode)) {
       return runSetSupportSplitMode(event.tenantSlug, event.mode);
     }
+    if (event.action === 'setRoleLabels' && event.tenantSlug && event.labels && typeof event.labels === 'object') {
+      return runSetRoleLabels(event.tenantSlug, event.labels);
+    }
     if (event.action === 'updatePasswordHash' && event.email && event.hash) {
       return updatePasswordHash(event.email, event.hash);
     }
@@ -125,6 +128,9 @@ async function runMigrations() {
       ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursFri" DOUBLE PRECISION;
       ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "shiftHoursSat" DOUBLE PRECISION;
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "shiftHours" DOUBLE PRECISION;
+
+      -- Per-venue role display names (JSON, e.g. {"SERVER":"Barista"} for coffee shops); display only
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "roleLabels" TEXT;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
@@ -218,6 +224,16 @@ async function runSetSupportSplitMode(tenantSlug: string, mode: 'POOLED' | 'PER_
   if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
   await setSupportSplitMode(tenantSlug, mode);
   return { success: true, tenant: tenant.slug, supportSplitMode: mode };
+}
+
+// Rename roles for display in one venue, e.g. {"SERVER":"Barista"}. `{}` resets to the defaults.
+async function runSetRoleLabels(tenantSlug: string, labels: Record<string, string>) {
+  const { setRoleLabels } = require('./services/tenant.service');
+  try {
+    return { success: true, tenant: tenantSlug, roleLabels: await setRoleLabels(tenantSlug, labels) };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 async function runSeed() {

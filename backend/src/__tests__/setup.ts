@@ -33,6 +33,7 @@ beforeAll(async () => {
       address TEXT,
       timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
       supportSplitMode TEXT NOT NULL DEFAULT 'POOLED',
+      roleLabels TEXT,
       shiftHoursSun REAL,
       shiftHoursMon REAL,
       shiftHoursTue REAL,

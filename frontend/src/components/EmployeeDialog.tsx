@@ -7,7 +7,7 @@ import {
   TextField, MenuItem, Typography,
 } from '@mui/material';
 import type { Employee, EmployeeRole, RoleRateInput } from '../types';
-import { ROLE_OPTIONS, ROLE_VALUES } from '../constants/roles';
+import { ROLE_VALUES, useRoleLabels } from '../constants/roles';
 
 const optionalRate = z.number().positive('Must be positive').max(999).optional();
 const rateFields = { SERVER: optionalRate, SHIFT_LEAD: optionalRate, BUSSER: optionalRate, EXPEDITOR: optionalRate };
@@ -67,6 +67,7 @@ const startingValues = (mode: EmployeeDialogMode, employee?: Employee | null): F
 
 export default function EmployeeDialog({ open, employee, mode: modeProp, pending, onSubmit, onClose }: Props) {
   const mode: EmployeeDialogMode = modeProp ?? (employee ? 'edit' : 'create');
+  const { roleOptions } = useRoleLabels();
   const { control, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schemas[mode]) as unknown as Resolver<FormValues>,
     defaultValues: startingValues(mode, employee),
@@ -77,7 +78,7 @@ export default function EmployeeDialog({ open, employee, mode: modeProp, pending
   }, [open, mode, employee, reset]);
 
   const submit = (d: FormValues) => {
-    const rates = ROLE_OPTIONS
+    const rates = roleOptions
       .filter((r) => d[r.value] != null)
       .map((r) => ({ role: r.value, hourlyRate: d[r.value] as number }));
     if (mode === 'edit') onSubmit({ name: d.name!, email: d.email!, role: d.role! });
@@ -110,7 +111,7 @@ export default function EmployeeDialog({ open, employee, mode: modeProp, pending
               {...field} value={field.value ?? ''} select label="Primary Role"
               error={!!errors.role} helperText={errors.role?.message ?? 'Used as the default when adding this person to a tip entry'}
             >
-              {ROLE_OPTIONS.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
+              {roleOptions.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
             </TextField>
           )} />
           {mode !== 'edit' && (
@@ -118,7 +119,7 @@ export default function EmployeeDialog({ open, employee, mode: modeProp, pending
               <Typography variant="subtitle2" color="text.secondary">
                 Base hourly rates — set one per role this person can work
               </Typography>
-              {ROLE_OPTIONS.map((r) => (
+              {roleOptions.map((r) => (
                 <Controller key={r.value} name={r.value} control={control} render={({ field }) => (
                   <TextField
                     label={`${r.label} rate ($/hr)`} type="number"

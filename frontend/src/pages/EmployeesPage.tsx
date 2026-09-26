@@ -12,7 +12,7 @@ import { useEmployees, useCreateEmployee, useUpdateEmployee, useSetRoleRates, us
 import EmployeeDialog from '../components/EmployeeDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Employee, EmployeeRole, RoleRateInput } from '../types';
-import { ROLE_OPTIONS, ROLE_VALUES, formatRole } from '../constants/roles';
+import { ROLE_VALUES, useRoleLabels } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
 const today = localDate();
@@ -21,11 +21,12 @@ const emptyRates = () => Object.fromEntries(ROLE_VALUES.map((r) => [r, ''])) as 
 const rateFor = (emp: Employee, role: EmployeeRole) =>
   emp.roleRates?.find((r) => r.role === role)?.hourlyRate;
 
-const ratesLabel = (emp: Employee) =>
+const ratesLabel = (emp: Employee, formatRole: (role: string) => string) =>
   (emp.roleRates ?? []).map((r) => `${formatRole(r.role)} $${r.hourlyRate.toFixed(2)}`).join(', ') || '—';
 
 export default function EmployeesPage() {
   const [status, setStatus] = useState<EmployeeStatus>('active');
+  const { formatRole, roleOptions } = useRoleLabels();
   const { data: employees = [], isFetching } = useEmployees(status);
   const createMut = useCreateEmployee();
   const updateMut = useUpdateEmployee();
@@ -82,7 +83,7 @@ export default function EmployeesPage() {
 
   const handleRateSubmit = async () => {
     if (!rateEmployee) return;
-    const rates = ROLE_OPTIONS
+    const rates = roleOptions
       .filter((r) => rateInputs[r.value] !== '' && Number(rateInputs[r.value]) > 0)
       .map((r) => ({ role: r.value, hourlyRate: Number(rateInputs[r.value]) }));
     if (rates.length === 0) { setError('Set at least one rate'); return; }
@@ -128,7 +129,7 @@ export default function EmployeesPage() {
                 <TableCell>{emp.name}</TableCell>
                 <TableCell>{emp.email}</TableCell>
                 <TableCell>{formatRole(emp.role)}</TableCell>
-                {status === 'active' ? <TableCell>{ratesLabel(emp)}</TableCell> : <TableCell>{new Date(emp.updatedAt).toLocaleDateString()}</TableCell>}
+                {status === 'active' ? <TableCell>{ratesLabel(emp, formatRole)}</TableCell> : <TableCell>{new Date(emp.updatedAt).toLocaleDateString()}</TableCell>}
                 <TableCell align="right">
                   {status === 'active' ? (
                     <>
@@ -168,7 +169,7 @@ export default function EmployeesPage() {
           <Typography variant="body2" color="text.secondary">
             Set the hourly rate for each role. Leave a field blank if they don't work that role.
           </Typography>
-          {ROLE_OPTIONS.map((r) => (
+          {roleOptions.map((r) => (
             <TextField
               key={r.value} label={`${r.label} rate ($/hr)`} type="number"
               value={rateInputs[r.value]}

@@ -20,6 +20,11 @@ describe('roleBreakdown', () => {
     expect(roleBreakdown([stint('SHIFT_LEAD', 8, 90)])[0].role).toBe('Shift Lead');
   });
 
+  it("uses the venue's role names when set, and defaults for the rest", () => {
+    expect(roleBreakdown([stint('SERVER', 4, 80), stint('BUSSER', 2, 10)], { SERVER: 'Barista' }).map((r) => r.role))
+      .toEqual(['Barista', 'Busser']);
+  });
+
   it('returns nothing when there are no stints', () => {
     expect(roleBreakdown([])).toEqual([]);
   });

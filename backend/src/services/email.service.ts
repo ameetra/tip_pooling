@@ -1,5 +1,5 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { formatRole } from '../types/tip-calculation.types';
+import { formatRole, RoleLabels } from '../types/tip-calculation.types';
 
 const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@usegratify.com';
@@ -19,6 +19,7 @@ export interface TipEmailData {
   entryDate: string;
   roles: string[];
   roleBreakdown?: { role: string; hours: number; tips: number }[];
+  roleLabels?: RoleLabels;
   hours: number;
   finalTips: number;
   totalPay: number;
@@ -66,7 +67,7 @@ const roleSplitText = (d: TipEmailData) => {
 };
 
 function buildEmailBody(d: TipEmailData, loginUrl: string): string {
-  const roles = esc(d.roles.map(formatRole).join(', ')) || '—';
+  const roles = esc(d.roles.map((r) => formatRole(r, d.roleLabels)).join(', ')) || '—';
   const name = esc(d.restaurantName);
   const employee = esc(d.employeeName);
   return `
@@ -150,7 +151,7 @@ function buildPlainText(d: TipEmailData, loginUrl: string): string {
 
 Hi ${d.employeeName},
 
-Role(s): ${d.roles.map(formatRole).join(', ') || '—'}
+Role(s): ${d.roles.map((r) => formatRole(r, d.roleLabels)).join(', ') || '—'}
 Hours worked: ${d.hours.toFixed(1)}
 Wages: $${wagesOf(d).toFixed(2)}
 Tips earned: $${d.finalTips.toFixed(2)}

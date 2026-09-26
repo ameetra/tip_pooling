@@ -40,6 +40,7 @@ model Tenant {
   address          String?
   timezone         String   @default("America/Los_Angeles")
   supportSplitMode String   @default("POOLED") // POOLED (shared role %) | PER_PERSON (each support worker gets the full role %)
+  roleLabels       String?  // JSON display-name overrides, e.g. {"SERVER":"Barista"}; codes + tip math unchanged
   // Day-of-week default "Total Shift Hours" (PER_PERSON denominator), null = no default for that day.
   shiftHoursSun    Float?
   shiftHoursMon    Float?

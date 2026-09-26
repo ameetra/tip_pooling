@@ -3,6 +3,7 @@ import prisma from '../database/client';
 import { tipEntryService } from '../services/tip-entry.service';
 import { payrollReportService } from '../services/payroll-report.service';
 import { roleBreakdown } from '../services/role-breakdown';
+import { getRoleLabels } from '../services/tenant.service';
 import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
 
@@ -99,10 +100,11 @@ export const tipController = {
         r.totalPay += c.totalPay;
         byDate.set(date, r);
       }
+      const labels = await getRoleLabels(req.tenantId);
       const records = [...byDate.values()].map((r) => ({
         date: r.date,
-        role: r.roles.map(formatRole).join(', '),
-        roleBreakdown: roleBreakdown(r.stints),
+        role: r.roles.map((role: string) => formatRole(role, labels)).join(', '),
+        roleBreakdown: roleBreakdown(r.stints, labels),
         hours: Number(r.hours.toFixed(2)),
         hourlyPay: Number(r.hourlyPay.toFixed(2)),
         tips: Number(r.tips.toFixed(2)),

@@ -9,9 +9,20 @@ export const MAX_DAILY_HOURS = 24;
 export const TIPPED_ROLES: readonly EmployeeRole[] = ['SERVER', 'SHIFT_LEAD'];
 export const isTipped = (role: EmployeeRole): boolean => TIPPED_ROLES.includes(role);
 
-// Underscore-aware title case for display: 'SHIFT_LEAD' -> 'Shift Lead'.
-export const formatRole = (role: string): string =>
-  role.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+// Per-venue display names keyed by role code, e.g. { SERVER: 'Barista' }. Display only — calc uses codes.
+export type RoleLabels = Partial<Record<string, string>>;
+
+// Venue label if set, else underscore-aware title case: 'SHIFT_LEAD' -> 'Shift Lead'.
+export const formatRole = (role: string, labels?: RoleLabels): string =>
+  labels?.[role] ?? role.split('_').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+
+export const parseRoleLabels = (json: string | null | undefined): RoleLabels => {
+  try {
+    return json ? JSON.parse(json) : {};
+  } catch {
+    return {};
+  }
+};
 
 // One role-stint: an employee working a given role for some hours at a given base rate.
 // The same employee may have multiple stints in a day (e.g. server in the morning, busser later).

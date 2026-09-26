@@ -1,7 +1,7 @@
 import prisma from '../database/client';
 import { calculateTips, computeCashTips, TipCalculationError } from './tip-calculation.service';
 import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery } from '../validation/tip.schema';
-import { StintInput, StintResult, SupportStaffConfig } from '../types/tip-calculation.types';
+import { StintInput, StintResult, SupportStaffConfig, parseRoleLabels } from '../types/tip-calculation.types';
 import { auditService } from './audit.service';
 import { sendTipEmail } from './email.service';
 import { pickAsOf } from './effective-date';
@@ -116,6 +116,7 @@ export const tipEntryService = {
     const restaurantName = tenant?.name ?? 'Demo Restaurant';
     const slug = (tenant as any)?.slug ?? null;
     const logoUrl = (tenant as any)?.logoUrl ?? null;
+    const roleLabels = parseRoleLabels((tenant as any)?.roleLabels);
     const entry = await prisma.tipEntry.findFirst({
       where: { id, tenantId, isDeleted: false },
       include: { tipCalculations: { include: { employee: { select: { name: true, email: true } } } } },
@@ -148,7 +149,8 @@ export const tipEntryService = {
           logoUrl,
           entryDate: entry.entryDate,
           roles: r.roles,
-          roleBreakdown: roleBreakdown(r.stints),
+          roleBreakdown: roleBreakdown(r.stints, roleLabels),
+          roleLabels,
           hours: Number(r.hours.toFixed(2)),
           finalTips: Number(r.finalTips.toFixed(2)),
           totalPay: Number(r.totalPay.toFixed(2)),
