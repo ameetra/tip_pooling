@@ -207,3 +207,32 @@
 
 **Prevention:**
 - A form whose validation can fail on a hidden field needs a schema per mode; check that Save actually sends a request.
+
+### 🔴 Bug #8: A login from one venue showed its staff under another venue's page
+**Date Found:** 2026-09-26
+**Severity:** Critical (one venue's staff list appeared under another venue's name and branding)
+**Status:** ✅ RESOLVED
+**Found By:** Production, after the Protagonist/Antagonist rosters went live
+
+**Symptoms:**
+- After signing in to Protagonist, opening the /pieces site showed Protagonist's staff with Pieces branding.
+
+**Root Cause:**
+- The browser kept one token for the whole site (`jwt`). The API scoped data by the token's venue, but the page drew
+  branding from the URL's venue, so the two could disagree. No data leaked across tenants; the page mislabeled it.
+
+**Fix:**
+- The browser now keeps one login per venue (`jwt:<slug>`) and sends `X-Venue` from the URL. `verifyJWT` returns 403
+  `VENUE_MISMATCH` when the token's venue differs from `X-Venue` or the header is missing.
+
+**Files Modified:**
+- `backend/src/middleware/auth.ts`, `frontend/src/api/client.ts`, `frontend/src/context/AuthContext.tsx`
+
+**Test Added:**
+- `backend/src/__tests__/api/venue-check.test.ts` (matching venue, other venue, unknown venue, missing header)
+- Verified live 2026-09-27: demo token + `X-Venue: pieces` is blocked; /pieces redirects to its own sign-in.
+
+**Commit:** bd09d14 (2026-09-27)
+
+**Prevention:**
+- Anything that identifies the venue (URL, token, branding) must come from one source or be checked against the others.
