@@ -268,13 +268,16 @@ async function runSeed() {
     ]);
 
     const supportEmail = process.env.SUPPORT_EMAIL || 'support@tippooling.app';
-    const supportPassword = process.env.SUPPORT_PASSWORD;
-    if (!supportPassword) return { success: false, error: 'SUPPORT_PASSWORD env var is required' };
+    // Passwords come from env so no live login is ever written in this (public) repo.
+    const { SUPPORT_PASSWORD, DEMO_ADMIN_PASSWORD, DEMO_MANAGER_PASSWORD } = process.env;
+    if (!SUPPORT_PASSWORD || !DEMO_ADMIN_PASSWORD || !DEMO_MANAGER_PASSWORD) {
+      return { success: false, error: 'SUPPORT_PASSWORD, DEMO_ADMIN_PASSWORD and DEMO_MANAGER_PASSWORD env vars are required' };
+    }
 
     const [adminHash, managerHash, supportHash] = await Promise.all([
-      bcrypt.hash('admin123', 10),
-      bcrypt.hash('manager123', 10),
-      bcrypt.hash(supportPassword, 10),
+      bcrypt.hash(DEMO_ADMIN_PASSWORD, 10),
+      bcrypt.hash(DEMO_MANAGER_PASSWORD, 10),
+      bcrypt.hash(SUPPORT_PASSWORD, 10),
     ]);
     await Promise.all([
       prisma.user.upsert({ where: { tenantId_email: { tenantId: tenant.id, email: 'admin@demo.com' } }, update: {}, create: { tenantId: tenant.id, email: 'admin@demo.com', passwordHash: adminHash, role: 'ADMIN' } }),

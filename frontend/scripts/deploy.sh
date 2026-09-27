@@ -3,9 +3,9 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-BUCKET_NAME="tip-pooling-dev-frontend"
-CLOUDFRONT_DIST_ID="E2P5QKQBHSSGLV"
-PROFILE="tip-pooling"
+source ../deploy.local.env  # AWS names live in a gitignored file; copy deploy.env.example to deploy.local.env
+BUCKET_NAME="${FRONTEND_BUCKET:?}"
+PROFILE="${AWS_PROFILE_NAME:?}"
 
 echo "=== Deploying frontend to S3/CloudFront ==="
 
@@ -30,10 +30,10 @@ aws s3 cp dist/index.html "s3://$BUCKET_NAME/index.html" \
 # Invalidate CloudFront
 echo "Invalidating CloudFront cache..."
 aws cloudfront create-invalidation \
-  --distribution-id "$CLOUDFRONT_DIST_ID" \
+  --distribution-id "${CLOUDFRONT_DIST_ID:?}" \
   --paths "/*" \
   --profile "$PROFILE" \
   --output text --query "Invalidation.Id"
 
 echo "=== Frontend deployed ==="
-echo "URL: https://d3vrbd8qbym3pv.cloudfront.net"
+echo "URL: https://usegratify.com"

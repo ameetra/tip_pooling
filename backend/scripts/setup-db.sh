@@ -3,10 +3,10 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-PROFILE="tip-pooling"
-FUNCTION_NAME="tip-pooling-dev-api"
-# Reference the secret by name (account-agnostic; no ARN/account id hardcoded)
-SECRET_ID="tip-pooling-dev/db-master-password"
+source ../deploy.local.env  # AWS names live in a gitignored file; copy deploy.env.example to deploy.local.env
+PROFILE="${AWS_PROFILE_NAME:?}"
+FUNCTION_NAME="${LAMBDA_FUNCTION:?}"
+SECRET_ID="${DB_SECRET_ID:?}"
 RDS_ENDPOINT="${RDS_ENDPOINT:?set RDS_ENDPOINT to your RDS instance endpoint}"
 
 echo "=== Setting up PostgreSQL database ==="

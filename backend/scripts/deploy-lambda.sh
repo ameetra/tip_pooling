@@ -3,8 +3,9 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-FUNCTION_NAME="tip-pooling-dev-api"
-PROFILE="tip-pooling"
+source ../deploy.local.env  # AWS names live in a gitignored file; copy deploy.env.example to deploy.local.env
+FUNCTION_NAME="${LAMBDA_FUNCTION:?}"
+PROFILE="${AWS_PROFILE_NAME:?}"
 HANDLER="${1:-dist/lambda.handler}"
 
 # Build

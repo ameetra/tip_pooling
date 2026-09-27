@@ -1,5 +1,5 @@
 // Lambda handler for database setup (create tables + seed data)
-// Invoke: aws lambda invoke --function-name tip-pooling-dev-api --payload '{"action":"migrate"}' out.json
+// Invoke: aws lambda invoke --function-name <lambda-function> --payload '{"action":"migrate"}' out.json
 
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';

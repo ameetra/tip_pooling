@@ -9,9 +9,6 @@ percentages. Each establishment runs as an isolated tenant under its own URL pat
 **Platform:** https://usegratify.com — each venue lives at `usegratify.com/<slug>`.
 Management sign-in at `/<slug>/manager-login`; employees use a magic-link at `/<slug>/login`.
 
-> Operator docs: see **SUPER_ADMIN_GUIDE.md** (running the platform) and **RUNBOOK_ADD_TENANT.md**
-> (adding a new venue). Credentials live in `CREDENTIALS.local.md` (gitignored).
-
 ## Screenshots
 
 Filling in a tip entry and previewing the pooled, prorated distribution live, before saving:
@@ -123,10 +120,8 @@ Admin actions run inside the Lambda/VPC to reach the private RDS and are gated b
 (`LAMBDA_ADMIN_SECRET` in the Lambda env). Pass `{"action":"...","secret":"<secret>"}`:
 
 - `migrate` — apply additive schema migrations
-- `seed` — seed the demo tenant
+- `seed` — seed the demo tenant (needs `SUPPORT_PASSWORD`, `DEMO_ADMIN_PASSWORD`, `DEMO_MANAGER_PASSWORD` in the Lambda env)
 - `provision` — create a venue + its admin(s): `{"action":"provision","secret":"…","venues":[{"slug","name","logoUrl","admins":[{"email","password"}]}]}`
-
-See **RUNBOOK_ADD_TENANT.md** for the full add-a-venue procedure and test checklist.
 
 ## API Endpoints
 

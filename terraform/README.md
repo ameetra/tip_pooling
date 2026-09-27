@@ -203,4 +203,3 @@ terraform import module.vpc.aws_vpc.main vpc-xxxxx
 - [Terraform AWS Provider Docs](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 - [AWS Best Practices](https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html)
 - Project TDD: `../tip-pooling-system-tdd.md`
-- Implementation Plan: `../IMPLEMENTATION_PLAN.md`
