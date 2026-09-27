@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api from '../api/client';
+import { createContext, useContext, useReducer, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
+import { tokenKey, venueFromPath } from '../api/client';
 
 interface JwtPayload {
   sub: string;
@@ -28,39 +29,24 @@ function parseJwt(token: string): JwtPayload | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('jwt'));
-  const [user, setUser] = useState<JwtPayload | null>(() => {
-    const t = localStorage.getItem('jwt');
-    return t ? parseJwt(t) : null;
-  });
+  const key = tokenKey(venueFromPath(useLocation().pathname));
+  // Storage is the source of truth (the API client reads it too); this just re-renders after login/logout.
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
 
-  useEffect(() => {
-    if (!token) {
-      api.defaults.headers.common['Authorization'] = '';
-      return;
-    }
-    const payload = parseJwt(token);
-    // Auto-logout if token is expired
-    if (payload && payload.exp * 1000 < Date.now()) {
-      logout();
-      return;
-    }
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(payload);
-  }, [token]);
+  const stored = localStorage.getItem(key);
+  const parsed = stored ? parseJwt(stored) : null;
+  const valid = parsed && parsed.exp * 1000 > Date.now();
+  const token = valid ? stored : null;
+  const user = valid ? parsed : null;
 
   const login = (jwt: string) => {
-    localStorage.setItem('jwt', jwt);
-    setToken(jwt);
-    api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
-    setUser(parseJwt(jwt));
+    localStorage.setItem(key, jwt);
+    rerender();
   };
 
   const logout = () => {
-    localStorage.removeItem('jwt');
-    setToken(null);
-    setUser(null);
-    api.defaults.headers.common['Authorization'] = '';
+    localStorage.removeItem(key);
+    rerender();
   };
 
   return <AuthContext.Provider value={{ token, user, login, logout }}>{children}</AuthContext.Provider>;

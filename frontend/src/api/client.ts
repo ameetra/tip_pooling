@@ -2,6 +2,19 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api/v1' });
 
+// Each venue (first URL segment) keeps its own login, so a token from one venue is never used on another.
+export const venueFromPath = (pathname: string) => pathname.split('/')[1] ?? '';
+export const tokenKey = (venue: string) => `jwt:${venue}`;
+
+// The API rejects a token whose venue differs from X-Venue.
+api.interceptors.request.use((config) => {
+  const venue = venueFromPath(window.location.pathname);
+  const token = localStorage.getItem(tokenKey(venue));
+  config.headers['X-Venue'] = venue;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // Unwrap { success, data } envelope; surface the API's error message on both
 // envelope errors (2xx with success:false) and HTTP errors (4xx/5xx).
 function apiError(payload: any, fallback: Error) {
