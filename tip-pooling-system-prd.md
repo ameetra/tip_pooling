@@ -59,13 +59,13 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Admin can perform all Manager functions
 - [ ] Admin can access all tenants/locations they manage - *Partial: one account per venue with the same email; no cross-venue switcher. **Deprioritized 2026-09-24**: this was scoped for the owner running several venues personally. Once venues belong to other establishments, their admins shouldn't have (or want) cross-venue access to each other's data, and the owner/vendor shouldn't hold standing access into customer data either. What may still be worth building later is a much thinner platform-support layer (tenant provisioning, resetting a locked-out customer admin) — and only once the current manual flow (Lambda admin action + shared secret, see RUNBOOK_ADD_TENANT.md) becomes a bottleneck.*
 - [x] Admin can create and manage Manager accounts *(Staff page: create, reset password and remove managers and shift leads)*
-- [ ] **Reset a locked-out Admin's password** - *Not built. Today the only route is re-running the `provision` action, which also rewrites the venue's name and logo (logo is wiped if omitted).* Requirements for a dedicated `resetAdminPassword` Lambda admin action:
+- [x] **Reset a locked-out Admin's password** *(operator-run `resetAdminPassword` Lambda admin action; re-running `provision` is no longer needed, which also rewrote the venue's name and logo)*:
   - Takes only the venue slug, admin email and a temporary password (8+ characters), and requires the shared admin secret
   - Changes only that one admin's password at that one venue; never touches venue settings or other users
-  - Fails with a clear error if the venue or admin doesn't exist (never creates an account)
+  - Fails with a clear error if the venue or an active admin with that email doesn't exist (never creates or reactivates an account)
   - Forces a password change at the admin's next sign-in
   - Records the reset in the audit trail (without the password)
-  - Replaces the legacy `updatePasswordHash` action, which only works for the old `default-tenant`
+  - Replaces the legacy `updatePasswordHash` action (removed), which only worked for the old `default-tenant`
 - [ ] **"Forgot password?" email link** on the venue sign-in page for Admins, Managers and Shift Leads - *Not built*
   - The user enters their email; if an active password account exists at that venue, a reset link is emailed (same email service as employee magic links)
   - The page shows the same "check your email" message whether or not the account exists (doesn't reveal who has an account)
@@ -373,7 +373,12 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] All data encrypted in transit (TLS 1.3) - *HTTPS only, with a minimum of TLS 1.2*
 - [x] All data encrypted at rest (AES-256) *(the database has storage encryption enabled)*
 - [ ] Password requirements: minimum 12 characters, uppercase, lowercase, number, special character - *12+ characters with upper case, lower case and a number; a special character is not required*
-- [ ] Failed login attempts locked after 5 tries (15-minute lockout) - *Login is limited to 10 attempts per IP address per 15 minutes*
+- [ ] **Account lockout after 3 wrong passwords** (owner decision 2026-09-30, replaces the earlier 5-tries / 15-minute idea) - *Not built; today login is only limited to 10 attempts per IP address per 15 minutes, which doesn't stop guessing from many addresses*
+  - 3 wrong passwords in a row for an account (Admin, Manager or Shift Lead) at a venue locks that account; a correct password resets the count
+  - A locked account can't sign in even with the right password, and the sign-in page says it's locked and how to get it unlocked (without revealing whether an email has an account: unknown emails get the same message after 3 tries)
+  - Unlocking: a password reset clears the lock (the venue Admin's reset on the Staff page for Managers/Shift Leads, the operator's `resetAdminPassword` action for Admins, and the "Forgot password?" link once built)
+  - Every lock and unlock is recorded in the audit trail
+  - Open question before building: lock until reset, or unlock automatically after a set time. Anyone who knows a manager's email can lock them out with 3 bad guesses, so a manual-only unlock risks locking out the closing manager mid-shift
 - [x] Magic link for employees single-use only
 - [ ] Regular security audits and penetration testing - *One security review done 2026-06-13*
 
