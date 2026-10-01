@@ -376,9 +376,9 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] **Account lockout after 3 wrong passwords** (owner decision 2026-09-30, replaces the earlier 5-tries / 15-minute idea) - *Not built; today login is only limited to 10 attempts per IP address per 15 minutes, which doesn't stop guessing from many addresses*
   - 3 wrong passwords in a row for an account (Admin, Manager or Shift Lead) at a venue locks that account; a correct password resets the count
   - A locked account can't sign in even with the right password, and the sign-in page says it's locked and how to get it unlocked (without revealing whether an email has an account: unknown emails get the same message after 3 tries)
-  - Unlocking: a password reset clears the lock (the venue Admin's reset on the Staff page for Managers/Shift Leads, the operator's `resetAdminPassword` action for Admins, and the "Forgot password?" link once built)
+  - Unlocking: the lock lifts automatically after 30 minutes (owner decision 2026-09-30), so a deliberate lockout by someone who knows a manager's email can't shut them out for long. A password reset also clears the lock right away (the venue Admin's reset on the Staff page for Managers/Shift Leads, the operator's `resetAdminPassword` action for Admins, and the "Forgot password?" link once built)
+  - After the lock lifts, the user gets 3 fresh attempts
   - Every lock and unlock is recorded in the audit trail
-  - Open question before building: lock until reset, or unlock automatically after a set time. Anyone who knows a manager's email can lock them out with 3 bad guesses, so a manual-only unlock risks locking out the closing manager mid-shift
 - [x] Magic link for employees single-use only
 - [ ] Regular security audits and penetration testing - *One security review done 2026-06-13*
 
