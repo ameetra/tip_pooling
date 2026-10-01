@@ -59,6 +59,20 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Admin can perform all Manager functions
 - [ ] Admin can access all tenants/locations they manage - *Partial: one account per venue with the same email; no cross-venue switcher. **Deprioritized 2026-09-24**: this was scoped for the owner running several venues personally. Once venues belong to other establishments, their admins shouldn't have (or want) cross-venue access to each other's data, and the owner/vendor shouldn't hold standing access into customer data either. What may still be worth building later is a much thinner platform-support layer (tenant provisioning, resetting a locked-out customer admin) — and only once the current manual flow (Lambda admin action + shared secret, see RUNBOOK_ADD_TENANT.md) becomes a bottleneck.*
 - [x] Admin can create and manage Manager accounts *(Staff page: create, reset password and remove managers and shift leads)*
+- [ ] **Reset a locked-out Admin's password** - *Not built. Today the only route is re-running the `provision` action, which also rewrites the venue's name and logo (logo is wiped if omitted).* Requirements for a dedicated `resetAdminPassword` Lambda admin action:
+  - Takes only the venue slug, admin email and a temporary password (8+ characters), and requires the shared admin secret
+  - Changes only that one admin's password at that one venue; never touches venue settings or other users
+  - Fails with a clear error if the venue or admin doesn't exist (never creates an account)
+  - Forces a password change at the admin's next sign-in
+  - Records the reset in the audit trail (without the password)
+  - Replaces the legacy `updatePasswordHash` action, which only works for the old `default-tenant`
+- [ ] **"Forgot password?" email link** on the venue sign-in page for Admins, Managers and Shift Leads - *Not built*
+  - The user enters their email; if an active password account exists at that venue, a reset link is emailed (same email service as employee magic links)
+  - The page shows the same "check your email" message whether or not the account exists (doesn't reveal who has an account)
+  - The link works for one venue only, expires after 15 minutes and can be used once
+  - Same rate limits as magic links: 3 requests per email per hour, 10 per IP address per hour
+  - Opening the link lets the user set a new password (same rules as Change Password); any earlier unused reset links stop working
+  - Records the reset in the audit trail (without the password)
 - [ ] Admin session timeout after 30 minutes of inactivity - *Sessions expire after 8 hours; there is no inactivity timeout*
 
 #### 3.1.2 Manager Role
