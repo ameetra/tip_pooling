@@ -87,6 +87,7 @@ function VenueRoutes() {
           <Route path="config" element={<SupportConfigPage />} />
           <Route path="tips" element={<TipEntriesPage />} />
           <Route path="tips/:id" element={<TipEntryDetailPage />} />
+          <Route path="tips/:id/edit" element={<TipEntryFormPage />} />
           <Route path="payroll" element={<PayrollReportPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>

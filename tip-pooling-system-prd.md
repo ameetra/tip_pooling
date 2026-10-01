@@ -247,7 +247,7 @@ A cloud-based tip pooling management system that automates the calculation and d
   - [x] Name, Role, Shifts worked, Hours *(no shifts)*
   - [ ] Hourly pay, Tips earned, Total pay, Effective hourly rate - *The entry page has no separate hourly-pay column; Preview shows wages*
 - [x] Manager reviews calculations and confirms accuracy *(publishing asks for confirmation)*
-- [ ] Manager can go back to edit if errors found - *Not built after saving: delete the draft and enter it again*
+- [x] Manager can go back to edit if errors found *(unpublished drafts only, see 3.5.2)*
 - [x] System saves calculations to database only upon explicit confirmation *(saved when the manager clicks Save Tip Entry; emails go out only on Publish)*
 - [ ] System displays success message with entry ID and timestamp - *Shows 'Published! N email(s) sent' and the published date, but no entry ID*
 
@@ -259,15 +259,15 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [ ] Manager can search entries by employee name - *Not built*
 - [ ] List displays: Date, Manager who entered, Total tips, Employee count, Status (Active/Deleted) - *Shows date, cash figures, POS tips and status*
 
-#### 3.5.2 Edit Historical Entries *(API only; corrections are made by deleting an entry and entering it again)*
-- [ ] Manager can select and edit any historical entry
-- [ ] Edit form pre-populates with existing data
-- [ ] Manager can modify any field
-- [x] System recalculates tips upon save *(API)*
-- [x] System creates new record with updated data *(API)*
-- [x] System soft-deletes previous record (marks as deleted, retains data) *(API)*
-- [x] System maintains link between old and new records (audit trail) *(API)*
-- [x] System records: who edited, when edited, what changed *(API, in the audit log)*
+#### 3.5.2 Edit Historical Entries *(unpublished drafts only; published entries are corrected by deleting and entering them again)*
+- [ ] Manager can select and edit any historical entry - *Partial: Edit Entry on an unpublished draft (requested by a Pieces manager 2026-09-30: fixing one wrong role meant deleting the whole draft and re-entering it). Published entries keep the delete + re-enter correction flow, since employees were already emailed*
+- [x] Edit form pre-populates with existing data (date, tip amounts and every employee row: employee, role, hours)
+- [x] Manager can modify any field, including adding, removing or changing employee rows *(except the date: change it by deleting and entering the day again)*
+- [x] System recalculates tips upon save
+- [x] System creates new record with updated data
+- [x] System soft-deletes previous record (marks as deleted, retains data)
+- [x] System maintains link between old and new records (audit trail)
+- [x] System records: who edited, when edited, what changed *(in the audit log)*
 
 #### 3.5.3 Audit Trail
 - [x] System maintains complete history of all changes *(creates, deletes, publishes, edits, rate and percentage changes are logged)*

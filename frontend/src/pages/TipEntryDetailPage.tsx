@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SendIcon from '@mui/icons-material/Send';
+import EditIcon from '@mui/icons-material/Edit';
 import { useTipEntry, useDeleteTipEntry, usePublishTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { deleteEntryMessage } from '../utils/tipEntry';
@@ -112,9 +113,12 @@ export default function TipEntryDetailPage() {
 
       <Stack direction="row" spacing={2}>
         {!entry.publishedAt && (
-          <Button variant="contained" color="success" startIcon={<SendIcon />} onClick={() => setConfirmPublish(true)}>
-            Publish & Send Emails
-          </Button>
+          <>
+            <Button variant="contained" color="success" startIcon={<SendIcon />} onClick={() => setConfirmPublish(true)}>
+              Publish & Send Emails
+            </Button>
+            <Button variant="outlined" startIcon={<EditIcon />} onClick={() => navigate(`/${slug}/tips/${id}/edit`)}>Edit Entry</Button>
+          </>
         )}
         <Button color="error" variant="outlined" onClick={() => setConfirmDelete(true)}>Delete Entry</Button>
       </Stack>

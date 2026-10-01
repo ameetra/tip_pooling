@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { get, post, del } from './client';
+import { get, post, patch, del } from './client';
 import type { TipEntry, TipEntryDetail, TipEntryInput, TipPreviewResponse } from '../types';
 import { dayBefore } from '../utils/dates';
 
@@ -36,6 +36,16 @@ export const useCreateTipEntry = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: TipEntryInput) => post('/tips/entries', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tipEntries'] }),
+  });
+};
+
+// Edit replaces the draft with a new entry (new id); the old one is soft-deleted server-side.
+// The date can't change on edit: the server keeps the original and ignores entryDate.
+export const useEditTipEntry = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: TipEntryInput }) => patch<TipEntry>(`/tips/entries/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tipEntries'] }),
   });
 };

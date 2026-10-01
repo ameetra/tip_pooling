@@ -190,6 +190,48 @@ describe('Tip Entry API - E2E Workflow', () => {
       expect(oldEntry!.replacedById).toBe(res.body.data.id);
     });
 
+    it('fixes one wrong role on a draft without re-entering the day', async () => {
+      const rows = [
+        { employeeId: aliceId, role: 'SERVER', hoursWorked: 6 },
+        { employeeId: bobId, role: 'SERVER', hoursWorked: 6 },
+      ];
+      const created = await request(app).post('/api/v1/tips/entries').send({ entryDate: '2026-04-10', ...cash, employees: rows });
+
+      const res = await request(app).patch(`/api/v1/tips/entries/${created.body.data.id}`).send({
+        ...cash, employees: [{ ...rows[0], role: 'BUSSER' }, rows[1]],
+      });
+      expect(res.status).toBe(200);
+
+      const detail = await request(app).get(`/api/v1/tips/entries/${res.body.data.id}`);
+      const alice = detail.body.data.tipCalculations.find((c: any) => c.employeeId === aliceId);
+      expect(alice.roleOnDay).toBe('BUSSER');
+      expect(alice.hourlyPay).toBe(72); // wages at the $12 busser rate (6h), not the $15 server rate
+      expect(detail.body.data.entryDate).toBe('2026-04-10');
+      const total = detail.body.data.tipCalculations.reduce((s: number, c: any) => s + c.finalTips, 0);
+      expect(total).toBeCloseTo(500, 2);
+
+      const list = await request(app).get('/api/v1/tips/entries');
+      expect(list.body.data.map((e: any) => e.id)).toEqual([res.body.data.id]);
+    });
+
+    it('rejects editing a published entry and leaves it unchanged', async () => {
+      const created = await request(app).post('/api/v1/tips/entries').send({
+        entryDate: '2026-04-10', ...cash, employees: [{ employeeId: bobId, role: 'SERVER', hoursWorked: 8 }],
+      });
+      const id = created.body.data.id;
+      await testPrisma.tipEntry.update({ where: { id }, data: { publishedAt: new Date() } });
+
+      const res = await request(app).patch(`/api/v1/tips/entries/${id}`).send({
+        posTips: 999, employees: [{ employeeId: bobId, role: 'SERVER', hoursWorked: 8 }],
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('ALREADY_PUBLISHED');
+
+      const entry = await testPrisma.tipEntry.findUnique({ where: { id } });
+      expect(entry!.isDeleted).toBe(false);
+      expect(entry!.posTips).toBe(200);
+    });
+
     it('returns 404 for a nonexistent entry', async () => {
       const res = await request(app).patch('/api/v1/tips/entries/nonexistent').send({
         employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }],

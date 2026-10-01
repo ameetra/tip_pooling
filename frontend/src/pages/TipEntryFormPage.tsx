@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Button, IconButton, MenuItem, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography, Alert, Chip, CircularProgress, Stack,
@@ -8,7 +8,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useEmployees } from '../api/employees';
-import { useTipPreview, useCreateTipEntry } from '../api/tips';
+import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry } from '../api/tips';
 import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
@@ -47,6 +47,9 @@ function MoneyField({ label, value, onChange, required, helperText }: {
 
 export default function TipEntryFormPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEdit = !!id;
+  const { data: existing, isLoading } = useTipEntry(id ?? '');
   const { user } = useAuth();
   const { slug } = useTenant();
   const { roleOptions } = useRoleLabels();
@@ -56,6 +59,8 @@ export default function TipEntryFormPage() {
   const isPerPerson = shiftHoursConfig?.supportSplitMode === 'PER_PERSON';
   const preview = useTipPreview();
   const createEntry = useCreateTipEntry();
+  const editEntry = useEditTipEntry();
+  const saving = createEntry.isPending || editEntry.isPending;
 
   const [entryDate, setEntryDate] = useState(today);
   const [cashInRegister, setCashInRegister] = useState('');
@@ -67,10 +72,27 @@ export default function TipEntryFormPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Auto-fill from the venue's day-of-week default whenever the date changes; still editable
-  // afterward for early closes, same as the old paper form's instructions.
+  // Fill the form once from the saved draft; later refetches must not wipe the manager's changes.
+  const prefilled = useRef(false);
   useEffect(() => {
-    if (!isPerPerson || !shiftHoursConfig) return;
+    if (!existing || prefilled.current) return;
+    prefilled.current = true;
+    setEntryDate(existing.entryDate);
+    setCashInRegister(String(existing.cashInRegister));
+    setCashSales(String(existing.cashSales));
+    setCashTips(String(existing.cashTips));
+    setPosTips(String(existing.posTips));
+    setShiftHours(existing.shiftHours != null ? String(existing.shiftHours) : '');
+    // One calculation row per stint, so a person who worked two roles comes back as two rows.
+    setRows(existing.tipCalculations.map((c) => ({
+      employeeId: c.employeeId, role: c.roleOnDay as EmployeeRole, hoursWorked: String(c.totalHours),
+    })));
+  }, [existing]);
+
+  // Auto-fill from the venue's day-of-week default whenever the date changes; still editable
+  // afterward for early closes, same as the old paper form's instructions. Drafts keep their saved value.
+  useEffect(() => {
+    if (isEdit || !isPerPerson || !shiftHoursConfig) return;
     const def = shiftHoursConfig.defaults[dayOfWeek(entryDate)];
     setShiftHours(def != null ? String(def) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +149,11 @@ export default function TipEntryFormPage() {
     const input = buildInput();
     if (!input) return;
     try {
+      if (isEdit) {
+        const updated = await editEntry.mutateAsync({ id: id!, data: input });
+        navigate(`/${slug}/tips/${updated.id}`);
+        return;
+      }
       const result: any = await createEntry.mutateAsync(input);
       if (isShiftLead) {
         resetForm();
@@ -137,16 +164,26 @@ export default function TipEntryFormPage() {
     } catch (e: any) { setError(e.message); }
   };
 
+  if (isEdit && isLoading) return <Typography>Loading...</Typography>;
+  if (isEdit && !existing) return <Typography>Entry not found</Typography>;
+  if (existing?.publishedAt) {
+    return (
+      <Alert severity="info" action={<Button onClick={() => navigate(`/${slug}/tips/${id}`)}>Back</Button>}>
+        This entry was published and can't be edited. To correct it, delete it and enter the day again.
+      </Alert>
+    );
+  }
+
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 2 }}>New Tip Entry</Typography>
+      <Typography variant="h5" sx={{ mb: 2 }}>{isEdit ? 'Edit Tip Entry' : 'New Tip Entry'}</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       {/* Date + Cash inputs */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
-          <TextField label="Date" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label="Date" type="date" value={entryDate} disabled={isEdit} onChange={(e) => setEntryDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           {isPerPerson && (
             <TextField
               label="Total Shift Hours" type="number" value={shiftHours} required
@@ -203,9 +240,12 @@ export default function TipEntryFormPage() {
         )}
       </Box>
 
-      <Button variant="contained" size="large" onClick={handleSubmit} disabled={createEntry.isPending || !buildInput()}>
-        {createEntry.isPending ? 'Saving...' : 'Save Tip Entry'}
-      </Button>
+      <Stack direction="row" spacing={2}>
+        <Button variant="contained" size="large" onClick={handleSubmit} disabled={saving || !buildInput()}>
+          {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Tip Entry'}
+        </Button>
+        {isEdit && <Button size="large" onClick={() => navigate(`/${slug}/tips/${id}`)}>Cancel</Button>}
+      </Stack>
     </Box>
   );
 }

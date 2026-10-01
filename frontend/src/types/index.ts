@@ -82,6 +82,7 @@ export interface TipEntry {
   cashSales: number;
   cashTips: number;
   posTips: number;
+  shiftHours: number | null;
   isDeleted: boolean;
   deletedAt: string | null;
   publishedAt: string | null;
