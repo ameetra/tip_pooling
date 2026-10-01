@@ -82,6 +82,24 @@ export async function upsertVenueAdmin(tenantId: string, email: string, password
 }
 
 /**
+ * Reset one existing ADMIN's password at one venue (locked-out admin). Unlike re-running `provision`,
+ * it never touches venue settings and never creates an account.
+ */
+export async function resetAdminPassword(slug: string, email: string, password: string) {
+  if (!password || password.length < 8) throw new Error('Temporary password must be at least 8 characters');
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  const admin = await (prisma as any).user.findFirst({ where: { tenantId: tenant.id, email: email.toLowerCase(), role: 'ADMIN', isActive: true } });
+  if (!admin) throw new Error(`No active admin ${email} at venue ${slug}`);
+  await (prisma as any).user.update({
+    where: { id: admin.id },
+    data: { passwordHash: await bcrypt.hash(password, 10), mustChangePassword: true },
+  });
+  await auditService.log({ tenantId: tenant.id, entityType: 'USER', entityId: admin.id, action: 'PASSWORD_RESET', newValues: { email: admin.email, via: 'lambda-admin' } });
+  return { tenant: slug, email: admin.email };
+}
+
+/**
  * Provision a venue with its first ADMIN. Reused by the `provision` Lambda action (M14)
  * and the super-admin console (M15).
  */

@@ -47,6 +47,21 @@ beforeAll(async () => {
   `);
 
   await testPrisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      tenantId TEXT NOT NULL,
+      email TEXT NOT NULL,
+      passwordHash TEXT NOT NULL,
+      role TEXT NOT NULL,
+      isActive INTEGER NOT NULL DEFAULT 1,
+      mustChangePassword INTEGER NOT NULL DEFAULT 0,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenantId) REFERENCES tenants(id),
+      UNIQUE(tenantId, email)
+    )
+  `);
+
+  await testPrisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS employees (
       id TEXT PRIMARY KEY,
       tenantId TEXT NOT NULL,
@@ -191,6 +206,7 @@ beforeEach(async () => {
   await testPrisma.$executeRawUnsafe('DELETE FROM employee_role_rates');
   await testPrisma.$executeRawUnsafe('DELETE FROM employee_rate_history');
   await testPrisma.$executeRawUnsafe('DELETE FROM employees');
+  await testPrisma.$executeRawUnsafe('DELETE FROM users');
   await testPrisma.$executeRawUnsafe('DELETE FROM tenants');
 
   // Create test tenant
