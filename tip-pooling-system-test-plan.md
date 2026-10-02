@@ -336,6 +336,25 @@ describe('TipCalculationService', () => {
 | TC-API-027 | Used token rejected | Token already used | 401 Unauthorized | P0 |
 | TC-API-028 | Invalid token rejected | Non-existent token | 401 Unauthorized | P0 |
 
+**Test Suite: `/api/v1/cash-counts`** (`backend/src/__tests__/api/cash-count.test.ts`, `cash-count-roles.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-CASH-001 | Count totals bills × face value + coins | `countedTotal` 257.46, status MATCHES | P0 |
+| TC-CASH-002 | Short / over count | Negative / positive variance, SHORT / OVER | P0 |
+| TC-CASH-003 | $0 count (missing envelope) | 201, SHORT by the full amount | P1 |
+| TC-CASH-004 | Count a date with no tip entry | 400 `NO_TIP_ENTRY` | P0 |
+| TC-CASH-005 | Second count on the same date | 400 `ALREADY_COUNTED` | P0 |
+| TC-CASH-006 | Negative or fractional bills, sub-cent coins, bad date | 400 `VALIDATION_ERROR` | P1 |
+| TC-CASH-007 | Edit a count | New record; old one soft-deleted with `replacedById`; UPDATE audit | P0 |
+| TC-CASH-008 | Tip entry re-entered with a different Cash in Register | `entryChanged`; recount copies the new expected amount and clears it | P0 |
+| TC-CASH-009 | Tip entry deleted after counting | `noEntry` flag | P1 |
+| TC-CASH-010 | Delete a count | Date shows NOT_COUNTED and can be counted again | P0 |
+| TC-CASH-011 | Uncounted drops before the range | Listed within 60 days; hidden beyond 60 days or at $0 | P1 |
+| TC-CASH-012 | Deposit filter | Only that deposit's counts, any date | P1 |
+| TC-CASH-013 | Another venue's counts | Not listed; PUT/DELETE return 404 | P0 |
+| TC-CASH-014 | Shift Lead / Employee token | 403 (Admin/Manager 200) | P0 |
+
 ### 4.2 Database Integration Tests
 
 #### 4.2.1 CRUD Operations
@@ -549,6 +568,20 @@ describe('TipCalculationService', () => {
 - Cap enforced correctly (highest server on shared shift)
 - Total distributed equals exact tip pool amount
 - Complex scenario completes without errors
+
+
+#### TC-E2E-CASH: Cash Drop Reconciliation (verified on the live demo venue 2026-10-02)
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | Manager opens Cash | Drops in the last 14 days plus uncounted older ones, with an uncounted count banner |
+| 2 | Click a $200 drop, enter 9 × $20 and deposit TEST-1 | Live total $180.00, "Short -$20.00" |
+| 3 | Save | Row shows Short -$20.00, deposit link and a totals row |
+| 4 | Edit to 10 × $20, add a comment | Row shows Matches with a Comment chip |
+| 5 | Click the deposit | Only that deposit's drops |
+| 6 | Phone width (390px) | Dialog opens full screen |
+| 7 | Delete the count | Drop shows Not counted again |
+| 8 | Shift lead opens /cash | Redirected to New Tip Entry; no Cash menu item; API serves no data |
 
 ---
 

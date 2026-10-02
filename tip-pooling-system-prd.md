@@ -359,35 +359,35 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Multi-venue paths (`/<venue>`), per-venue branding and forced password change at first sign-in
 - [x] Email sent as Gratify through Amazon SES with DKIM signing and a DMARC policy
 
-### 3.10 Cash Drop Reconciliation *(not built; requested by the Pieces owner 2026-10-02)*
+### 3.10 Cash Drop Reconciliation *(built 2026-10-02; requested by the Pieces owner)*
 
 Each night's cash goes into an envelope in the drop box. About once a week an Admin or Manager counts each envelope and checks it against the Cash in Register on that day's tip entry. This replaces the `Cash_Over-Under` tab of the Pieces daily cash log spreadsheet.
 
 #### 3.10.1 Counting a Drop
-- [ ] Admins and Managers only (Shift Leads and employees can't see or use it, in the app or the API)
-- [ ] One count per tip entry date. The expected amount is that entry's **Cash in Register**, draft or published
-- [ ] The count is entered as **number of bills** for $100, $50, $20, $10, $5, $2 and $1, plus **coins as a dollar amount**
-- [ ] The form shows each denomination's dollar value, the counted total and the over/under (counted - expected) as you type
-- [ ] Optional **Deposit** reference (e.g. the bank deposit number) to group drops that went to the bank together
-- [ ] Optional comments (e.g. "-80 Electrician" for cash paid out of the register)
-- [ ] The total and over/under are calculated by the server from the bill counts, not taken from the browser
-- [ ] Records who counted and when (replaces the spreadsheet's Validator Initials)
-- [ ] A count can be corrected or deleted at any time, even after its deposit went to the bank (owner decision 2026-10-02: no lock). The old version is kept (soft delete) and every create, change and delete goes to the audit trail
-- [ ] A short or over count does **not** change tip calculations or payouts; it is a record only
+- [x] Admins and Managers only (Shift Leads and employees can't see or use it, in the app or the API)
+- [x] One count per tip entry date. The expected amount is that entry's **Cash in Register**, draft or published
+- [x] The count is entered as **number of bills** for $100, $50, $20, $10, $5, $2 and $1, plus **coins as a dollar amount**
+- [x] The form shows each denomination's dollar value, the counted total and the over/under (counted - expected) as you type
+- [x] Optional **Deposit** reference (e.g. the bank deposit number) to group drops that went to the bank together
+- [x] Optional comments (e.g. "-80 Electrician" for cash paid out of the register)
+- [x] The total and over/under are calculated by the server from the bill counts, not taken from the browser
+- [x] Records who counted and when (replaces the spreadsheet's Validator Initials)
+- [x] A count can be corrected or deleted at any time, even after its deposit went to the bank (owner decision 2026-10-02: no lock). The old version is kept (soft delete) and every create, change and delete goes to the audit trail
+- [x] A short or over count does **not** change tip calculations or payouts; it is a record only
 
 #### 3.10.2 Reconciliation Screen
-- [ ] A Cash Reconciliation page lists tip entry dates with: Date, Expected, Counted, Over/Under, Deposit, Status
-- [ ] Status: **Not counted**, **Matches**, **Short** or **Over**
-- [ ] Defaults to every uncounted drop plus the last 14 days; Admin/Manager can pick a date range
-- [ ] Filter by Deposit reference, with totals (expected, counted, net over/under) for the rows shown
-- [ ] Usable on a phone (counting happens at a desk, not always at a computer)
+- [x] A Cash Reconciliation page lists tip entry dates with: Date, Expected, Counted, Over/Under, Deposit, Status
+- [x] Status: **Not counted**, **Matches**, **Short** or **Over**
+- [x] Defaults to every uncounted drop (last 60 days) plus the last 14 days; Admin/Manager can pick the start date *(no end date: the list runs to today)*
+- [x] Filter by Deposit reference (click a deposit in the list), with totals (expected, counted, net over/under) for the counted rows shown
+- [x] Usable on a phone (counting happens at a desk, not always at a computer) *(the count form opens full screen; the side menu is still the desktop layout)*
 
 #### 3.10.3 Edge Cases
-- [ ] The expected amount is saved with the count. If the tip entry is later corrected (deleted and entered again) with a different Cash in Register, the drop is flagged **Entry changed since count** instead of silently changing the over/under
-- [ ] Counts are linked to the date, not the tip entry record, so they survive the delete + re-enter correction flow
-- [ ] If the day's tip entry is deleted and not re-entered, the count stays visible and is flagged **No tip entry**
-- [ ] One envelope per date: if a day had two envelopes, add them together when counting
-- [ ] A count of $0 is allowed (missing envelope), and shows as Short by the full amount
+- [x] The expected amount is saved with the count. If the tip entry is later corrected (deleted and entered again) with a different Cash in Register, the drop is flagged **Entry changed since count** instead of silently changing the over/under
+- [x] Counts are linked to the date, not the tip entry record, so they survive the delete + re-enter correction flow
+- [x] If the day's tip entry is deleted and not re-entered, the count stays visible and is flagged **No tip entry**
+- [x] One envelope per date: if a day had two envelopes, add them together when counting
+- [x] A count of $0 is allowed (missing envelope), and shows as Short by the full amount
 
 ---
 

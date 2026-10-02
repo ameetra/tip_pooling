@@ -1280,6 +1280,22 @@ async function editTipEntry(
 }
 ```
 
+### 5.3 Cash Drop Reconciliation (PRD 3.10)
+
+**Table `cash_counts`:** `tenantId`, `entryDate`, `expectedAmount`, bill counts `bills100` through `bills1` (integers), `coins` (dollars), `countedTotal`, `deposit?`, `comments?`, `countedByEmail`, plus the usual soft-delete columns (`isDeleted`, `deletedAt`, `replacedById`). A partial unique index allows only one active count per venue per date (`WHERE "isDeleted" = false`). The over/under is never stored; it is `countedTotal - expectedAmount`.
+
+**Endpoints** (`/api/v1/cash-counts`, Admin/Manager only):
+- `GET ?from&to`: one row per date, newest first: tip entry dates in the range (counted or not), plus uncounted drops from the last 60 days with Cash in Register > 0. With `?deposit=X` it returns every count in that deposit, whatever the date. Each row has `currentExpected`, `count`, `variance`, `status` (`NOT_COUNTED | MATCHES | SHORT | OVER`), `entryChanged` and `noEntry`.
+- `POST` `{ entryDate, bills…, coins, deposit?, comments? }`: fails with `NO_TIP_ENTRY` or `ALREADY_COUNTED`.
+- `PUT /:id`: replaces the count in one transaction (soft-delete the old count, create the new one, link them with `replacedById`).
+- `DELETE /:id`: soft delete.
+
+**Rules:**
+- The server computes `countedTotal` from the bill counts, using whole cents.
+- The count is linked to the **date**, not the tip entry id, so it survives the delete + re-enter correction flow.
+- `expectedAmount` is copied from the day's Cash in Register when the drop is counted (summed if the date has more than one active entry) and copied again on edit. If the entry later changes, the row is flagged `entryChanged`; recounting clears the flag. If the entry is deleted, the row is flagged `noEntry` and keeps the copied amount.
+- Every create, update and delete writes a `CASH_COUNT` audit record. Counts never affect tip calculations.
+
 ---
 
 ## 6. Security Design
