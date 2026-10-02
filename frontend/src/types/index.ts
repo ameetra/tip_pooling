@@ -176,3 +176,29 @@ export interface PayrollReport {
   totalTips: number;
   unpublished: { id: string; entryDate: string }[];
 }
+
+export type BillField = 'bills100' | 'bills50' | 'bills20' | 'bills10' | 'bills5' | 'bills2' | 'bills1';
+
+export type CashCountInput = Record<BillField, number> & { coins: number; deposit: string; comments: string };
+
+export interface CashCount extends Record<BillField, number> {
+  id: string;
+  entryDate: string;
+  expectedAmount: number;
+  coins: number;
+  countedTotal: number;
+  deposit: string | null;
+  comments: string | null;
+  countedByEmail: string | null;
+  createdAt: string;
+}
+
+export interface CashCountRow {
+  entryDate: string;
+  currentExpected: number | null; // Cash in Register on the day's tip entry now (null: no tip entry)
+  count: CashCount | null;
+  variance: number | null; // counted - expected at the time of counting
+  status: 'NOT_COUNTED' | 'MATCHES' | 'SHORT' | 'OVER';
+  entryChanged: boolean;
+  noEntry: boolean;
+}

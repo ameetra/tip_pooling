@@ -6,6 +6,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import PaymentsIcon from '@mui/icons-material/Payments';
+import LocalAtmIcon from '@mui/icons-material/LocalAtm';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,7 @@ const DRAWER_WIDTH = 220;
 const managerNavItems = [
   { label: 'Tips', path: '/tips', icon: <ReceiptIcon /> },
   { label: 'Payroll', path: '/payroll', icon: <PaymentsIcon /> },
+  { label: 'Cash', path: '/cash', icon: <LocalAtmIcon /> },
   { label: 'Employees', path: '/employees', icon: <PeopleIcon /> },
   { label: 'Config', path: '/config', icon: <SettingsIcon /> },
   { label: 'Staff', path: '/users', icon: <AdminPanelSettingsIcon /> },

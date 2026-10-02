@@ -17,6 +17,7 @@ import TipEntryDetailPage from './pages/TipEntryDetailPage';
 import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
 import PayrollReportPage from './pages/PayrollReportPage';
+import CashReconciliationPage from './pages/CashReconciliationPage';
 import { isManagement, isStaff } from './constants/roles';
 
 function RequireAuth({ children, kind }: { children: React.ReactNode; kind: 'employee' | 'manager' }) {
@@ -89,6 +90,7 @@ function VenueRoutes() {
           <Route path="tips/:id" element={<TipEntryDetailPage />} />
           <Route path="tips/:id/edit" element={<TipEntryFormPage />} />
           <Route path="payroll" element={<PayrollReportPage />} />
+          <Route path="cash" element={<CashReconciliationPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>
       </Route>
