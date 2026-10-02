@@ -9,6 +9,7 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import LocalAtmIcon from '@mui/icons-material/LocalAtm';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import VenueBrand from './VenueBrand';
@@ -24,6 +25,9 @@ const managerNavItems = [
   { label: 'Staff', path: '/users', icon: <AdminPanelSettingsIcon /> },
 ];
 
+// The deleted-entries report is for admins coaching their managers, so managers don't see it.
+const adminNavItems = [...managerNavItems, { label: 'Deleted', path: '/deleted-entries', icon: <DeleteSweepIcon /> }];
+
 const shiftLeadNavItems = [
   { label: 'New Tip Entry', path: '/tips/new', icon: <ReceiptIcon /> },
 ];
@@ -33,7 +37,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const { logout, user } = useAuth();
   const { slug } = useTenant();
-  const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : managerNavItems;
+  const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : user?.role === 'ADMIN' ? adminNavItems : managerNavItems;
   const to = (path: string) => `/${slug}${path}`;
 
   return (

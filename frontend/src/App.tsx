@@ -18,6 +18,7 @@ import EmployeeTipHistoryPage from './pages/EmployeeTipHistoryPage';
 import UsersPage from './pages/UsersPage';
 import PayrollReportPage from './pages/PayrollReportPage';
 import CashReconciliationPage from './pages/CashReconciliationPage';
+import DeletedEntriesPage from './pages/DeletedEntriesPage';
 import { isManagement, isStaff } from './constants/roles';
 
 function RequireAuth({ children, kind }: { children: React.ReactNode; kind: 'employee' | 'manager' }) {
@@ -93,6 +94,7 @@ function VenueRoutes() {
           <Route path="cash" element={<CashReconciliationPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>
+        <Route path="deleted-entries" element={<RequireRole allow={(role) => role === 'ADMIN'}><DeletedEntriesPage /></RequireRole>} />
       </Route>
     </Routes>
   );

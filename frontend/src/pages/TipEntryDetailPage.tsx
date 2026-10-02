@@ -9,7 +9,7 @@ import SendIcon from '@mui/icons-material/Send';
 import EditIcon from '@mui/icons-material/Edit';
 import { useTipEntry, useDeleteTipEntry, usePublishTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { deleteEntryMessage } from '../utils/tipEntry';
+import DeleteTipEntryDialog from '../components/DeleteTipEntryDialog';
 import { useTenant } from '../context/TenantContext';
 import { useRoleLabels } from '../constants/roles';
 
@@ -24,11 +24,6 @@ export default function TipEntryDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [publishResult, setPublishResult] = useState<{ emailsSent: number; emailsFailed: number } | null>(null);
-
-  const handleDelete = async () => {
-    await deleteMut.mutateAsync(id!);
-    navigate(`/${slug}/tips`);
-  };
 
   const handlePublish = async () => {
     const result = await publishMut.mutateAsync(id!);
@@ -132,13 +127,10 @@ export default function TipEntryDetailPage() {
         confirmLabel="Publish & Send"
         confirmColor="success"
       />
-      <ConfirmDialog
-        open={confirmDelete}
-        title="Delete Tip Entry"
-        message={deleteEntryMessage(entry)}
-        onConfirm={handleDelete}
+      <DeleteTipEntryDialog
+        entry={confirmDelete ? entry : undefined}
+        onConfirm={async (why) => { await deleteMut.mutateAsync({ id: id!, why }); navigate(`/${slug}/tips`); }}
         onCancel={() => setConfirmDelete(false)}
-        confirmLabel="Delete"
       />
     </Box>
   );

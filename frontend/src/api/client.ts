@@ -43,4 +43,4 @@ export const get = <T>(url: string) => api.get(url) as unknown as Promise<T>;
 export const post = <T>(url: string, data?: unknown) => api.post(url, data) as unknown as Promise<T>;
 export const patch = <T>(url: string, data?: unknown) => api.patch(url, data) as unknown as Promise<T>;
 export const put = <T>(url: string, data?: unknown) => api.put(url, data) as unknown as Promise<T>;
-export const del = <T = void>(url: string) => api.delete(url) as unknown as Promise<T>;
+export const del = <T = void>(url: string, data?: unknown) => api.delete(url, { data }) as unknown as Promise<T>;

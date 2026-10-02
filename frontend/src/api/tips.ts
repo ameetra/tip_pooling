@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { get, post, patch, del } from './client';
-import type { TipEntry, TipEntryDetail, TipEntryInput, TipPreviewResponse } from '../types';
+import type { DeletedEntriesReport, DeleteReason, TipEntry, TipEntryDetail, TipEntryInput, TipPreviewResponse } from '../types';
 import { dayBefore } from '../utils/dates';
 
 export interface PublishResult { emailsSent: number; emailsFailed: number; }
@@ -53,10 +53,18 @@ export const useEditTipEntry = () => {
 export const useDeleteTipEntry = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => del(`/tips/entries/${id}`),
+    // Published entries need a reason (the server rejects deleting one without it); drafts don't.
+    mutationFn: ({ id, why }: { id: string; why?: { reason: DeleteReason; note: string } }) => del(`/tips/entries/${id}`, why),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tipEntries'] }),
   });
 };
+
+export const useDeletedEntriesReport = (startDate: string, endDate: string) =>
+  useQuery({
+    queryKey: ['deletedEntries', startDate, endDate],
+    queryFn: () => get<DeletedEntriesReport>(`/tips/deleted-report?start_date=${startDate}&end_date=${endDate}`),
+    enabled: !!startDate && !!endDate,
+  });
 
 export const usePublishTipEntry = () => {
   const qc = useQueryClient();

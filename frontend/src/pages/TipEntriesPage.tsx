@@ -7,10 +7,9 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useTipEntries, useOlderDrafts, useDeleteTipEntry, TIP_ENTRIES_LIMIT } from '../api/tips';
-import ConfirmDialog from '../components/ConfirmDialog';
+import DeleteTipEntryDialog from '../components/DeleteTipEntryDialog';
 import { useTenant } from '../context/TenantContext';
 import { localDate } from '../utils/dates';
-import { deleteEntryMessage } from '../utils/tipEntry';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
@@ -21,12 +20,6 @@ export default function TipEntriesPage() {
   const { data: olderDrafts = [] } = useOlderDrafts(since);
   const deleteMut = useDeleteTipEntry();
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    await deleteMut.mutateAsync(deleteId);
-    setDeleteId(null);
-  };
 
   return (
     <Box>
@@ -107,13 +100,10 @@ export default function TipEntriesPage() {
         </Table>
       </TableContainer>
 
-      <ConfirmDialog
-        open={!!deleteId}
-        title="Delete Tip Entry"
-        message={deleteEntryMessage(entries.find((e) => e.id === deleteId))}
-        onConfirm={handleDelete}
+      <DeleteTipEntryDialog
+        entry={entries.find((e) => e.id === deleteId)}
+        onConfirm={async (why) => { await deleteMut.mutateAsync({ id: deleteId!, why }); setDeleteId(null); }}
         onCancel={() => setDeleteId(null)}
-        confirmLabel="Delete"
       />
     </Box>
   );

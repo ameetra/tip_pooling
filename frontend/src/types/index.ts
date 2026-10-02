@@ -168,6 +168,16 @@ export interface PayrollRow {
   totalTips: number;
 }
 
+export type DeleteReason = 'WRONG_HOURS' | 'WRONG_EMPLOYEES' | 'WRONG_TIPS' | 'WRONG_DATE' | 'OTHER';
+
+export interface DeletedEntriesReport {
+  entries: {
+    id: string; entryDate: string; publishedAt: string; deletedAt: string;
+    deletedByEmail: string | null; deleteReason: DeleteReason | null; deleteNote: string | null; totalTipPool: number;
+  }[];
+  byUser: { email: string; count: number; reasons: Partial<Record<DeleteReason, number>> }[];
+}
+
 export interface PayrollReport {
   startDate: string;
   endDate: string;
