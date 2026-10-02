@@ -998,7 +998,8 @@ GET    /api/v1/audit-logs/:entity-type/:entity-id
 **Request:**
 ```http
 POST /api/v1/tips/entries
-Authorization: Bearer <jwt_token>
+Cookie: gratify_<venue>=<jwt_token>
+X-Venue: <venue>
 Content-Type: application/json
 
 {
@@ -1309,6 +1310,16 @@ async function editTipEntry(
 ## 6. Security Design
 
 ### 6.1 Authentication Flow
+
+**As built (2026-10-02):** the API issues its own HS256 JWT (8h) rather than using Cognito. Login, magic-link verify and
+password change set it as a per-venue cookie `gratify_<venue>` (`HttpOnly; Secure; SameSite=Strict; Path=/api`); the
+response body carries only the token's non-secret claims, which the SPA keeps in localStorage for its route guards.
+Every API call sends `X-Venue` (the venue from the URL); the API reads that venue's cookie and rejects a token whose
+tenant differs (403). `POST /api/v1/auth/logout` clears the cookie. Bearer headers are not accepted. CSRF is covered by
+SameSite=Strict, same-origin `/api/*` through CloudFront, the CORS allow-list and the required custom `X-Venue` header.
+App secrets (`DATABASE_URL`, `JWT_SECRET`, `LAMBDA_ADMIN_SECRET`, `SUPPORT_PASSWORD`) live in Secrets Manager secret
+`tip-pooling-dev/app`, loaded at Lambda cold start; DB TLS verifies the RDS certificate against the bundled RDS global CA.
+The original Cognito design below is kept for reference.
 
 **Admin/Manager Login:**
 1. User enters email + password
