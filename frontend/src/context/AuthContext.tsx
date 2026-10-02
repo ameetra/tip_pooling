@@ -1,8 +1,8 @@
 import { createContext, useContext, useReducer, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { tokenKey, venueFromPath } from '../api/client';
+import { post, userKey, venueFromPath } from '../api/client';
 
-interface JwtPayload {
+export interface AuthUser {
   sub: string;
   tenantId: string;
   role: string;
@@ -12,44 +12,44 @@ interface JwtPayload {
 }
 
 interface AuthContextValue {
-  token: string | null;
-  user: JwtPayload | null;
-  login: (jwt: string) => void;
+  user: AuthUser | null;
+  login: (user: AuthUser) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function parseJwt(token: string): JwtPayload | null {
+// Tokens used to live in localStorage; they are httpOnly cookies now, so drop any left behind.
+Object.keys(localStorage).filter((k) => k.startsWith('jwt:')).forEach((k) => localStorage.removeItem(k));
+
+function readUser(key: string): AuthUser | null {
   try {
-    return JSON.parse(atob(token.split('.')[1]));
+    const user = JSON.parse(localStorage.getItem(key) ?? 'null') as AuthUser | null;
+    return user && user.exp * 1000 > Date.now() ? user : null;
   } catch {
     return null;
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const key = tokenKey(venueFromPath(useLocation().pathname));
-  // Storage is the source of truth (the API client reads it too); this just re-renders after login/logout.
+  const key = userKey(venueFromPath(useLocation().pathname));
+  // Only the token's non-secret claims are kept here, for the UI and route guards. The token itself is an
+  // httpOnly cookie that page scripts can't read, and the API enforces it.
   const [, rerender] = useReducer((n: number) => n + 1, 0);
+  const user = readUser(key);
 
-  const stored = localStorage.getItem(key);
-  const parsed = stored ? parseJwt(stored) : null;
-  const valid = parsed && parsed.exp * 1000 > Date.now();
-  const token = valid ? stored : null;
-  const user = valid ? parsed : null;
-
-  const login = (jwt: string) => {
-    localStorage.setItem(key, jwt);
+  const login = (u: AuthUser) => {
+    localStorage.setItem(key, JSON.stringify(u));
     rerender();
   };
 
   const logout = () => {
+    post('/auth/logout').catch(() => {});
     localStorage.removeItem(key);
     rerender();
   };
 
-  return <AuthContext.Provider value={{ token, user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

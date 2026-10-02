@@ -30,7 +30,7 @@ describe('resetAdminPassword (Lambda admin action)', () => {
     expect((await login('test', 'owner@test.com', 'old-password')).status).toBe(401);
     const res = await login('test', 'owner@test.com', 'Temp-pass-123');
     expect(res.status).toBe(200);
-    expect(res.body.data.mustChangePassword).toBe(true);
+    expect(res.body.data.user.mustChangePassword).toBe(true);
 
     const audit = await testPrisma.auditLog.findFirst({ where: { entityId: 'owner-test', action: 'PASSWORD_RESET' } });
     expect(audit).not.toBeNull();

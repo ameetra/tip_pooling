@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Link, Paper, TextField, Typography } from '@mui/material';
 import { post } from '../api/client';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import VenueBrand from '../components/VenueBrand';
 
@@ -21,9 +21,9 @@ export default function ManagerLoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { jwt, mustChangePassword } = await post<{ jwt: string; mustChangePassword: boolean }>('/auth/login', { email, password, slug });
-      login(jwt);
-      navigate(mustChangePassword ? `/${slug}/change-password` : `/${slug}`);
+      const { user } = await post<{ user: AuthUser }>('/auth/login', { email, password, slug });
+      login(user);
+      navigate(user.mustChangePassword ? `/${slug}/change-password` : `/${slug}`);
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.');
     } finally {

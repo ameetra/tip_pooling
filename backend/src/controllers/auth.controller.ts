@@ -1,8 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { loginUser, requestMagicLink, verifyMagicLink, changePassword } from '../services/auth.service';
+import { loginUser, requestMagicLink, verifyMagicLink, changePassword, verifyJwtToken } from '../services/auth.service';
 import { getTenantBySlug } from '../services/tenant.service';
 import { StrongPasswordSchema } from '../validation/user.schema';
+import { AUTH_COOKIE, authCookieName } from '../middleware/auth';
+
+// The JWT goes only into the httpOnly cookie; the body carries its non-secret claims for the UI.
+function signIn(req: Request, res: Response, jwt: string) {
+  res.cookie(authCookieName(req.headers['x-venue']), jwt, AUTH_COOKIE);
+  res.json({ success: true, data: { user: verifyJwtToken(jwt) } });
+}
+
+export function handleLogout(req: Request, res: Response) {
+  res.clearCookie(authCookieName(req.headers['x-venue']), AUTH_COOKIE);
+  res.json({ success: true, data: null });
+}
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1).max(128), slug: z.string().optional() });
 const magicLinkSchema = z.object({ email: z.string().email(), slug: z.string().optional() });
@@ -26,8 +38,8 @@ export async function handleLogin(req: Request, res: Response, next: NextFunctio
     const { email, password, slug } = loginSchema.parse(req.body);
     const tenant = await resolveTenant(slug);
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress;
-    const result = await loginUser(email, password, tenant.id, ip);
-    res.json({ success: true, data: result });
+    const { jwt } = await loginUser(email, password, tenant.id, ip);
+    signIn(req, res, jwt);
   } catch (err) {
     next(err);
   }
@@ -48,8 +60,8 @@ export async function handleRequestMagicLink(req: Request, res: Response, next: 
 export async function handleChangePassword(req: Request, res: Response, next: NextFunction) {
   try {
     const { newPassword } = changePasswordSchema.parse(req.body);
-    const result = await changePassword(req.user!.sub, req.tenantId!, newPassword);
-    res.json({ success: true, data: result });
+    const { jwt } = await changePassword(req.user!.sub, req.tenantId!, newPassword);
+    signIn(req, res, jwt);
   } catch (err) {
     next(err);
   }
@@ -62,8 +74,8 @@ export async function handleVerifyMagicLink(req: Request, res: Response, next: N
       res.status(400).json({ success: false, error: { code: 'MISSING_TOKEN', message: 'Token is required.' } });
       return;
     }
-    const result = await verifyMagicLink(token);
-    res.json({ success: true, data: result });
+    const { jwt } = await verifyMagicLink(token);
+    signIn(req, res, jwt);
   } catch (err) {
     next(err);
   }

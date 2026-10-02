@@ -18,9 +18,8 @@ export default function VerifyPage() {
 
     api.get(`/auth/verify?token=${token}`)
       .then((data: any) => {
-        login(data.jwt);
-        const payload = JSON.parse(atob(data.jwt.split('.')[1]));
-        const dest = ['ADMIN', 'MANAGER'].includes(payload?.role) ? `/${slug}/tips` : `/${slug}/my-tips`;
+        login(data.user);
+        const dest = ['ADMIN', 'MANAGER'].includes(data.user.role) ? `/${slug}/tips` : `/${slug}/my-tips`;
         navigate(dest, { replace: true });
       })
       .catch((err: any) => setError(err.message || 'Verification failed. The link may have expired.'));

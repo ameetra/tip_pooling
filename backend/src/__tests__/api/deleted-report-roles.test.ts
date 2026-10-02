@@ -12,7 +12,7 @@ const tokenAs = (role: string) =>
 
 const reportAs = (role: string) =>
   request(app).get('/api/v1/tips/deleted-report?start_date=2026-04-01&end_date=2026-04-30')
-    .set('Authorization', `Bearer ${tokenAs(role)}`).set('X-Venue', 'test');
+    .set('Cookie', `gratify_test=${tokenAs(role)}`).set('X-Venue', 'test');
 
 describe('deleted entries report is Admin only', () => {
   it('allows ADMIN', async () => {

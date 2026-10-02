@@ -22,18 +22,18 @@ import DeletedEntriesPage from './pages/DeletedEntriesPage';
 import { isManagement, isStaff } from './constants/roles';
 
 function RequireAuth({ children, kind }: { children: React.ReactNode; kind: 'employee' | 'manager' }) {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const { slug } = useTenant();
-  if (!token) return <Navigate to={`/${slug}/${kind === 'employee' ? 'login' : 'manager-login'}`} replace />;
+  if (!user) return <Navigate to={`/${slug}/${kind === 'employee' ? 'login' : 'manager-login'}`} replace />;
   if (user?.mustChangePassword) return <Navigate to={`/${slug}/change-password`} replace />;
   return <>{children}</>;
 }
 
 // Auth required, but allowed regardless of mustChangePassword (avoids redirect loop on the change-password page).
-function RequireToken({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+function RequireSignedIn({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const { slug } = useTenant();
-  return token ? <>{children}</> : <Navigate to={`/${slug}/manager-login`} replace />;
+  return user ? <>{children}</> : <Navigate to={`/${slug}/manager-login`} replace />;
 }
 
 // Each kind of login has one home page.
@@ -70,7 +70,7 @@ function VenueRoutes() {
     <Routes>
       <Route path="login" element={<EmployeeLoginPage />} />
       <Route path="manager-login" element={<ManagerLoginPage />} />
-      <Route path="change-password" element={<RequireToken><ChangePasswordPage /></RequireToken>} />
+      <Route path="change-password" element={<RequireSignedIn><ChangePasswordPage /></RequireSignedIn>} />
       <Route path="auth/verify" element={<VerifyPage />} />
 
       {/* Employee-only routes: anyone who isn't staff */}

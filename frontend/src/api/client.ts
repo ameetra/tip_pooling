@@ -2,16 +2,14 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api/v1' });
 
-// Each venue (first URL segment) keeps its own login, so a token from one venue is never used on another.
+// Each venue (first URL segment) keeps its own login, so a sign-in at one venue is never used on another.
 export const venueFromPath = (pathname: string) => pathname.split('/')[1] ?? '';
-export const tokenKey = (venue: string) => `jwt:${venue}`;
+export const userKey = (venue: string) => `user:${venue}`;
+const currentVenue = () => venueFromPath(window.location.pathname);
 
-// The API rejects a token whose venue differs from X-Venue.
+// The login token travels as an httpOnly cookie; X-Venue tells the API which venue's cookie to use.
 api.interceptors.request.use((config) => {
-  const venue = venueFromPath(window.location.pathname);
-  const token = localStorage.getItem(tokenKey(venue));
-  config.headers['X-Venue'] = venue;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.headers['X-Venue'] = currentVenue();
   return config;
 });
 
@@ -32,6 +30,12 @@ api.interceptors.response.use(
     return res.data.data;
   },
   (error) => {
+    // Signed in per the UI but the cookie is gone or expired: forget the user so the route guards send them to sign in.
+    const key = userKey(currentVenue());
+    if (error.response?.status === 401 && localStorage.getItem(key)) {
+      localStorage.removeItem(key);
+      window.location.reload();
+    }
     throw apiError(error.response?.data, error);
   },
 );

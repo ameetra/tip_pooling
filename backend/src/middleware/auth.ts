@@ -17,6 +17,12 @@ async function tenantIdForVenue(slug: string): Promise<string | undefined> {
   return venueIds.get(slug);
 }
 
+// The login JWT lives in an httpOnly cookie (page scripts can't read it), one per venue so each venue keeps its
+// own sign-in. SameSite=Strict plus the required X-Venue header block cross-site request forgery.
+export const authCookieName = (venue: unknown) =>
+  `gratify_${typeof venue === 'string' && /^[a-z0-9-]+$/i.test(venue) ? venue : ''}`;
+export const AUTH_COOKIE = { httpOnly: true, secure: true, sameSite: 'strict', path: '/api', maxAge: 8 * 60 * 60 * 1000 } as const;
+
 export async function verifyJWT(req: Request, res: Response, next: NextFunction) {
   // In test mode, populate a stand-in user so role-dependent logic is exercisable.
   // Defaults to ADMIN; tests can override with an x-test-role header.
@@ -26,22 +32,22 @@ export async function verifyJWT(req: Request, res: Response, next: NextFunction)
     return next();
   }
 
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const venue = req.headers['x-venue'];
+  const token = req.cookies?.[authCookieName(venue)];
+  if (!token) {
     res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } });
     return;
   }
 
   let payload;
   try {
-    payload = verifyJwtToken(header.slice(7));
+    payload = verifyJwtToken(token);
   } catch {
     res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token.' } });
     return;
   }
 
   // The SPA sends the venue from its URL; a token from another venue must not act under that venue's page.
-  const venue = req.headers['x-venue'];
   if (typeof venue !== 'string' || (await tenantIdForVenue(venue)) !== payload.tenantId) {
     res.status(403).json({ success: false, error: { code: 'VENUE_MISMATCH', message: 'Signed in to a different venue.' } });
     return;

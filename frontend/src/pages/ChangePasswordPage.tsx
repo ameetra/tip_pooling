@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Link, Paper, TextField, Typography } from '@mui/material';
 import { post } from '../api/client';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 
 export default function ChangePasswordPage() {
@@ -22,8 +22,8 @@ export default function ChangePasswordPage() {
     setLoading(true);
     setError('');
     try {
-      const { jwt } = await post<{ jwt: string }>('/auth/change-password', { newPassword: password });
-      login(jwt);
+      const { user } = await post<{ user: AuthUser }>('/auth/change-password', { newPassword: password });
+      login(user);
       navigate(`/${slug}`);
     } catch (err: any) {
       setError(err.message || 'Could not change password.');

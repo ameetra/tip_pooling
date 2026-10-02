@@ -11,7 +11,7 @@ const tokenAs = (role: string) =>
   jwt.sign({ sub: 'u1', tenantId: 'test-tenant', role, email: 'u@test.com' }, process.env.JWT_SECRET!, { algorithm: 'HS256' });
 
 const listAs = (role: string) =>
-  request(app).get('/api/v1/cash-counts').set('Authorization', `Bearer ${tokenAs(role)}`).set('X-Venue', 'test');
+  request(app).get('/api/v1/cash-counts').set('Cookie', `gratify_test=${tokenAs(role)}`).set('X-Venue', 'test');
 
 describe('cash counts are Admin/Manager only', () => {
   it.each(['ADMIN', 'MANAGER'])('allows %s', async (role) => {

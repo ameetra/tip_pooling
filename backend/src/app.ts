@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { tenantContext } from './middleware/tenant-context';
 import { verifyJWT, requireRole } from './middleware/auth';
@@ -43,6 +44,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
+  app.use(cookieParser());
   app.use(tenantContext);
 
   // Health check (public)
