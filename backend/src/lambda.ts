@@ -1,6 +1,6 @@
 import serverlessHttp from 'serverless-http';
 import { createApp } from './app';
-import prisma from './database/client';
+import prisma, { pgSsl } from './database/client';
 
 const app = createApp();
 const httpHandler = serverlessHttp(app);
@@ -43,7 +43,7 @@ async function runResetAdminPassword(tenantSlug: string, email: string, password
 
 async function runMigrations() {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: pgSsl() });
   try {
     await pool.query(`
       DO $$ BEGIN

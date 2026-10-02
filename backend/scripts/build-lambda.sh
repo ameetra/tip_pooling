@@ -23,6 +23,9 @@ mkdir -p lambda-package
 # Copy compiled code
 cp -r dist lambda-package/
 
+# RDS CA bundle for verified DB TLS (read from dist/database/client.js as ../../certs)
+cp -r certs lambda-package/
+
 # Copy Prisma PostgreSQL schema
 cp prisma/schema-postgres.prisma lambda-package/schema.prisma
 

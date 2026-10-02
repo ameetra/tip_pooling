@@ -3,13 +3,20 @@ import type { PrismaClient as SqlitePrismaClient } from '../generated/prisma/cli
 
 const isPostgres = (process.env.DATABASE_URL || '').startsWith('postgresql://');
 
+// Verify the RDS server certificate against Amazon's CA bundle (shipped in the Lambda package).
+// DATABASE_URL must not carry an sslmode param: pg lets it override this setting.
+export const pgSsl = () => ({
+  ca: require('fs').readFileSync(require('path').join(__dirname, '../../certs/rds-global-bundle.pem'), 'utf8'),
+  rejectUnauthorized: true,
+});
+
 function createClient(): SqlitePrismaClient {
   if (isPostgres) {
     const { PrismaPg } = require('@prisma/adapter-pg');
     const { Pool } = require('pg');
     const { PrismaClient } = require('../generated/prisma-pg/client');
 
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5, ssl: { rejectUnauthorized: false } });
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5, ssl: pgSsl() });
     const adapter = new PrismaPg(pool);
     return new PrismaClient({ adapter });
   }

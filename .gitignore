@@ -59,6 +59,7 @@ override.tf.json
 # AWS
 .aws/
 *.pem
+!backend/certs/rds-global-bundle.pem
 *.key
 *_accessKeys.csv
 *.csv
