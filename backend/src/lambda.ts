@@ -126,6 +126,33 @@ async function runMigrations() {
 
       -- Per-venue role display names (JSON, e.g. {"SERVER":"Barista"} for coffee shops); display only
       ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "roleLabels" TEXT;
+
+      -- Cash drop reconciliation (PRD 3.10): one active count per venue per date
+      CREATE TABLE IF NOT EXISTS "cash_counts" (
+        "id" TEXT PRIMARY KEY,
+        "tenantId" TEXT NOT NULL REFERENCES "tenants"("id"),
+        "entryDate" TEXT NOT NULL,
+        "expectedAmount" DOUBLE PRECISION NOT NULL,
+        "bills100" INTEGER NOT NULL DEFAULT 0,
+        "bills50" INTEGER NOT NULL DEFAULT 0,
+        "bills20" INTEGER NOT NULL DEFAULT 0,
+        "bills10" INTEGER NOT NULL DEFAULT 0,
+        "bills5" INTEGER NOT NULL DEFAULT 0,
+        "bills2" INTEGER NOT NULL DEFAULT 0,
+        "bills1" INTEGER NOT NULL DEFAULT 0,
+        "coins" DOUBLE PRECISION NOT NULL DEFAULT 0,
+        "countedTotal" DOUBLE PRECISION NOT NULL,
+        "deposit" TEXT,
+        "comments" TEXT,
+        "countedByEmail" TEXT,
+        "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+        "deletedAt" TIMESTAMP(3),
+        "replacedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS "cash_counts_tenantId_entryDate_isDeleted_idx" ON "cash_counts"("tenantId", "entryDate", "isDeleted");
+      CREATE UNIQUE INDEX IF NOT EXISTS "cash_counts_unique_active" ON "cash_counts"("tenantId", "entryDate") WHERE "isDeleted" = false;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {

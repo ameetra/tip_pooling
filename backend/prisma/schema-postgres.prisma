@@ -188,6 +188,34 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model CashCount {
+  id             String    @id @default(cuid())
+  tenantId       String
+  entryDate      String    // YYYY-MM-DD of the tip entry whose drop was counted
+  expectedAmount Float     // the entry's cashInRegister when counted (re-snapshotted on edit)
+  bills100       Int       @default(0)
+  bills50        Int       @default(0)
+  bills20        Int       @default(0)
+  bills10        Int       @default(0)
+  bills5         Int       @default(0)
+  bills2         Int       @default(0)
+  bills1         Int       @default(0)
+  coins          Float     @default(0)
+  countedTotal   Float
+  deposit        String?
+  comments       String?
+  countedByEmail String?
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  replacedById   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // One active count per date: partial unique index created in raw SQL (Prisma can't express WHERE)
+  @@index([tenantId, entryDate, isDeleted])
+  @@map("cash_counts")
+}
+
 model MagicLinkToken {
   id        String    @id @default(cuid())
   email     String

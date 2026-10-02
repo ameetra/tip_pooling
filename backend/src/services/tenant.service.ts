@@ -3,6 +3,7 @@ import prisma from '../database/client';
 import { auditService } from './audit.service';
 import { ShiftHoursDefaultsInput } from '../validation/tip.schema';
 import { ROLE_VALUES, RoleLabels, parseRoleLabels } from '../types/tip-calculation.types';
+import { todayIn } from './effective-date';
 
 export interface Branding {
   slug: string;
@@ -18,6 +19,12 @@ export async function getTenantBySlug(slug: string) {
 export async function getBranding(slug: string): Promise<Branding | null> {
   const t = await getTenantBySlug(slug);
   return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels) } : null;
+}
+
+// Today's calendar date (YYYY-MM-DD) in the venue's timezone.
+export async function tenantToday(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  return todayIn(tenant?.timezone ?? 'America/Los_Angeles');
 }
 
 export async function getRoleLabels(tenantId: string): Promise<RoleLabels> {

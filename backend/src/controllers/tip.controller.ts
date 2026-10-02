@@ -6,11 +6,7 @@ import { roleBreakdown } from '../services/role-breakdown';
 import { getRoleLabels } from '../services/tenant.service';
 import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
-
-function performer(req: Request) {
-  const u = (req as any).user;
-  return u ? { userId: u.sub, email: u.email } : undefined;
-}
+import { performer } from '../middleware/auth';
 
 export const tipController = {
   async preview(req: Request, res: Response, next: NextFunction) {

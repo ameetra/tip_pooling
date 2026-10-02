@@ -13,6 +13,7 @@ import tipRoutes from './routes/tip.routes';
 import auditRoutes from './routes/audit.routes';
 import userRoutes from './routes/user.routes';
 import shiftHoursRoutes from './routes/shift-hours.routes';
+import cashCountRoutes from './routes/cash-count.routes';
 import { tipController } from './controllers/tip.controller';
 import { employeeController } from './controllers/employee.controller';
 import { shiftHoursController } from './controllers/shift-hours.controller';
@@ -77,6 +78,7 @@ export function createApp() {
   app.use('/api/v1/config/shift-hours', ...adminOrManager, shiftHoursRoutes);
   app.use('/api/v1/tips', ...adminOrManager, tipRoutes);
   app.use('/api/v1/audit', ...adminOrManager, auditRoutes);
+  app.use('/api/v1/cash-counts', ...adminOrManager, cashCountRoutes);
 
   // Staff management — ADMIN + MANAGER (controller enforces target-role rules)
   app.use('/api/v1/users', verifyJWT, requireRole('ADMIN', 'MANAGER'), userRoutes);

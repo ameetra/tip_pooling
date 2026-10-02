@@ -1,12 +1,8 @@
 import prisma from '../database/client';
 import { PaginationQuery, SupportStaffConfigInput } from '../validation/tip.schema';
 import { auditService } from './audit.service';
-import { pickAsOf, toDateString, todayIn } from './effective-date';
-
-const tenantToday = async (tenantId: string) => {
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  return todayIn(tenant?.timezone ?? 'America/Los_Angeles');
-};
+import { pickAsOf, toDateString } from './effective-date';
+import { tenantToday } from './tenant.service';
 
 export const supportConfigService = {
   // Each role's configuration in force on `date` (used by the tip calculation with the entry's date).

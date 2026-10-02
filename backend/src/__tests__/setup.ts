@@ -188,6 +188,34 @@ beforeAll(async () => {
     )
   `);
 
+  await testPrisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS cash_counts (
+      id TEXT PRIMARY KEY,
+      tenantId TEXT NOT NULL,
+      entryDate TEXT NOT NULL,
+      expectedAmount REAL NOT NULL,
+      bills100 INTEGER NOT NULL DEFAULT 0,
+      bills50 INTEGER NOT NULL DEFAULT 0,
+      bills20 INTEGER NOT NULL DEFAULT 0,
+      bills10 INTEGER NOT NULL DEFAULT 0,
+      bills5 INTEGER NOT NULL DEFAULT 0,
+      bills2 INTEGER NOT NULL DEFAULT 0,
+      bills1 INTEGER NOT NULL DEFAULT 0,
+      coins REAL NOT NULL DEFAULT 0,
+      countedTotal REAL NOT NULL,
+      deposit TEXT,
+      comments TEXT,
+      countedByEmail TEXT,
+      isDeleted INTEGER NOT NULL DEFAULT 0,
+      deletedAt DATETIME,
+      replacedById TEXT,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenantId) REFERENCES tenants(id)
+    )
+  `);
+  await testPrisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_counts_unique_active ON cash_counts(tenantId, entryDate) WHERE isDeleted = 0`);
+
   // Create indexes
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_employees_tenant_active ON employees(tenantId, isActive)`);
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_support_config_tenant_role ON support_staff_config(tenantId, role)`);
@@ -199,6 +227,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   // Clean all tables in reverse dependency order
   await testPrisma.$executeRawUnsafe('DELETE FROM audit_logs');
+  await testPrisma.$executeRawUnsafe('DELETE FROM cash_counts');
   await testPrisma.$executeRawUnsafe('DELETE FROM magic_link_tokens');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_calculations');
   await testPrisma.$executeRawUnsafe('DELETE FROM tip_entries');

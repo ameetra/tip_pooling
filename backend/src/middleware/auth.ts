@@ -67,3 +67,8 @@ export function requireRole(...roles: string[]) {
     next();
   };
 }
+
+// The signed-in user, as recorded in the audit trail.
+export function performer(req: Request) {
+  return req.user ? { userId: req.user.sub, email: req.user.email } : undefined;
+}
