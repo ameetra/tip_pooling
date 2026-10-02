@@ -8,6 +8,11 @@ echo "=== Building Lambda deployment package ==="
 # Clean
 rm -rf dist lambda-package lambda-package.zip
 
+# tsc compiles src/generated/prisma-pg, so the PG client must be generated first. Otherwise the package
+# ships the previous schema's client and new columns fail at runtime with "Unknown argument".
+echo "Generating Prisma PostgreSQL client..."
+PRISMA_SCHEMA=prisma/schema-postgres.prisma npx prisma generate 2>&1 | tail -1
+
 # Compile TypeScript
 echo "Compiling TypeScript..."
 npm run build

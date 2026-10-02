@@ -236,3 +236,31 @@
 
 **Prevention:**
 - Anything that identifies the venue (URL, token, branding) must come from one source or be checked against the others.
+
+### 🟡 Bug #9: The Lambda build shipped the previous schema's Prisma client
+**Date Found:** 2026-10-02
+**Severity:** High (deleting a published tip entry with a reason returned 500 in production)
+**Status:** ✅ RESOLVED
+**Found By:** Live verification on the demo venue after deploying deleted-entry reasons (PRD 3.11)
+
+**Symptoms:**
+- The delete dialog showed "An unexpected error occurred". The Lambda log had `Unknown argument deletedByUserId`
+  from `prisma.tipEntry.updateMany()`, even though the migration had added the column.
+
+**Root Cause:**
+- `build-lambda.sh` ran `tsc` (which compiles `src/generated/prisma-pg`) before `prisma generate` for the Postgres
+  schema. The package got the client compiled from the last build, so a schema change only took effect on the
+  second deploy. Unit tests use the SQLite client, so they couldn't catch it.
+
+**Fix:**
+- Generate the Postgres client before compiling.
+
+**Files Modified:**
+- `backend/scripts/build-lambda.sh`
+
+**Test Added:**
+- None automated (build script). Verified live 2026-10-02: a manager deleted the 2026-04-27 demo entry with a reason;
+  it appears on the admin Deleted Entries page.
+
+**Prevention:**
+- After any schema change, test a write that uses the new columns on the deployed demo venue, not only reads.
