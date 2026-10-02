@@ -23,7 +23,7 @@ DB_USERNAME=$(echo "$SECRET_JSON" | node -e "let d='';process.stdin.on('data',c=
 DB_PASSWORD=$(echo "$SECRET_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).password))")
 DB_NAME=$(echo "$SECRET_JSON" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).dbname))")
 
-DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}?schema=public&sslmode=no-verify"
+DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}?schema=public"
 
 # Create .env.production
 echo "Creating .env.production..."
