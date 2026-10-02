@@ -1,13 +1,23 @@
 import serverlessHttp from 'serverless-http';
-import { createApp } from './app';
-import prisma, { pgSsl } from './database/client';
+import type PrismaClient from './database/client';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
-const app = createApp();
-const httpHandler = serverlessHttp(app);
-
-const ADMIN_SECRET = process.env.LAMBDA_ADMIN_SECRET;
+// Secrets (DATABASE_URL, JWT_SECRET, LAMBDA_ADMIN_SECRET, SUPPORT_PASSWORD) live in Secrets Manager, not the
+// Lambda env. They must be in process.env before the app modules load, since those read them at import time.
+let prisma: typeof PrismaClient;
+const init = (async () => {
+  const SecretId = process.env.APP_SECRET_ID;
+  if (SecretId) {
+    const { SecretString } = await new SecretsManagerClient({}).send(new GetSecretValueCommand({ SecretId }));
+    Object.assign(process.env, JSON.parse(SecretString!));
+  }
+  prisma = require('./database/client').default;
+  return serverlessHttp(require('./app').createApp());
+})();
 
 export const handler = async (event: any, context: any) => {
+  const httpHandler = await init;
+  const ADMIN_SECRET = process.env.LAMBDA_ADMIN_SECRET;
   // Handle admin actions invoked directly (not via API Gateway)
   // Require a secret to prevent unauthorized invocations
   if (event.action) {
@@ -43,7 +53,7 @@ async function runResetAdminPassword(tenantSlug: string, email: string, password
 
 async function runMigrations() {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: pgSsl() });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: require('./database/client').pgSsl() });
   try {
     await pool.query(`
       DO $$ BEGIN
