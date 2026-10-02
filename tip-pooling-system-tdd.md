@@ -1296,6 +1296,14 @@ async function editTipEntry(
 - `expectedAmount` is copied from the day's Cash in Register when the drop is counted (summed if the date has more than one active entry) and copied again on edit. If the entry later changes, the row is flagged `entryChanged`; recounting clears the flag. If the entry is deleted, the row is flagged `noEntry` and keeps the copied amount.
 - Every create, update and delete writes a `CASH_COUNT` audit record. Counts never affect tip calculations.
 
+### 5.4 Deleted Entry Reasons (PRD 3.11)
+
+**Columns on `tip_entries`** (all nullable): `deletedByUserId`, `deletedByEmail`, `deleteReason` (`WRONG_HOURS | WRONG_EMPLOYEES | WRONG_TIPS | WRONG_DATE | OTHER`), `deleteNote`. They're stored on the entry rather than read back from `audit_logs` JSON so the report is one indexed query. The DELETE audit record also gets `{ reason, note }`.
+
+**Endpoints:**
+- `DELETE /api/v1/tips/entries/:id` with optional body `{ reason, note }`. If the entry is published and either is missing, the response is 400 `REASON_REQUIRED` and nothing is deleted.
+- `GET /api/v1/tips/deleted-report?start_date&end_date` (**ADMIN only**, max 1 year). Returns `{ entries, byUser }` for deleted entries with `publishedAt` set, whose `deletedAt` falls in the range on the venue's timezone, newest first. `byUser` is `{ email, count, reasons: { [reason]: n } }`, sorted by count.
+
 ---
 
 ## 6. Security Design

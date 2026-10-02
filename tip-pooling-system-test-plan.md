@@ -355,6 +355,20 @@ describe('TipCalculationService', () => {
 | TC-CASH-013 | Another venue's counts | Not listed; PUT/DELETE return 404 | P0 |
 | TC-CASH-014 | Shift Lead / Employee token | 403 (Admin/Manager 200) | P0 |
 
+**Test Suite: deleted entry reasons** (`backend/src/__tests__/api/deleted-entries.test.ts`, `deleted-report-roles.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-DEL-001 | Delete a published entry with no reason, reason only, or blank note | 400; entry not deleted | P0 |
+| TC-DEL-002 | Unknown reason | 400 `VALIDATION_ERROR` | P1 |
+| TC-DEL-003 | Delete a published entry with reason + note | 204; who, reason and trimmed note stored; audit has the reason | P0 |
+| TC-DEL-004 | Delete a draft with no reason | 204 | P0 |
+| TC-DEL-005 | Report lists deletions in range | Newest first, total tips, per-user counts by reason | P0 |
+| TC-DEL-006 | Range is by deletion date on the venue's calendar | 8pm LA on the last day included; 8pm LA the day before the start excluded | P1 |
+| TC-DEL-007 | Deleted drafts and edit-replaced drafts | Not in the report | P0 |
+| TC-DEL-008 | Another venue's deletions | Not listed | P0 |
+| TC-DEL-009 | Manager / Shift Lead / Employee token | 403 (Admin 200) | P0 |
+
 ### 4.2 Database Integration Tests
 
 #### 4.2.1 CRUD Operations

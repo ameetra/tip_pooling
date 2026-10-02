@@ -389,6 +389,24 @@ Each night's cash goes into an envelope in the drop box. About once a week an Ad
 - [x] One envelope per date: if a day had two envelopes, add them together when counting
 - [x] A count of $0 is allowed (missing envelope), and shows as Short by the full amount
 
+### 3.11 Deleted Entry Reasons *(built 2026-10-02)*
+
+A published entry has been emailed to staff and counted in payroll, and deleting and re-entering it is how mistakes get corrected (3.5). Admins want to see who is making those corrections and why, so they can train anyone who keeps making the same mistake.
+
+#### 3.11.1 Deleting a Published Entry
+- [x] Deleting a **published** entry needs a **reason** and a **note** (required, up to 500 characters). Delete stays disabled until both are filled in
+- [x] Reasons: Wrong hours, Missing or extra employee, Wrong tip amounts, Wrong date, Other
+- [x] The server enforces this too: deleting a published entry without a reason fails with `REASON_REQUIRED`
+- [x] Saved on the entry with who deleted it (their sign-in email) and when, and written to the audit trail
+- [x] Drafts are deleted without a reason, as before. Edits to a draft (which replace it) are not deletions
+
+#### 3.11.2 Deleted Entries Report
+- [x] **Admins only** (Managers, Shift Leads and employees can't see it, in the app or the API)
+- [x] Filtered by the date the entry was **deleted**, on the venue's calendar. Defaults to the last 30 days
+- [x] One row per deleted published entry: entry date, when deleted, deleted by, reason, note, total tips
+- [x] A summary per person at the top: how many entries they deleted, broken down by reason
+- [x] Only covers deletions made after this shipped (no published entries had been deleted before)
+
 ---
 
 ## 4. Non-Functional Requirements
