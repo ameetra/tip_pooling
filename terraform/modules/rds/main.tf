@@ -50,13 +50,15 @@ resource "aws_db_instance" "main" {
   publicly_accessible    = false
   multi_az               = var.multi_az
 
-  backup_retention_period = 7
+  backup_retention_period = 14
   backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
 
-  skip_final_snapshot       = var.environment == "dev"
-  final_snapshot_identifier = var.environment != "dev" ? "${var.name_prefix}-final-snapshot" : null
-  deletion_protection       = var.environment != "dev"
+  # "dev" is the live production database (usegratify.com), so it is always protected.
+  copy_tags_to_snapshot     = true
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.name_prefix}-final-snapshot"
+  deletion_protection       = true
 
   tags = merge(var.tags, { Name = "${var.name_prefix}-postgres" })
 }

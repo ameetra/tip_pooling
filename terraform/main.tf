@@ -7,6 +7,9 @@ locals {
     Project     = var.project_name
     Environment = var.environment
     ManagedBy   = "terraform"
+    # Lowercase keys are the cost-allocation tags shared with other projects in this account.
+    project = "tip-pooling"
+    env     = "prod"
   }
 }
 
