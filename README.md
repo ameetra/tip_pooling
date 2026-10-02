@@ -117,7 +117,7 @@ bash scripts/deploy.sh           # Build, sync to S3, invalidate CloudFront
 ### Database migration & tenant provisioning (admin Lambda actions)
 
 Admin actions run inside the Lambda/VPC to reach the private RDS and are gated by a secret
-(`LAMBDA_ADMIN_SECRET` in the Lambda env). Pass `{"action":"...","secret":"<secret>"}`:
+(`LAMBDA_ADMIN_SECRET`, stored in Secrets Manager with the other app secrets). Pass `{"action":"...","secret":"<secret>"}`:
 
 - `migrate` — apply additive schema migrations
 - `seed` — seed the demo tenant (needs `SUPPORT_PASSWORD`, `DEMO_ADMIN_PASSWORD`, `DEMO_MANAGER_PASSWORD` in the Lambda env)
