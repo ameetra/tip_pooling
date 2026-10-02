@@ -15,9 +15,11 @@ Filling in a tip entry and previewing the pooled, prorated distribution live, be
 
 ![Live tip calculation preview](frontend/public/landing/tip-preview.gif)
 
-| Tip Entries | Payroll Report | Employees |
-|---|---|---|
-| ![Tip entries list](frontend/public/landing/tip-entries.png) | ![Payroll report](frontend/public/landing/payroll-report.png) | ![Employees with per-role rates](frontend/public/landing/employees.png) |
+| Tip Entries | Payroll Report |
+|---|---|
+| ![Tip entries list with a draft](frontend/public/landing/tip-entries.png) | ![Payroll report](frontend/public/landing/payroll-report.png) |
+| **Cash Reconciliation** | **Employees** |
+| ![Cash reconciliation](frontend/public/landing/cash-reconciliation.png) | ![Employees with per-role rates](frontend/public/landing/employees.png) |
 
 ## Features
 

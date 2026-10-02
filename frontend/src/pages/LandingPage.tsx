@@ -7,6 +7,7 @@ const screenshots = [
   { src: '/landing/tip-entries.png', alt: 'Tip entries list showing published daily entries', caption: 'Track every day’s entries, published or draft' },
   { src: '/landing/payroll-report.png', alt: 'Payroll report totaling tips per employee', caption: 'Payroll-ready totals for any date range' },
   { src: '/landing/employees.png', alt: 'Employee list with per-role hourly rates', caption: 'Per-role rates for staff who wear more than one hat' },
+  { src: '/landing/cash-reconciliation.png', alt: 'Cash reconciliation comparing counted drops with expected cash', caption: 'Count every cash drop and catch shortages fast' },
 ];
 
 const features = [
@@ -36,7 +37,7 @@ export default function LandingPage() {
       <Box sx={{ maxWidth: 1100, mx: 'auto', p: 2, pt: 6 }}>
         <Stack direction="row" spacing={3} useFlexGap sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
           {screenshots.map((s) => (
-            <Card key={s.src} elevation={2} sx={{ width: 320, overflow: 'hidden' }}>
+            <Card key={s.src} elevation={2} sx={{ width: 480, overflow: 'hidden' }}>
               <CardMedia component="img" image={s.src} alt={s.alt} />
               <Typography variant="body2" color="text.secondary" sx={{ p: 1.5 }}>{s.caption}</Typography>
             </Card>
