@@ -206,8 +206,8 @@ describe('TipCalculationService', () => {
 | TC-AUTH-002 | Login with invalid credentials | Wrong password | 401 Unauthorized | P0 |
 | TC-AUTH-003 | Manager cannot access admin endpoints | Manager JWT token | 403 Forbidden | P0 |
 | TC-AUTH-004 | Employee cannot access manager endpoints | Employee JWT token | 403 Forbidden | P0 |
-| TC-AUTH-005 | JWT token expires after timeout | Token older than 30 min | 401 Unauthorized | P1 |
-| TC-AUTH-006 | Refresh token successfully | Valid refresh token | New JWT token | P1 |
+| TC-AUTH-005 | JWT token expires after timeout | Token older than 8h | 401 Unauthorized | P1 |
+| TC-AUTH-006 | Refresh token successfully | — | Not implemented: tokens last 8h, then the user signs in again | — |
 
 #### 3.1.6 Magic Link Tests
 
@@ -368,6 +368,72 @@ describe('TipCalculationService', () => {
 | TC-DEL-007 | Deleted drafts and edit-replaced drafts | Not in the report | P0 |
 | TC-DEL-008 | Another venue's deletions | Not listed | P0 |
 | TC-DEL-009 | Manager / Shift Lead / Employee token | 403 (Admin 200) | P0 |
+
+**Test Suite: cookie sign-in** (`backend/src/__tests__/api/auth-cookie.test.ts`, `venue-check.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-COOKIE-001 | Login | 200; `gratify_<venue>` cookie is HttpOnly, Secure, SameSite=Strict, Path=/api; body has `user` claims and no `jwt` | P0 |
+| TC-COOKIE-002 | Request with the login cookie / with no cookie | 200 / 401 | P0 |
+| TC-COOKIE-003 | `POST /auth/logout` | Cookie expired; later API calls 401 | P0 |
+| TC-COOKIE-004 | `Authorization: Bearer` header instead of the cookie | 401 (no longer accepted) | P0 |
+| TC-COOKIE-005 | Signed in at one venue, calling as another (`X-Venue` differs) | 401 (each venue reads only its own cookie) | P0 |
+| TC-COOKIE-006 | UI shows signed in but the cookie is expired (frontend, manual) | Stored claims cleared, redirected to sign-in | P1 |
+
+**Test Suite: venue check** (`backend/src/__tests__/api/venue-check.test.ts`, Bug #8 regression)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-VENUE-001 | Token's venue matches `X-Venue` | 200 | P0 |
+| TC-VENUE-002 | Another venue's token placed in this venue's cookie | 403 `VENUE_MISMATCH` | P0 |
+| TC-VENUE-003 | Unknown venue / no `X-Venue` header | 403 | P0 |
+| TC-VENUE-004 | Employee magic link for any job role (incl. SHIFT_LEAD) (`employee-login-role.test.ts`) | Token role is EMPLOYEE, never the job role | P0 |
+
+**Test Suite: `resetAdminPassword` admin action** (`backend/src/__tests__/api/admin-password-reset.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-RESET-001 | Reset a locked-out admin | Signs in with the temp password; forced to change it | P0 |
+| TC-RESET-002 | Side effects | Venue name/logo, other admins and the same email at other venues unchanged | P0 |
+| TC-RESET-003 | Unknown venue, non-admin, removed admin, short password | Refused; nothing created | P0 |
+| TC-RESET-004 | Invoked without the admin secret / over HTTP | Unauthorized | P0 |
+
+**Test Suite: employee reactivation** (`backend/src/__tests__/api/employee-reactivate.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-REACT-001 | Deactivated employees | Listed only under `status=inactive` | P0 |
+| TC-REACT-002 | Reactivate with new role and rates | Active again; old rates dropped, rate history kept | P0 |
+| TC-REACT-003 | Reactivate an active employee / another venue's employee | Refused / 404 | P0 |
+| TC-REACT-004 | Plain edit of a deactivated employee | Cannot reactivate (must enter role and rates) | P1 |
+| TC-REACT-005 | Add an employee whose email is deactivated / still active | Error points to the Inactive list / says email taken | P1 |
+
+**Test Suite: payroll report** (`backend/src/__tests__/api/payroll-report.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-PAY-001 | Range with published entries | Per-employee totals from published, non-deleted, in-range entries; drafts listed as excluded | P0 |
+| TC-PAY-002 | Nothing published in range | Empty report | P1 |
+| TC-PAY-003 | Missing date, start after end, range over a year | 400 | P1 |
+| TC-PAY-004 | Another venue's entries | Never included | P0 |
+
+**Test Suite: draft edits** (`backend/src/__tests__/api/tip-entry.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-EDIT-001 | Edit a draft | New record; old soft-deleted with `replacedById` | P0 |
+| TC-EDIT-002 | Fix one wrong role on a draft | Only that row changes; day not re-entered | P1 |
+| TC-EDIT-003 | Edit a published entry | Rejected; entry unchanged (use delete + re-enter) | P0 |
+
+**Test Suite: per-venue settings** (`backend/src/__tests__/api/role-labels.test.ts`, `services/__tests__/tip-calculation.test.ts`)
+
+| Test ID | Test Case | Expected Response | Priority |
+|---------|-----------|-------------------|----------|
+| TC-LABEL-001 | Venue with `{"SERVER":"Barista"}` | Barista shown wherever Server would be | P1 |
+| TC-LABEL-002 | Venue with no labels / empty set | Default role names | P1 |
+| TC-LABEL-003 | Unknown role or blank name | Rejected / blank dropped | P2 |
+| TC-SPLIT-001 | `PER_PERSON` support split | Each busser/expo takes their own %, not a shared one | P0 |
+| TC-SPLIT-002 | `PER_PERSON` payouts meet or exceed the pool | Error | P0 |
 
 ### 4.2 Database Integration Tests
 
@@ -628,9 +694,9 @@ describe('TipCalculationService', () => {
 | TC-SEC-001 | SQL Injection in login | Email: `admin'--` | Login fails, no SQL error exposed | P0 |
 | TC-SEC-002 | XSS in employee name | Name: `<script>alert('xss')</script>` | Stored safely, displayed escaped | P0 |
 | TC-SEC-003 | JWT token tampering | Modify role in JWT | 401 Unauthorized, token rejected | P0 |
-| TC-SEC-004 | Brute force login attempts | 10 failed login attempts | Account locked after 5 attempts | P0 |
+| TC-SEC-004 | Brute force login attempts | 11 login attempts from one IP within 15 min | 429 `RATE_LIMIT` (10 per IP per 15 min; no per-account lock yet) | P0 |
 | TC-SEC-005 | Magic link token guessing | Random tokens | All rejected (cryptographically secure) | P0 |
-| TC-SEC-006 | CSRF attack | Cross-site form submission | CSRF token validation fails | P1 |
+| TC-SEC-006 | CSRF attack | Cross-site form submission | SameSite=Strict auth cookie is not sent cross-site, and the request lacks the required `X-Venue` header → 401 | P1 |
 | TC-SEC-007 | Session fixation | Reuse old session ID | Session ID regenerated on login | P1 |
 | TC-SEC-008 | Password requirements | Weak password: "123456" | Rejected, min requirements enforced | P0 |
 
@@ -653,6 +719,10 @@ describe('TipCalculationService', () => {
 | TC-SEC-016 | API keys in environment variables | Check deployment | All secrets in AWS Secrets Manager | P0 |
 | TC-SEC-017 | Password hashing | Check database | Passwords hashed with bcrypt/Argon2 | P0 |
 | TC-SEC-018 | Sensitive data in logs | Review CloudWatch logs | No PII, passwords, tokens in logs | P1 |
+| TC-SEC-029 | Login token unreadable by page scripts | After login on the live site, run `document.cookie` and list localStorage | `document.cookie` empty; localStorage holds only `user:<venue>` claims, no JWT | P0 |
+| TC-SEC-030 | DB TLS verifies the RDS certificate | Lambda `DATABASE_URL` has no `sslmode`; run `migrate` admin action | "Migrations applied" over `rejectUnauthorized: true` with the bundled RDS CA | P0 |
+| TC-SEC-031 | No secrets in Lambda config | `aws lambda get-function-configuration` | Env holds only `APP_SECRET_ID` + non-secret settings; app still signs in (secrets from `tip-pooling-dev/app`) | P0 |
+| TC-SEC-032 | Database recoverable | Check RDS settings; restore drill to a temp instance | Deletion protection on, ≥14-day point-in-time backups, recent manual snapshot; restored copy has matching row counts | P0 |
 
 ### 6.4 OWASP Top 10 Tests
 
