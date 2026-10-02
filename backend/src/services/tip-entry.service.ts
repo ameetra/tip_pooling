@@ -266,17 +266,21 @@ export const tipEntryService = {
     return result.count > 0;
   },
 
-  // Deleted published entries whose deletion falls in [start, end] (UTC dates), plus per-user counts so an
-  // admin can spot who keeps needing corrections. Drafts and edit-replaced drafts are never published, so excluded.
+  // Deleted published entries whose deletion falls in [start, end] on the venue's calendar, plus per-user counts
+  // so an admin can spot who keeps needing corrections. Drafts and edit-replaced drafts are never published, so excluded.
   async deletedReport(tenantId: string, start: string, end: string) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } });
+    const venueDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: tenant?.timezone ?? 'America/Los_Angeles' });
+    const DAY = 86_400_000;
+    // A day of slack on each side covers any UTC offset; the exact venue-day cut is made below.
     const rows = await prisma.tipEntry.findMany({
       where: {
         tenantId, isDeleted: true, publishedAt: { not: null },
-        deletedAt: { gte: new Date(`${start}T00:00:00Z`), lt: new Date(Date.parse(`${end}T00:00:00Z`) + 86_400_000) },
+        deletedAt: { gte: new Date(Date.parse(start) - DAY), lt: new Date(Date.parse(end) + 2 * DAY) },
       },
       orderBy: { deletedAt: 'desc' },
     });
-    const entries = rows.map((r) => ({
+    const entries = rows.filter((r) => { const d = venueDay(r.deletedAt!); return d >= start && d <= end; }).map((r) => ({
       id: r.id, entryDate: r.entryDate, publishedAt: r.publishedAt, deletedAt: r.deletedAt,
       deletedByEmail: r.deletedByEmail, deleteReason: r.deleteReason, deleteNote: r.deleteNote,
       totalTipPool: Number((computeCashTips(r.cashInRegister, r.cashSales, r.cashTips) + r.posTips).toFixed(2)),

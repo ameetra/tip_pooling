@@ -101,6 +101,13 @@ describe('Deleting published entries requires a reason; admins see a report', ()
       expect(res.body.data.entries.map((e: any) => e.entryDate)).toEqual(['2026-03-30']);
     });
 
+    it('uses the venue\'s calendar day of deletion (test venue is Los Angeles)', async () => {
+      await deletedBy(await createEntry('2026-03-30'), 'sam@test.com', 'OTHER', '2026-04-01T03:00:00Z'); // Mar 31, 8pm LA
+      await deletedBy(await createEntry('2026-04-29'), 'sam@test.com', 'OTHER', '2026-05-01T03:00:00Z'); // Apr 30, 8pm LA
+      const res = await request(app).get(`${REPORT}?start_date=2026-04-01&end_date=2026-04-30`);
+      expect(res.body.data.entries.map((e: any) => e.entryDate)).toEqual(['2026-04-29']);
+    });
+
     it('excludes deleted drafts and drafts replaced by an edit', async () => {
       const today = new Date().toISOString().slice(0, 10);
       await remove(await createEntry('2026-04-10'));
