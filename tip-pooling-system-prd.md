@@ -372,7 +372,7 @@ Each night's cash goes into an envelope in the drop box. About once a week an Ad
 - [ ] Optional comments (e.g. "-80 Electrician" for cash paid out of the register)
 - [ ] The total and over/under are calculated by the server from the bill counts, not taken from the browser
 - [ ] Records who counted and when (replaces the spreadsheet's Validator Initials)
-- [ ] A count can be corrected or deleted. The old version is kept (soft delete) and every create, change and delete goes to the audit trail
+- [ ] A count can be corrected or deleted at any time, even after its deposit went to the bank (owner decision 2026-10-02: no lock). The old version is kept (soft delete) and every create, change and delete goes to the audit trail
 - [ ] A short or over count does **not** change tip calculations or payouts; it is a record only
 
 #### 3.10.2 Reconciliation Screen
