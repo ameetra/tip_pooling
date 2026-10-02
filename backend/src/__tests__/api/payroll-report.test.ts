@@ -48,7 +48,7 @@ describe('Payroll report API', () => {
       const deleted = await createEntry('2026-04-13', [{ employeeId: bobId, role: 'SERVER', hoursWorked: 8 }]);
       const outOfRange = await createEntry('2026-05-01', [{ employeeId: bobId, role: 'SERVER', hoursWorked: 8 }]);
       await Promise.all([a, b, deleted, outOfRange].map(publish));
-      await request(app).delete(`/api/v1/tips/entries/${deleted}`);
+      await request(app).delete(`/api/v1/tips/entries/${deleted}`).send({ reason: 'OTHER', note: 'test' });
 
       const res = await request(app).get(`${REPORT}?start_date=2026-04-10&end_date=2026-04-30`);
 

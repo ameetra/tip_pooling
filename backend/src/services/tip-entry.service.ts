@@ -1,6 +1,6 @@
 import prisma from '../database/client';
 import { calculateTips, computeCashTips, TipCalculationError } from './tip-calculation.service';
-import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery } from '../validation/tip.schema';
+import { TipPreviewInput, CreateTipEntryInput, EditTipEntryInput, TipEntryQuery, DeleteTipEntryInput } from '../validation/tip.schema';
 import { StintInput, StintResult, SupportStaffConfig, parseRoleLabels } from '../types/tip-calculation.types';
 import { auditService } from './audit.service';
 import { sendTipEmail } from './email.service';
@@ -245,14 +245,51 @@ export const tipEntryService = {
     });
   },
 
-  async softDelete(tenantId: string, id: string, performedBy?: { userId: string; email: string }) {
+  // A published entry has been emailed to staff and counted in payroll, so deleting it needs a reason
+  // that admins can review (PRD 3.11). Drafts delete freely.
+  async softDelete(tenantId: string, id: string, performedBy?: { userId: string; email: string }, why: DeleteTipEntryInput = {}) {
+    const entry = await prisma.tipEntry.findFirst({ where: { id, tenantId, isDeleted: false }, select: { publishedAt: true } });
+    if (!entry) return false;
+    if (entry.publishedAt && !(why.reason && why.note)) {
+      throw new TipCalculationError('A reason and note are required to delete a published entry', 'REASON_REQUIRED');
+    }
     const result = await prisma.tipEntry.updateMany({
       where: { id, tenantId, isDeleted: false },
-      data: { isDeleted: true, deletedAt: new Date() },
+      data: {
+        isDeleted: true, deletedAt: new Date(),
+        deletedByUserId: performedBy?.userId, deletedByEmail: performedBy?.email, deleteReason: why.reason, deleteNote: why.note,
+      },
     });
     if (result.count > 0) {
-      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE', performedBy });
+      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE', performedBy, newValues: why });
     }
     return result.count > 0;
+  },
+
+  // Deleted published entries whose deletion falls in [start, end] (UTC dates), plus per-user counts so an
+  // admin can spot who keeps needing corrections. Drafts and edit-replaced drafts are never published, so excluded.
+  async deletedReport(tenantId: string, start: string, end: string) {
+    const rows = await prisma.tipEntry.findMany({
+      where: {
+        tenantId, isDeleted: true, publishedAt: { not: null },
+        deletedAt: { gte: new Date(`${start}T00:00:00Z`), lt: new Date(Date.parse(`${end}T00:00:00Z`) + 86_400_000) },
+      },
+      orderBy: { deletedAt: 'desc' },
+    });
+    const entries = rows.map((r) => ({
+      id: r.id, entryDate: r.entryDate, publishedAt: r.publishedAt, deletedAt: r.deletedAt,
+      deletedByEmail: r.deletedByEmail, deleteReason: r.deleteReason, deleteNote: r.deleteNote,
+      totalTipPool: Number((computeCashTips(r.cashInRegister, r.cashSales, r.cashTips) + r.posTips).toFixed(2)),
+    }));
+
+    const byEmail = new Map<string, { email: string; count: number; reasons: Record<string, number> }>();
+    for (const e of entries) {
+      const email = e.deletedByEmail ?? 'unknown';
+      const u = byEmail.get(email) ?? { email, count: 0, reasons: {} };
+      u.count++;
+      if (e.deleteReason) u.reasons[e.deleteReason] = (u.reasons[e.deleteReason] ?? 0) + 1;
+      byEmail.set(email, u);
+    }
+    return { entries, byUser: [...byEmail.values()].sort((a, b) => b.count - a.count) };
   },
 };

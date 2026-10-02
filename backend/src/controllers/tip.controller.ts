@@ -113,10 +113,17 @@ export const tipController = {
     } catch (err) { next(err); }
   },
 
+  async deletedReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { start_date, end_date } = PayrollReportQuerySchema.parse(req.query);
+      res.json({ success: true, data: await tipEntryService.deletedReport(req.tenantId, start_date, end_date) });
+    } catch (err) { next(err); }
+  },
+
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const deleted = await tipEntryService.softDelete(req.tenantId, id, performer(req));
+      const deleted = await tipEntryService.softDelete(req.tenantId, id, performer(req), req.body);
       if (!deleted) { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tip entry not found' } }); return; }
       res.status(204).send();
     } catch (err) { next(err); }

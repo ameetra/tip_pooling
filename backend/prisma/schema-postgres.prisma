@@ -126,6 +126,11 @@ model TipEntry {
   deletedAt       DateTime?
   replacedById    String?
   publishedAt     DateTime?
+  // Who deleted it and why (PRD 3.11); reason is required only for published entries
+  deletedByUserId String?
+  deletedByEmail  String?
+  deleteReason    String? // WRONG_HOURS, WRONG_EMPLOYEES, WRONG_TIPS, WRONG_DATE, OTHER
+  deleteNote      String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

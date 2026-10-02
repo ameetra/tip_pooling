@@ -153,6 +153,12 @@ async function runMigrations() {
       );
       CREATE INDEX IF NOT EXISTS "cash_counts_tenantId_entryDate_isDeleted_idx" ON "cash_counts"("tenantId", "entryDate", "isDeleted");
       CREATE UNIQUE INDEX IF NOT EXISTS "cash_counts_unique_active" ON "cash_counts"("tenantId", "entryDate") WHERE "isDeleted" = false;
+
+      -- Who deleted a tip entry and why (PRD 3.11)
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deletedByUserId" TEXT;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deletedByEmail" TEXT;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deleteReason" TEXT;
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deleteNote" TEXT;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {

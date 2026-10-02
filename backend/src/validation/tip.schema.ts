@@ -72,6 +72,14 @@ export const TipEntryQuerySchema = PaginationSchema.extend({
 
 const MAX_REPORT_DAYS = 366;
 
+// Why a published entry was deleted (PRD 3.11). Optional here because only published entries need it;
+// the service enforces that. DELETE requests from drafts usually have no body at all.
+export const DELETE_REASONS = ['WRONG_HOURS', 'WRONG_EMPLOYEES', 'WRONG_TIPS', 'WRONG_DATE', 'OTHER'] as const;
+export const DeleteTipEntrySchema = z.object({
+  reason: z.enum(DELETE_REASONS).optional(),
+  note: z.string().trim().min(1).max(500).optional(),
+}).default({});
+
 export const PayrollReportQuerySchema = z.object({
   start_date: calendarDate,
   end_date: calendarDate,
@@ -86,6 +94,7 @@ export type PaginationQuery = z.infer<typeof PaginationSchema>;
 export type TipPreviewInput = z.infer<typeof TipPreviewSchema>;
 export type CreateTipEntryInput = z.infer<typeof CreateTipEntrySchema>;
 export type EditTipEntryInput = z.infer<typeof EditTipEntrySchema>;
+export type DeleteTipEntryInput = z.infer<typeof DeleteTipEntrySchema>;
 export type SupportStaffConfigInput = z.infer<typeof SupportStaffConfigSchema>;
 export type ShiftHoursDefaultsInput = z.infer<typeof ShiftHoursDefaultsSchema>;
 export type TipEntryQuery = z.infer<typeof TipEntryQuerySchema>;

@@ -119,6 +119,10 @@ beforeAll(async () => {
       deletedAt DATETIME,
       replacedById TEXT,
       publishedAt DATETIME,
+      deletedByUserId TEXT,
+      deletedByEmail TEXT,
+      deleteReason TEXT,
+      deleteNote TEXT,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenantId) REFERENCES tenants(id)
