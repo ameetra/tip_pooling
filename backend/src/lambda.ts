@@ -38,9 +38,33 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'resetAdminPassword' && event.tenantSlug && event.email && event.password) {
       return runResetAdminPassword(event.tenantSlug, event.email, event.password);
     }
+    if (event.action === 'dbStats') return runDbStats(event.host);
   }
   return httpHandler(event, context);
 };
+
+// Exact row count per table, on prod or (with `host`) another RDS instance using the same credentials,
+// e.g. a restored backup during a restore drill.
+async function runDbStats(host?: string) {
+  if (host && !/^[a-z0-9.-]+\.rds\.amazonaws\.com$/.test(host)) return { success: false, error: 'host must be an RDS endpoint' };
+  const url = new URL(process.env.DATABASE_URL!);
+  if (host) url.hostname = host;
+  const schema = url.searchParams.get('schema') || 'public';
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: url.toString(), ssl: require('./database/client').pgSsl() });
+  try {
+    const { rows } = await pool.query('SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY tablename', [schema]);
+    const counts: Record<string, number> = {};
+    for (const { tablename } of rows) {
+      counts[tablename] = (await pool.query(`SELECT count(*)::int AS n FROM "${schema}"."${tablename}"`)).rows[0].n;
+    }
+    return { success: true, host: url.hostname, counts };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  } finally {
+    await pool.end();
+  }
+}
 
 async function runResetAdminPassword(tenantSlug: string, email: string, password: string) {
   const { resetAdminPassword } = require('./services/tenant.service');
