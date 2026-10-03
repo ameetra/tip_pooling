@@ -428,7 +428,10 @@ A published entry has been emailed to staff and counted in payroll, and deleting
   - After the lock lifts, the user gets 3 fresh attempts
   - Every lock and unlock is recorded in the audit trail
 - [x] Magic link for employees single-use only
-- [ ] Regular security audits and penetration testing - *One security review done 2026-06-13*
+- [x] **Sign-in token can't be read by page scripts** *(since 2026-10-02 it's kept in a secure, httpOnly cookie, one per venue, instead of browser storage; signing out clears it)*
+- [x] **App secrets kept out of the server configuration** *(database password, signing key and admin secret live in AWS Secrets Manager since 2026-10-02)*
+- [x] **Database connection verifies the server's certificate** *(since 2026-10-02, so the app only talks to the real database)*
+- [ ] Regular security audits and penetration testing - *One security review done 2026-06-13; 10 of its 12 findings fixed (last three on 2026-10-02); a firewall (WAF) and API error pages remain*
 
 ### 4.3 Scalability
 - [x] System designed for multi-tenant architecture
@@ -439,8 +442,9 @@ A published entry has been emailed to staff and counted in payroll, and deleting
 ### 4.4 Availability
 - [ ] System uptime: 99.5% (excluding planned maintenance)
 - [ ] Planned maintenance window: Sundays 2-4 AM (tenant timezone)
-- [ ] Automated backups every 6 hours - *Automated daily backups with 7-day retention*
-- [ ] Point-in-time recovery capability (30 days) - *Configured for 7 days*
+- [ ] Automated backups every 6 hours - *Automated daily backups with 14-day retention (raised from 7 on 2026-10-02)*
+- [ ] Point-in-time recovery capability (30 days) - *Configured for 14 days*
+- [x] **Database can't be deleted by mistake, and restores are tested** *(deletion protection on, manual snapshot before risky changes; restore drill 2026-10-02: a full copy was ready in about 27 minutes with all data matching)*
 
 ### 4.5 Usability
 - [ ] Mobile-responsive design (works on phones, tablets, desktops) - *Employee pages and emails work on phones; the manager menu is a fixed side panel*
