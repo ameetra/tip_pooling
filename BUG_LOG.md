@@ -264,3 +264,33 @@
 
 **Prevention:**
 - After any schema change, test a write that uses the new columns on the deployed demo venue, not only reads.
+
+### 🟡 Bug #10: New passwords failed with "Request validation failed"
+**Date Found:** 2026-10-09
+**Severity:** High (a venue admin couldn't finish the forced password change, so couldn't use the app)
+**Status:** ✅ RESOLVED
+**Found By:** Production (venue admin report)
+
+**Symptoms:**
+- After an admin reset, picking a new password on the Set a New Password page showed "Request validation failed".
+  The password never saved, so the new password didn't work at sign-in either.
+
+**Root Cause:**
+- The page (and the Staff page's Add/Reset dialogs) only checked for 8+ characters, but the server requires 12+
+  with an upper case letter, a lower case letter and a number. The server's generic validation message was shown as is.
+
+**Fix:**
+- The password rule lives in one frontend helper that mirrors the server's, is shown under the field, and is checked
+  before submitting. A server validation error is turned into the rule in plain words. New `PasswordField`
+  with a show/hide button on sign-in, Change Password and both Staff dialogs.
+
+**Files Modified:**
+- `frontend/src/utils/password.ts`, `frontend/src/components/PasswordField.tsx`
+- `frontend/src/pages/ChangePasswordPage.tsx`, `ManagerLoginPage.tsx`, `UsersPage.tsx`
+
+**Test Added:**
+- None automated (the frontend has no unit test runner). Verified live 2026-10-09 on the demo venue: a short password
+  is refused with "Use at least 12 characters", Staff dialog blocks Create until the rule is met, a valid password saves.
+
+**Prevention:**
+- When the server tightens a validation rule, change the matching frontend check in the same commit.

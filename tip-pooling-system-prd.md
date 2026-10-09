@@ -421,6 +421,8 @@ A published entry has been emailed to staff and counted in payroll, and deleting
 - [ ] All data encrypted in transit (TLS 1.3) - *HTTPS only, with a minimum of TLS 1.2*
 - [x] All data encrypted at rest (AES-256) *(the database has storage encryption enabled)*
 - [ ] Password requirements: minimum 12 characters, uppercase, lowercase, number, special character - *12+ characters with upper case, lower case and a number; a special character is not required*
+  - [x] The rule is shown under every new-password field and checked before saving, with a plain-language message for what's missing *(2026-10-09)*
+  - [x] Every password field has a show/hide button so users can check what they typed *(2026-10-09)*
 - [ ] **Account lockout after 3 wrong passwords** (owner decision 2026-09-30, replaces the earlier 5-tries / 15-minute idea) - *Not built; today login is only limited to 10 attempts per IP address per 15 minutes, which doesn't stop guessing from many addresses*
   - 3 wrong passwords in a row for an account (Admin, Manager or Shift Lead) at a venue locks that account; a correct password resets the count
   - A locked account can't sign in even with the right password, and the sign-in page says it's locked and how to get it unlocked (without revealing whether an email has an account: unknown emails get the same message after 3 tries)

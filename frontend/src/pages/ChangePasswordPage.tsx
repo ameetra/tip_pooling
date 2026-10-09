@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Box, Button, Link, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Link, Paper, Typography } from '@mui/material';
 import { post } from '../api/client';
 import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
+import PasswordField from '../components/PasswordField';
+import { PASSWORD_RULES, passwordProblem, passwordSaveError } from '../utils/password';
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
@@ -17,8 +19,9 @@ export default function ChangePasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) return setError('Passwords do not match.');
-    if (password.length < 8) return setError('Password must be at least 8 characters.');
+    const problem = passwordProblem(password);
+    if (problem) return setError(problem);
+    if (password !== confirm) return setError("The two passwords don't match.");
     setLoading(true);
     setError('');
     try {
@@ -26,7 +29,7 @@ export default function ChangePasswordPage() {
       login(user);
       navigate(`/${slug}`);
     } catch (err: any) {
-      setError(err.message || 'Could not change password.');
+      setError(passwordSaveError(err));
     } finally {
       setLoading(false);
     }
@@ -42,8 +45,10 @@ export default function ChangePasswordPage() {
 
         <form onSubmit={handleSubmit}>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <TextField fullWidth label="New password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus sx={{ mb: 2 }} />
-          <TextField fullWidth label="Confirm new password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required sx={{ mb: 2 }} />
+          <PasswordField fullWidth label="New password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus autoComplete="new-password"
+            error={!!password && !!passwordProblem(password)} helperText={(password && passwordProblem(password)) || PASSWORD_RULES} sx={{ mb: 2 }} />
+          <PasswordField fullWidth label="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password"
+            error={!!confirm && confirm !== password} helperText={confirm && confirm !== password ? "Doesn't match yet." : ' '} sx={{ mb: 2 }} />
           <Button type="submit" variant="contained" fullWidth disabled={loading}>
             {loading ? 'Saving…' : 'Set password'}
           </Button>

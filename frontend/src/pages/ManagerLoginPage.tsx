@@ -5,6 +5,7 @@ import { post } from '../api/client';
 import { useAuth, type AuthUser } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import VenueBrand from '../components/VenueBrand';
+import PasswordField from '../components/PasswordField';
 
 export default function ManagerLoginPage() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function ManagerLoginPage() {
       login(user);
       navigate(user.mustChangePassword ? `/${slug}/change-password` : `/${slug}`);
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password.');
+      setError(err.code === 'VALIDATION_ERROR' ? 'Please check your email address and password.' : err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ export default function ManagerLoginPage() {
         <form onSubmit={handleSubmit}>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <TextField fullWidth label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus sx={{ mb: 2 }} />
-          <TextField fullWidth label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required sx={{ mb: 2 }} />
+          <PasswordField fullWidth label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required sx={{ mb: 2 }} />
           <Button type="submit" variant="contained" fullWidth disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>

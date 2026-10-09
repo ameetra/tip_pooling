@@ -10,6 +10,8 @@ import KeyIcon from '@mui/icons-material/Key';
 import AddIcon from '@mui/icons-material/Add';
 import { usersApi, type Staff, type StaffRole } from '../api/users';
 import { useAuth } from '../context/AuthContext';
+import PasswordField from '../components/PasswordField';
+import { PASSWORD_RULES, passwordProblem, passwordSaveError } from '../utils/password';
 
 const roleLabel = (r: StaffRole) => (r === 'MANAGER' ? 'Manager' : 'Shift Lead');
 
@@ -29,7 +31,7 @@ function AddStaffDialog({ open, onClose, callerRole }: { open: boolean; onClose:
       setEmail(''); setPassword(''); setError('');
       setRole(canPickManager ? 'MANAGER' : 'SHIFT_LEAD');
     },
-    onError: (err: any) => setError(err.message || 'Failed to create staff member'),
+    onError: (err: any) => setError(err.code === 'VALIDATION_ERROR' ? passwordSaveError(err) : err.message || 'Failed to create staff member'),
   });
 
   return (
@@ -49,11 +51,12 @@ function AddStaffDialog({ open, onClose, callerRole }: { open: boolean; onClose:
           <MenuItem value="SHIFT_LEAD">Shift Lead</MenuItem>
         </TextField>
         <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
-        <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth helperText="Min 8 characters" />
+        <PasswordField label="Password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth autoComplete="new-password"
+          error={!!password && !!passwordProblem(password)} helperText={(password && passwordProblem(password)) || PASSWORD_RULES} />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => mutation.mutate()} disabled={!email || password.length < 8 || mutation.isPending}>
+        <Button variant="contained" onClick={() => mutation.mutate()} disabled={!email || !!passwordProblem(password) || mutation.isPending}>
           Create
         </Button>
       </DialogActions>
@@ -69,7 +72,7 @@ function ResetPasswordDialog({ staff, onClose }: { staff: Staff | null; onClose:
   const mutation = useMutation({
     mutationFn: () => usersApi.resetPassword(staff!.id, password),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); onClose(); setPassword(''); setError(''); },
-    onError: (err: any) => setError(err.message || 'Failed to reset password'),
+    onError: (err: any) => setError(passwordSaveError(err)),
   });
 
   return (
@@ -77,11 +80,12 @@ function ResetPasswordDialog({ staff, onClose }: { staff: Staff | null; onClose:
       <DialogTitle>Reset Password — {staff?.email}</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
         {error && <Alert severity="error">{error}</Alert>}
-        <TextField label="New Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth helperText="Min 8 characters" />
+        <PasswordField label="New Password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth autoComplete="new-password"
+          error={!!password && !!passwordProblem(password)} helperText={(password && passwordProblem(password)) || PASSWORD_RULES} />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => mutation.mutate()} disabled={password.length < 8 || mutation.isPending}>
+        <Button variant="contained" onClick={() => mutation.mutate()} disabled={!!passwordProblem(password) || mutation.isPending}>
           Reset
         </Button>
       </DialogActions>
