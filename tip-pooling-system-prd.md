@@ -58,7 +58,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Admin can create username and password for their account *(the account is provisioned for them and they set their own password at first sign-in)*
 - [x] Admin can perform all Manager functions
 - [ ] Admin can access all tenants/locations they manage - *Partial: one account per venue with the same email; no cross-venue switcher. **Deprioritized 2026-09-24**: this was scoped for the owner running several venues personally. Once venues belong to other establishments, their admins shouldn't have (or want) cross-venue access to each other's data, and the owner/vendor shouldn't hold standing access into customer data either. What may still be worth building later is a much thinner platform-support layer (tenant provisioning, resetting a locked-out customer admin) — and only once the current manual flow (Lambda admin action + shared secret, see RUNBOOK_ADD_TENANT.md) becomes a bottleneck.*
-- [x] Admin can create and manage Manager accounts *(Staff page: create, reset password and remove managers and shift leads)*
+- [x] Admin can create and manage Manager accounts *(Staff page: create, reset password and remove managers and shift leads; adding back a removed person with the same email reactivates their login, since 2026-10-09)*
 - [x] **Reset a locked-out Admin's password** *(operator-run `resetAdminPassword` Lambda admin action; re-running `provision` is no longer needed, which also rewrote the venue's name and logo)*:
   - Takes only the venue slug, admin email and a temporary password (8+ characters), and requires the shared admin secret
   - Changes only that one admin's password at that one venue; never touches venue settings or other users

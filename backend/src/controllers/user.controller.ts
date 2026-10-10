@@ -30,11 +30,19 @@ export const userController = {
       const { email, password, role } = req.body as { email: string; password: string; role: string };
       if (!allowedTargetRoles(req.user?.role).includes(role)) return forbidden(res);
 
+      const existing = await (prisma as any).user.findFirst({ where: { tenantId: req.tenantId, email } });
+      if (existing?.isActive) {
+        res.status(409).json({ success: false, error: { code: 'DUPLICATE_ENTRY', message: 'This email already has a login at this venue.' } });
+        return;
+      }
+
+      // Removing staff only deactivates them (email stays unique per venue), so re-adding someone reactivates that row.
       const passwordHash = await bcrypt.hash(password, 10);
-      const user = await (prisma as any).user.create({
-        data: { tenantId: req.tenantId, email, passwordHash, role, mustChangePassword: true },
-        select: { id: true, email: true, role: true, createdAt: true },
-      });
+      const data = { passwordHash, role, isActive: true, mustChangePassword: true };
+      const select = { id: true, email: true, role: true, createdAt: true };
+      const user = existing
+        ? await (prisma as any).user.update({ where: { id: existing.id }, data, select })
+        : await (prisma as any).user.create({ data: { tenantId: req.tenantId, email, ...data }, select });
       res.status(201).json({ success: true, data: user });
     } catch (err) { next(err); }
   },

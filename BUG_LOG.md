@@ -294,3 +294,29 @@
 
 **Prevention:**
 - When the server tightens a validation rule, change the matching frontend check in the same commit.
+
+### 🟠 Bug #11: A removed manager or shift lead couldn't be added back
+**Date Found:** 2026-10-09
+**Severity:** Medium (rehiring someone meant using a different email address)
+**Status:** ✅ RESOLVED
+**Found By:** Live testing on the demo venue
+
+**Symptoms:**
+- Adding a staff login with the email of a removed one failed with "A record with this value already exists".
+
+**Root Cause:**
+- Removing staff only deactivates the login, and emails are unique per venue, so creating a new row with the same
+  email hit the unique constraint.
+
+**Fix:**
+- Adding staff reactivates a removed login with the new role and password (forced change at first sign-in).
+  An email with an active login gets "This email already has a login at this venue."
+
+**Files Modified:**
+- `backend/src/controllers/user.controller.ts`
+
+**Test Added:**
+- `backend/src/__tests__/api/staff-readd.test.ts` (reactivation + clear duplicate message). Verified live 2026-10-09.
+
+**Prevention:**
+- Any "create" on a soft-deleted table needs a reactivate path (same lesson as Bug #6 for employees).
