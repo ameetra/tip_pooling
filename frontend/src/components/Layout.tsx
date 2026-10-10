@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { formatRole } from '../constants/roles';
 import {
   AppBar, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, IconButton, Tooltip,
 } from '@mui/material';
@@ -49,8 +50,8 @@ export default function Layout() {
             {user && (
               <>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>{user.email}</Typography>
-                <Typography variant="caption" sx={{ opacity: 0.6, textTransform: 'capitalize', bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.25, borderRadius: 1 }}>
-                  {user.role.toLowerCase()}
+                <Typography variant="caption" sx={{ opacity: 0.6, bgcolor: 'rgba(255,255,255,0.15)', px: 1, py: 0.25, borderRadius: 1 }}>
+                  {formatRole(user.role)}
                 </Typography>
               </>
             )}
