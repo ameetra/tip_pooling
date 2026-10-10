@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { employeeService } from '../services/employee.service';
 import { EmployeeQuerySchema } from '../validation/employee.schema';
+import { hidesPay, withoutRates } from '../utils/pay-redaction';
 
 export const employeeController = {
   async create(req: Request, res: Response, next: NextFunction) {
@@ -14,7 +15,7 @@ export const employeeController = {
     try {
       const query = EmployeeQuerySchema.parse(req.query);
       const result = await employeeService.findAll(req.tenantId, query);
-      res.json({ success: true, ...result });
+      res.json({ success: true, ...result, data: hidesPay(req) ? result.data.map(withoutRates) : result.data });
     } catch (err) { next(err); }
   },
 

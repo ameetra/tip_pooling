@@ -7,12 +7,13 @@ import { getRoleLabels } from '../services/tenant.service';
 import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
 import { performer } from '../middleware/auth';
+import { hidesPay, tipsOnly } from '../utils/pay-redaction';
 
 export const tipController = {
   async preview(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await tipEntryService.preview(req.tenantId, req.body);
-      res.json({ success: true, data: result });
+      res.json({ success: true, data: hidesPay(req) ? { ...result, results: tipsOnly(result.results) } : result });
     } catch (err) { next(err); }
   },
 
@@ -20,7 +21,7 @@ export const tipController = {
     try {
       const force = req.query.force === 'true' && (req as any).user?.role === 'ADMIN';
       const entry = await tipEntryService.create(req.tenantId, req.body, force, performer(req));
-      res.status(201).json({ success: true, data: entry });
+      res.status(201).json({ success: true, data: hidesPay(req) ? { ...entry, results: tipsOnly(entry.results) } : entry });
     } catch (err) { next(err); }
   },
 

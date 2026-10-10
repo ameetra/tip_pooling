@@ -139,6 +139,41 @@ describe('Tip Entry API - E2E Workflow', () => {
     });
   });
 
+  describe('shift leads never receive pay data', () => {
+    const PAY_FIELDS = /hourlyRate|wage|totalPay|effectiveHourlyRate|stints/i;
+    const body = () => ({
+      entryDate: '2026-04-10', ...cash,
+      employees: [
+        { employeeId: aliceId, role: 'SERVER', hoursWorked: 8 },
+        { employeeId: charlieId, role: 'BUSSER', hoursWorked: 8 },
+      ],
+    });
+
+    it('preview and create return tips but no wages for a shift lead', async () => {
+      for (const path of ['/api/v1/tips/preview', '/api/v1/tips/entries']) {
+        const res = await request(app).post(path).set('x-test-role', 'SHIFT_LEAD').send(body());
+        expect(res.status).toBeLessThan(300);
+        expect(JSON.stringify(res.body.data.results)).not.toMatch(PAY_FIELDS);
+        expect(res.body.data.results.find((r: any) => r.name === 'Alice').totalTips).toBeGreaterThan(0);
+      }
+    });
+
+    it('employee list omits hourly rates for a shift lead but keeps names and roles', async () => {
+      const res = await request(app).get('/api/v1/employees').set('x-test-role', 'SHIFT_LEAD');
+      expect(JSON.stringify(res.body.data)).not.toMatch(/hourlyRate/);
+      const alice = res.body.data.find((e: any) => e.name === 'Alice');
+      expect(alice.roleRates.map((r: any) => r.role)).toEqual(['BUSSER', 'SERVER']);
+    });
+
+    it('managers still see wages and rates', async () => {
+      const preview = await request(app).post('/api/v1/tips/preview').set('x-test-role', 'MANAGER')
+        .send({ ...body(), employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }] });
+      expect(preview.body.data.results[0].totalWage).toBe(120);
+      const list = await request(app).get('/api/v1/employees').set('x-test-role', 'MANAGER');
+      expect(list.body.data.find((e: any) => e.name === 'Alice').roleRates[0].hourlyRate).toBe(12);
+    });
+  });
+
   describe('GET /api/v1/tips/entries/:id', () => {
     it('returns calculations with employee details (no shifts)', async () => {
       const created = await request(app).post('/api/v1/tips/entries').send({
