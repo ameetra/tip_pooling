@@ -26,6 +26,16 @@ describe('re-adding removed staff', () => {
     expect(res.body.data.user.mustChangePassword).toBe(true);
   });
 
+  it("a manager can't take over a removed manager's login", async () => {
+    const mgr = await add('mgr@test.com', 'FirstPassword1', 'MANAGER');
+    await request(app).delete(`/api/v1/users/${mgr.body.data.id}`).expect(204);
+
+    const res = await request(app).post('/api/v1/users').set('x-test-role', 'MANAGER')
+      .send({ email: 'mgr@test.com', password: 'Takeover2026x', role: 'SHIFT_LEAD' });
+    expect(res.status).toBe(409);
+    expect((await login('mgr@test.com', 'Takeover2026x')).status).toBe(401);
+  });
+
   it('refuses an email that already has an active login, with a clear message', async () => {
     await add('lead@test.com', 'FirstPassword1').expect(201);
     const res = await add('lead@test.com', 'SecondPassword2');

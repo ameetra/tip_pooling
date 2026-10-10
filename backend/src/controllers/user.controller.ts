@@ -31,7 +31,8 @@ export const userController = {
       if (!allowedTargetRoles(req.user?.role).includes(role)) return forbidden(res);
 
       const existing = await (prisma as any).user.findFirst({ where: { tenantId: req.tenantId, email } });
-      if (existing?.isActive) {
+      // A login outside the caller's scope (e.g. a removed admin) is never taken over, even when inactive.
+      if (existing && (existing.isActive || !allowedTargetRoles(req.user?.role).includes(existing.role))) {
         res.status(409).json({ success: false, error: { code: 'DUPLICATE_ENTRY', message: 'This email already has a login at this venue.' } });
         return;
       }

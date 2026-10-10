@@ -311,6 +311,8 @@
 **Fix:**
 - Adding staff reactivates a removed login with the new role and password (forced change at first sign-in).
   An email with an active login gets "This email already has a login at this venue."
+- Follow-up the same day (security review): only a login the caller may manage is reactivated, so a manager can't
+  take over a removed manager's or admin's account record; those get the same "already has a login" message.
 
 **Files Modified:**
 - `backend/src/controllers/user.controller.ts`
