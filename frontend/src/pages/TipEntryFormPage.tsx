@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Button, IconButton, MenuItem, Paper, Table, TableBody, TableCell, TableContainer,
+  Box, Button, Card, CardContent, IconButton, MenuItem, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography, Alert, Chip, CircularProgress, Stack,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import SendIcon from '@mui/icons-material/Send';
 import { useEmployees } from '../api/employees';
 import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry, usePublishTipEntry } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -75,9 +76,8 @@ export default function TipEntryFormPage() {
   const [shiftHours, setShiftHours] = useState('');
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  // A shift lead's just-saved draft, offered for publishing since they never see the entry detail page.
-  const [saved, setSaved] = useState<{ id: string; entryDate: string } | null>(null);
+  // A shift lead's just-saved entry, summarized here for publishing since they can't open the entry detail page.
+  const [saved, setSaved] = useState<{ id: string; entryDate: string; totalPool: number; results: EmployeeResult[]; published?: string } | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
 
   // Fill the form once from the saved draft; later refetches must not wipe the manager's changes.
@@ -158,8 +158,7 @@ export default function TipEntryFormPage() {
     setConfirmPublish(false);
     try {
       const { emailsSent, emailsFailed } = await publishEntry.mutateAsync(saved!.id);
-      setSuccess(`Published ${saved!.entryDate}. ${emailsSent} email(s) sent${emailsFailed ? `, ${emailsFailed} failed` : ''}.`);
-      setSaved(null);
+      setSaved({ ...saved!, published: `${emailsSent} email(s) sent${emailsFailed ? `, ${emailsFailed} failed` : ''}.` });
     } catch (e) { setError((e as Error).message); }
   };
 
@@ -167,8 +166,6 @@ export default function TipEntryFormPage() {
     const input = buildInput();
     if (!input) return;
     setError('');
-    setSuccess('');
-    setSaved(null);
     try {
       if (isEdit) {
         const updated = await editEntry.mutateAsync({ id: id!, data: input });
@@ -177,9 +174,8 @@ export default function TipEntryFormPage() {
       }
       const result: any = await createEntry.mutateAsync(input);
       if (isShiftLead) {
+        setSaved({ id: result.id, entryDate: input.entryDate, totalPool, results: result.results });
         resetForm();
-        setSaved({ id: result.id, entryDate: input.entryDate });
-        setSuccess(`Entry saved for ${input.entryDate}. Publish it to email everyone their tips, or leave it for a manager.`);
       } else {
         navigate(`/${slug}/tips/${result.id}`);
       }
@@ -196,31 +192,51 @@ export default function TipEntryFormPage() {
     );
   }
 
+  // Laid out like the manager's entry detail page, minus pay figures and the edit/delete actions shift leads can't use.
+  if (saved) {
+    return (
+      <Box>
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        {saved.published && <Alert severity="success" sx={{ mb: 2 }}>Published! {saved.published}</Alert>}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+              <Typography variant="h5">Tip Entry: {saved.entryDate}</Typography>
+              {saved.published ? <Chip label="Published" color="success" /> : <Chip label="Draft" />}
+            </Box>
+            <Chip label={`Total Pool: $${saved.totalPool.toFixed(2)}`} color="primary" />
+          </CardContent>
+        </Card>
+        <Typography variant="h6" sx={{ mb: 1 }}>Calculation Breakdown</Typography>
+        <Paper sx={{ mb: 3 }}><PreviewTable results={saved.results} showPay={false} /></Paper>
+        {!saved.published && (
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Saved as a draft. Publish to email everyone their tips, or leave it for a manager to publish.</Typography>
+        )}
+        <Stack direction="row" spacing={2}>
+          {!saved.published && (
+            <Button variant="contained" color="success" startIcon={<SendIcon />} disabled={publishEntry.isPending} onClick={() => setConfirmPublish(true)}>
+              {publishEntry.isPending ? 'Publishing...' : 'Publish & Send Emails'}
+            </Button>
+          )}
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => { setSaved(null); setError(''); }}>New Tip Entry</Button>
+        </Stack>
+        <ConfirmDialog
+          open={confirmPublish}
+          title="Publish & Send Emails"
+          message={`This will send tip summary emails to all ${saved.results.length} employee(s) for ${saved.entryDate}. This cannot be undone.`}
+          onConfirm={handlePublish}
+          onCancel={() => setConfirmPublish(false)}
+          confirmLabel="Publish & Send"
+          confirmColor="success"
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2 }}>{isEdit ? 'Edit Tip Entry' : 'New Tip Entry'}</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-      {success && (
-        <Alert
-          severity="success" sx={{ mb: 2 }} onClose={() => { setSuccess(''); setSaved(null); }}
-          action={saved && (
-            <Button color="success" variant="contained" size="small" disabled={publishEntry.isPending} onClick={() => setConfirmPublish(true)}>
-              {publishEntry.isPending ? 'Publishing...' : 'Publish & Send Emails'}
-            </Button>
-          )}
-        >
-          {success}
-        </Alert>
-      )}
-      <ConfirmDialog
-        open={confirmPublish}
-        title="Publish & Send Emails"
-        message={`This will email each employee their tips for ${saved?.entryDate}. This cannot be undone.`}
-        onConfirm={handlePublish}
-        onCancel={() => setConfirmPublish(false)}
-        confirmLabel="Publish & Send"
-        confirmColor="success"
-      />
 
       {/* Date + Cash inputs */}
       <Paper sx={{ p: 2, mb: 3 }}>
