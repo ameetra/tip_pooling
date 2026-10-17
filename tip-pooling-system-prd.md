@@ -343,7 +343,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 
 ### 3.9 Built Beyond the Original PRD
 
-- [x] **Shift Lead role:** a staff login that enters and publishes tips (publishing allowed since 2026-10-17: after saving, the form offers Publish & Send Emails; no wage or pay figures, in the app or the API: since 2026-10-09 the server strips hourly rates, wages and total pay from what it sends them)
+- [x] **Shift Lead role:** a staff login that enters and publishes tips (publishing allowed since 2026-10-17: after saving, a summary card shows each person's tips with Publish & Send Emails and New Tip Entry; no wage or pay figures, in the app or the API: since 2026-10-09 the server strips hourly rates, wages and total pay from what it sends them)
 - [x] Shift leads are also a tipped role: they pool tips with servers by hours
 - [x] Several roles per employee, each with its own hourly rate and effective-dated rate history
 - [x] Deactivated employees are listed under **Inactive** on the Employees screen and can be reactivated (role and rates re-entered); adding a duplicate email explains where the existing record is
