@@ -8,11 +8,12 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useEmployees } from '../api/employees';
-import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry } from '../api/tips';
+import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry, usePublishTipEntry } from '../api/tips';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
-import type { EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
+import type { Employee, EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
 import { useRoleLabels } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
@@ -32,6 +33,9 @@ const today = localDate();
 // Digits with an optional decimal point and at most 2 decimal places.
 const MONEY = /^\d*\.?\d{0,2}$/;
 const amount = (s: string) => Number(s) || 0;
+
+// Only roles the employee has a rate for (plus their primary role's legacy rate); the server rejects any other.
+const rolesOf = (emp: Employee) => new Set<string>([emp.role, ...(emp.roleRates ?? []).map((r) => r.role)]);
 
 function MoneyField({ label, value, onChange, required, helperText }: {
   label: string; value: string; onChange: (v: string) => void; required?: boolean; helperText?: string;
@@ -60,6 +64,7 @@ export default function TipEntryFormPage() {
   const preview = useTipPreview();
   const createEntry = useCreateTipEntry();
   const editEntry = useEditTipEntry();
+  const publishEntry = usePublishTipEntry();
   const saving = createEntry.isPending || editEntry.isPending;
 
   const [entryDate, setEntryDate] = useState(today);
@@ -71,6 +76,9 @@ export default function TipEntryFormPage() {
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // A shift lead's just-saved draft, offered for publishing since they never see the entry detail page.
+  const [saved, setSaved] = useState<{ id: string; entryDate: string } | null>(null);
+  const [confirmPublish, setConfirmPublish] = useState(false);
 
   // Fill the form once from the saved draft; later refetches must not wipe the manager's changes.
   const prefilled = useRef(false);
@@ -142,12 +150,23 @@ export default function TipEntryFormPage() {
 
   const handlePreview = () => {
     const input = buildInput();
-    if (input) preview.mutate(input);
+    setError('');
+    if (input) preview.mutate(input, { onError: (e) => setError(e.message) });
+  };
+
+  const handlePublish = async () => {
+    setConfirmPublish(false);
+    try {
+      const { emailsSent, emailsFailed } = await publishEntry.mutateAsync(saved!.id);
+      setSuccess(`Published ${saved!.entryDate}. ${emailsSent} email(s) sent${emailsFailed ? `, ${emailsFailed} failed` : ''}.`);
+      setSaved(null);
+    } catch (e) { setError((e as Error).message); }
   };
 
   const handleSubmit = async () => {
     const input = buildInput();
     if (!input) return;
+    setError('');
     try {
       if (isEdit) {
         const updated = await editEntry.mutateAsync({ id: id!, data: input });
@@ -157,7 +176,8 @@ export default function TipEntryFormPage() {
       const result: any = await createEntry.mutateAsync(input);
       if (isShiftLead) {
         resetForm();
-        setSuccess(`Entry saved for ${input.entryDate}.`);
+        setSaved({ id: result.id, entryDate: input.entryDate });
+        setSuccess(`Entry saved for ${input.entryDate}. Publish it to email everyone their tips, or leave it for a manager.`);
       } else {
         navigate(`/${slug}/tips/${result.id}`);
       }
@@ -178,7 +198,27 @@ export default function TipEntryFormPage() {
     <Box>
       <Typography variant="h5" sx={{ mb: 2 }}>{isEdit ? 'Edit Tip Entry' : 'New Tip Entry'}</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {success && (
+        <Alert
+          severity="success" sx={{ mb: 2 }} onClose={() => { setSuccess(''); setSaved(null); }}
+          action={saved && (
+            <Button color="success" variant="contained" size="small" disabled={publishEntry.isPending} onClick={() => setConfirmPublish(true)}>
+              {publishEntry.isPending ? 'Publishing...' : 'Publish & Send Emails'}
+            </Button>
+          )}
+        >
+          {success}
+        </Alert>
+      )}
+      <ConfirmDialog
+        open={confirmPublish}
+        title="Publish & Send Emails"
+        message={`This will email each employee their tips for ${saved?.entryDate}. This cannot be undone.`}
+        onConfirm={handlePublish}
+        onCancel={() => setConfirmPublish(false)}
+        confirmLabel="Publish & Send"
+        confirmColor="success"
+      />
 
       {/* Date + Cash inputs */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -210,18 +250,23 @@ export default function TipEntryFormPage() {
           <Typography variant="h6">Employees</Typography>
           <Button startIcon={<AddIcon />} onClick={addRow} disabled={employees.length === 0}>Add Row</Button>
         </Box>
-        {rows.map((row, i) => (
-          <Stack key={i} direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
-            <TextField select label="Employee" value={row.employeeId} onChange={(e) => updateRow(i, 'employeeId', e.target.value)} sx={{ minWidth: 200 }}>
-              {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-            </TextField>
-            <TextField select label="Role" value={row.role} onChange={(e) => updateRow(i, 'role', e.target.value)} sx={{ width: 140 }}>
-              {roleOptions.map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
-            </TextField>
-            <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }} sx={{ width: 110 }} />
-            <IconButton onClick={() => removeRow(i)}><DeleteIcon /></IconButton>
-          </Stack>
-        ))}
+        {rows.map((row, i) => {
+          const emp = employees.find((e) => e.id === row.employeeId);
+          // Keep the row's current role listed so a draft saved before a role was removed still displays.
+          const roles = emp && rolesOf(emp).add(row.role);
+          return (
+            <Stack key={i} direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+              <TextField select label="Employee" value={row.employeeId} onChange={(e) => updateRow(i, 'employeeId', e.target.value)} sx={{ minWidth: 200 }}>
+                {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+              </TextField>
+              <TextField select label="Role" value={row.role} onChange={(e) => updateRow(i, 'role', e.target.value)} sx={{ width: 140 }}>
+                {roleOptions.filter((r) => !roles || roles.has(r.value)).map((r) => <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>)}
+              </TextField>
+              <TextField label="Hours" type="number" value={row.hoursWorked} onChange={(e) => updateRow(i, 'hoursWorked', e.target.value)} slotProps={{ htmlInput: { min: 0.5, max: 24, step: 0.5 } }} sx={{ width: 110 }} />
+              <IconButton onClick={() => removeRow(i)}><DeleteIcon /></IconButton>
+            </Stack>
+          );
+        })}
         {rows.length === 0 && <Typography color="text.secondary">Add rows to calculate tips. The same person can be added more than once for different roles.</Typography>}
       </Paper>
 

@@ -322,3 +322,33 @@
 
 **Prevention:**
 - Any "create" on a soft-deleted table needs a reactivate path (same lesson as Bug #6 for employees).
+
+### 🟡 Bug #12: Shift-lead tip entry: silent preview failure, roles with no rate, no way to publish
+**Date Found:** 2026-10-17
+**Severity:** High (a shift lead couldn't finish a day's tips on their own)
+**Status:** ✅ RESOLVED
+**Found By:** Product owner testing the shift lead login
+
+**Symptoms:**
+- Preview Tips appeared to do nothing; Save then failed with "Martney Boyer has no base rate set for role SHIFT_LEAD".
+- After a later successful save, the old error banner stayed up next to "Entry saved".
+- Shift leads had no way to publish, so every entry waited for a manager.
+
+**Root Cause:**
+- The form never displayed preview errors, and never cleared an old error before a new attempt.
+- The Role dropdown listed every role for every employee, but rates exist only for an employee's own roles.
+- Publish was mounted under the Admin/Manager-only routes, and the shift lead form has no detail page with a Publish button.
+
+**Fix:**
+- Preview errors show in the error banner; preview and save clear the previous error first.
+- Role dropdown lists only the employee's roles (their per-role rates plus primary role).
+- `POST /tips/entries/:id/publish` is open to shift leads (owner decision 2026-10-17); after saving, the form offers Publish & Send Emails.
+
+**Files Modified:**
+- `frontend/src/pages/TipEntryFormPage.tsx`, `backend/src/app.ts`, `backend/src/routes/tip.routes.ts`
+
+**Test Added:**
+- `backend/src/__tests__/api/tip-entry.test.ts` ("a shift lead can publish the draft they saved"). Frontend has no unit test runner; verify live.
+
+**Prevention:**
+- Every form action needs a visible error path; dropdowns should offer only values the server will accept.

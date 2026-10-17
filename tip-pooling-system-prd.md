@@ -343,7 +343,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 
 ### 3.9 Built Beyond the Original PRD
 
-- [x] **Shift Lead role:** a staff login that can only enter tips (no wage or pay figures, in the app or the API: since 2026-10-09 the server strips hourly rates, wages and total pay from what it sends them)
+- [x] **Shift Lead role:** a staff login that enters and publishes tips (publishing allowed since 2026-10-17: after saving, the form offers Publish & Send Emails; no wage or pay figures, in the app or the API: since 2026-10-09 the server strips hourly rates, wages and total pay from what it sends them)
 - [x] Shift leads are also a tipped role: they pool tips with servers by hours
 - [x] Several roles per employee, each with its own hourly rate and effective-dated rate history
 - [x] Deactivated employees are listed under **Inactive** on the Employees screen and can be reactivated (role and rates re-entered); adding a duplicate email explains where the existing record is
@@ -583,9 +583,9 @@ A published entry has been emailed to staff and counted in payroll, and deleting
 
 **Audit Trail:** Complete historical record of all data changes and user actions
 
-**Shift Lead:** Staff role that enters tips for the day and also shares the server tip pool
+**Shift Lead:** Staff role that enters and publishes tips for the day and also shares the server tip pool
 
-**Draft / Published Entry:** A saved entry is a draft until a manager publishes it; publishing emails each employee and counts the entry in payroll
+**Draft / Published Entry:** A saved entry is a draft until a manager or shift lead publishes it; publishing emails each employee and counts the entry in payroll
 
 **Effective Date:** The day a rate or percentage change starts to apply; calculations use the value in force on the tip entry date
 

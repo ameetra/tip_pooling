@@ -62,12 +62,13 @@ export function createApp() {
   // Employee tip history — any authenticated user can read their own
   app.get('/api/v1/tips/my-history', verifyJWT, tipController.myHistory);
 
-  // Shift-lead-accessible routes: tip entry creation + read-only employee lookup
+  // Shift-lead-accessible routes: tip entry creation and publishing + read-only employee lookup
   // for the form's dropdown. Registered before the broad mounts so these
   // specific paths bypass the adminOrManager gate.
   const tipCreator = [verifyJWT, requireRole('ADMIN', 'MANAGER', 'SHIFT_LEAD')];
   app.post('/api/v1/tips/preview', ...tipCreator, validateBody(TipPreviewSchema), tipController.preview);
   app.post('/api/v1/tips/entries', ...tipCreator, validateBody(CreateTipEntrySchema), tipController.create);
+  app.post('/api/v1/tips/entries/:id/publish', ...tipCreator, tipController.publish);
   app.get('/api/v1/employees', ...tipCreator, employeeController.findAll);
   // Shift leads need to read the PER_PERSON "Total Shift Hours" defaults to fill out the entry
   // form, but only Admin/Manager can change them (mounted below with the other config routes).

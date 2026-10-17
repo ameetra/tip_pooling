@@ -3,6 +3,8 @@ import request from 'supertest';
 import { createApp } from '../../app';
 import { testPrisma } from '../setup';
 
+jest.mock('../../services/email.service', () => ({ sendTipEmail: jest.fn().mockResolvedValue(undefined) }));
+
 const app = createApp();
 
 describe('Tip Entry API - E2E Workflow', () => {
@@ -156,6 +158,15 @@ describe('Tip Entry API - E2E Workflow', () => {
         expect(JSON.stringify(res.body.data.results)).not.toMatch(PAY_FIELDS);
         expect(res.body.data.results.find((r: any) => r.name === 'Alice').totalTips).toBeGreaterThan(0);
       }
+    });
+
+    it('a shift lead can publish the draft they saved', async () => {
+      const created = await request(app).post('/api/v1/tips/entries').set('x-test-role', 'SHIFT_LEAD').send(body());
+      const res = await request(app).post(`/api/v1/tips/entries/${created.body.data.id}/publish`).set('x-test-role', 'SHIFT_LEAD');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ emailsSent: 2, emailsFailed: 0 });
+      const entry = await testPrisma.tipEntry.findUnique({ where: { id: created.body.data.id } });
+      expect(entry?.publishedAt).not.toBeNull();
     });
 
     it('employee list omits hourly rates for a shift lead but keeps names and roles', async () => {
