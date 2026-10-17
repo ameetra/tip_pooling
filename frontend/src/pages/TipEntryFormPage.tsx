@@ -167,6 +167,8 @@ export default function TipEntryFormPage() {
     const input = buildInput();
     if (!input) return;
     setError('');
+    setSuccess('');
+    setSaved(null);
     try {
       if (isEdit) {
         const updated = await editEntry.mutateAsync({ id: id!, data: input });
