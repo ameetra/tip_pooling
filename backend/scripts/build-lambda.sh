@@ -20,8 +20,9 @@ npm run build
 # Create package directory
 mkdir -p lambda-package
 
-# Copy compiled code
+# Copy compiled code and the ESM handler entry
 cp -r dist lambda-package/
+cp lambda-entry.mjs lambda-package/
 
 # RDS CA bundle for verified DB TLS (read from dist/database/client.js as ../../certs)
 cp -r certs lambda-package/

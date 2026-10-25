@@ -80,7 +80,7 @@ variable "lambda_runtime" {
 variable "lambda_memory_size" {
   description = "Lambda memory size (MB)"
   type        = number
-  default     = 512
+  default     = 1024 # CPU scales with memory; 512 made cold starts ~2s
 }
 
 variable "lambda_timeout" {

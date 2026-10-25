@@ -4,15 +4,20 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 
 // Secrets (DATABASE_URL, JWT_SECRET, LAMBDA_ADMIN_SECRET, SUPPORT_PASSWORD) live in Secrets Manager, not the
 // Lambda env. They must be in process.env before the app modules load, since those read them at import time.
+// lambda-entry.mjs awaits `init` at top level so this all runs in Lambda's init phase (full CPU burst)
+// rather than inside the first request.
 let prisma: typeof PrismaClient;
-const init = (async () => {
+export const init = (async () => {
   const SecretId = process.env.APP_SECRET_ID;
   if (SecretId) {
     const { SecretString } = await new SecretsManagerClient({}).send(new GetSecretValueCommand({ SecretId }));
     Object.assign(process.env, JSON.parse(SecretString!));
   }
   prisma = require('./database/client').default;
-  return serverlessHttp(require('./app').createApp());
+  const httpHandler = serverlessHttp(require('./app').createApp());
+  // Open the first DB connection (TLS handshake) up front; a failure here just defers it to the first query.
+  if (SecretId) await prisma.$queryRaw`SELECT 1`.catch((e: Error) => console.warn('DB warm-up failed:', e.message));
+  return httpHandler;
 })();
 
 export const handler = async (event: any, context: any) => {

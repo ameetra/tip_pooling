@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 source ../deploy.local.env  # AWS names live in a gitignored file; copy deploy.env.example to deploy.local.env
 FUNCTION_NAME="${LAMBDA_FUNCTION:?}"
 PROFILE="${AWS_PROFILE_NAME:?}"
-HANDLER="${1:-dist/lambda.handler}"
+HANDLER="${1:-lambda-entry.handler}"
 
 # Build
 bash scripts/build-lambda.sh
