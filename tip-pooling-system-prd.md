@@ -356,6 +356,7 @@ A cloud-based tip pooling management system that automates the calculation and d
 - [x] Role-based access: each login type can open only its own pages (enforced in the app and the API); employee logins carry an EMPLOYEE role
 - [x] Support staff percentages with a separate effective date per role, applied by tip entry date
 - [x] Staff management page: Admins manage Managers and Shift Leads; Managers manage Shift Leads
+- [x] **Barista staff role (2026-10-24):** a staff login with exactly the Shift Lead's access for now (tip entry and publishing, no wage or pay figures); only the name differs (the top bar shows "Barista"). Kept as its own role so its access can diverge from Shift Lead later. Opt-in per venue: the platform owner enables it with the `setStaffRoles` admin action (`["BARISTA"]`), and only then can the venue's Admins and Managers add Baristas on the Staff page. Live for Protagonist and Antagonist.
 - [x] Multi-venue paths (`/<venue>`), per-venue branding and forced password change at first sign-in
 - [x] Email sent as Gratify through Amazon SES with DKIM signing and a DMARC policy
 
@@ -584,6 +585,8 @@ A published entry has been emailed to staff and counted in payroll, and deleting
 **Audit Trail:** Complete historical record of all data changes and user actions
 
 **Shift Lead:** Staff role that enters and publishes tips for the day and also shares the server tip pool
+
+**Barista (staff role):** Venue-opt-in staff login with the same access as a Shift Lead; separate from the "Barista" display name some venues give the Server tip role
 
 **Draft / Published Entry:** A saved entry is a draft until a manager or shift lead publishes it; publishing emails each employee and counts the entry in payroll
 

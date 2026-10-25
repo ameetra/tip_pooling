@@ -151,26 +151,26 @@ describe('Tip Entry API - E2E Workflow', () => {
       ],
     });
 
-    it('preview and create return tips but no wages for a shift lead', async () => {
+    it.each(['SHIFT_LEAD', 'BARISTA'])('preview and create return tips but no wages for a %s', async (role) => {
       for (const path of ['/api/v1/tips/preview', '/api/v1/tips/entries']) {
-        const res = await request(app).post(path).set('x-test-role', 'SHIFT_LEAD').send(body());
+        const res = await request(app).post(path).set('x-test-role', role).send(body());
         expect(res.status).toBeLessThan(300);
         expect(JSON.stringify(res.body.data.results)).not.toMatch(PAY_FIELDS);
         expect(res.body.data.results.find((r: any) => r.name === 'Alice').totalTips).toBeGreaterThan(0);
       }
     });
 
-    it('a shift lead can publish the draft they saved', async () => {
-      const created = await request(app).post('/api/v1/tips/entries').set('x-test-role', 'SHIFT_LEAD').send(body());
-      const res = await request(app).post(`/api/v1/tips/entries/${created.body.data.id}/publish`).set('x-test-role', 'SHIFT_LEAD');
+    it.each(['SHIFT_LEAD', 'BARISTA'])('a %s can publish the draft they saved', async (role) => {
+      const created = await request(app).post('/api/v1/tips/entries').set('x-test-role', role).send(body());
+      const res = await request(app).post(`/api/v1/tips/entries/${created.body.data.id}/publish`).set('x-test-role', role);
       expect(res.status).toBe(200);
       expect(res.body.data).toEqual({ emailsSent: 2, emailsFailed: 0 });
       const entry = await testPrisma.tipEntry.findUnique({ where: { id: created.body.data.id } });
       expect(entry?.publishedAt).not.toBeNull();
     });
 
-    it('employee list omits hourly rates for a shift lead but keeps names and roles', async () => {
-      const res = await request(app).get('/api/v1/employees').set('x-test-role', 'SHIFT_LEAD');
+    it.each(['SHIFT_LEAD', 'BARISTA'])('employee list omits hourly rates for a %s but keeps names and roles', async (role) => {
+      const res = await request(app).get('/api/v1/employees').set('x-test-role', role);
       expect(JSON.stringify(res.body.data)).not.toMatch(/hourlyRate/);
       const alice = res.body.data.find((e: any) => e.name === 'Alice');
       expect(alice.roleRates.map((r: any) => r.role)).toEqual(['BUSSER', 'SERVER']);

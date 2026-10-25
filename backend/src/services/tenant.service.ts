@@ -4,12 +4,14 @@ import { auditService } from './audit.service';
 import { ShiftHoursDefaultsInput } from '../validation/tip.schema';
 import { ROLE_VALUES, RoleLabels, parseRoleLabels } from '../types/tip-calculation.types';
 import { todayIn } from './effective-date';
+import { OPTIONAL_STAFF_ROLES } from '../validation/user.schema';
 
 export interface Branding {
   slug: string;
   name: string;
   logoUrl: string | null;
   roleLabels?: RoleLabels;
+  staffRoles: string[];
 }
 
 export async function getTenantBySlug(slug: string) {
@@ -18,7 +20,7 @@ export async function getTenantBySlug(slug: string) {
 
 export async function getBranding(slug: string): Promise<Branding | null> {
   const t = await getTenantBySlug(slug);
-  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels) } : null;
+  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels), staffRoles: parseStaffRoles(t.staffRoles) } : null;
 }
 
 // Today's calendar date (YYYY-MM-DD) in the venue's timezone.
@@ -45,6 +47,26 @@ export async function setRoleLabels(slug: string, labels: Record<string, string>
   await (prisma as any).tenant.update({ where: { slug }, data: { roleLabels } });
   await auditService.log({ tenantId: tenant.id, entityType: 'ROLE_LABELS', entityId: tenant.id, action: 'UPDATE', oldValues: parseRoleLabels(tenant.roleLabels), newValues: cleaned });
   return cleaned;
+}
+
+const parseStaffRoles = (json?: string | null): string[] => (json ? JSON.parse(json) : []);
+
+// Opt-in staff roles (e.g. BARISTA) this venue can assign on the Staff page.
+export async function getStaffRoles(tenantId: string): Promise<string[]> {
+  const t = await (prisma as any).tenant.findUnique({ where: { id: tenantId }, select: { staffRoles: true } });
+  return parseStaffRoles(t?.staffRoles);
+}
+
+/** Enable opt-in staff roles at a venue, e.g. ['BARISTA']; `[]` disables them. Existing logins keep their role. */
+export async function setStaffRoles(slug: string, roles: string[]) {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  const unknown = roles.filter((role) => !OPTIONAL_STAFF_ROLES.includes(role));
+  if (unknown.length) throw new Error(`Unknown staff role(s): ${unknown.join(', ')}`);
+  const staffRoles = [...new Set(roles)];
+  await (prisma as any).tenant.update({ where: { slug }, data: { staffRoles: staffRoles.length ? JSON.stringify(staffRoles) : null } });
+  await auditService.log({ tenantId: tenant.id, entityType: 'STAFF_ROLES', entityId: tenant.id, action: 'UPDATE', oldValues: { staffRoles: parseStaffRoles(tenant.staffRoles) }, newValues: { staffRoles } });
+  return staffRoles;
 }
 
 export async function listBranding(): Promise<Branding[]> {

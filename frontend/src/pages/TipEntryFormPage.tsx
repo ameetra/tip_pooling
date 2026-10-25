@@ -15,7 +15,7 @@ import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import type { Employee, EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
-import { useRoleLabels } from '../constants/roles';
+import { isShiftLead as isShiftLeadRole, useRoleLabels } from '../constants/roles';
 import { localDate } from '../utils/dates';
 
 const SHIFT_HOURS_DAYS: ShiftHoursDay[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -58,7 +58,7 @@ export default function TipEntryFormPage() {
   const { user } = useAuth();
   const { slug } = useTenant();
   const { roleOptions } = useRoleLabels();
-  const isShiftLead = user?.role === 'SHIFT_LEAD';
+  const isShiftLead = isShiftLeadRole(user?.role);
   const { data: employees = [] } = useEmployees();
   const { data: shiftHoursConfig } = useShiftHoursConfig();
   const isPerPerson = shiftHoursConfig?.supportSplitMode === 'PER_PERSON';

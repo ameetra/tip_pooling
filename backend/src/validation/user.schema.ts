@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-export const StaffRoleSchema = z.enum(['MANAGER', 'SHIFT_LEAD']);
+export const StaffRoleSchema = z.enum(['MANAGER', 'SHIFT_LEAD', 'BARISTA']);
+
+// Baristas get exactly the shift lead's access for now. Every shift-lead permission check uses this list,
+// so giving baristas different access later means changing the list at that one check.
+export const SHIFT_LEAD_ROLES = ['SHIFT_LEAD', 'BARISTA'];
+// Staff roles a venue must opt into (setStaffRoles Lambda action) before they can be assigned.
+export const OPTIONAL_STAFF_ROLES = ['BARISTA'];
 
 // Policy for newly set passwords (create / reset / change). Login stays lenient so
 // existing accounts with older passwords aren't locked out.

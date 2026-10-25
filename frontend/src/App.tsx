@@ -19,7 +19,7 @@ import UsersPage from './pages/UsersPage';
 import PayrollReportPage from './pages/PayrollReportPage';
 import CashReconciliationPage from './pages/CashReconciliationPage';
 import DeletedEntriesPage from './pages/DeletedEntriesPage';
-import { isManagement, isStaff } from './constants/roles';
+import { isManagement, isShiftLead, isStaff } from './constants/roles';
 
 function RequireAuth({ children, kind }: { children: React.ReactNode; kind: 'employee' | 'manager' }) {
   const { user } = useAuth();
@@ -37,7 +37,7 @@ function RequireSignedIn({ children }: { children: React.ReactNode }) {
 }
 
 // Each kind of login has one home page.
-const homePath = (role: string) => (role === 'SHIFT_LEAD' ? 'tips/new' : isStaff(role) ? 'tips' : 'my-tips');
+const homePath = (role: string) => (isShiftLead(role) ? 'tips/new' : isStaff(role) ? 'tips' : 'my-tips');
 
 // Renders the page only for roles that pass `allow`; everyone else is sent to their own home page.
 function RequireRole({ allow, children }: { allow: (role: string) => boolean; children: React.ReactNode }) {

@@ -40,6 +40,9 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'setRoleLabels' && event.tenantSlug && event.labels && typeof event.labels === 'object') {
       return runSetRoleLabels(event.tenantSlug, event.labels);
     }
+    if (event.action === 'setStaffRoles' && event.tenantSlug && Array.isArray(event.roles)) {
+      return runSetStaffRoles(event.tenantSlug, event.roles);
+    }
     if (event.action === 'resetAdminPassword' && event.tenantSlug && event.email && event.password) {
       return runResetAdminPassword(event.tenantSlug, event.email, event.password);
     }
@@ -166,6 +169,9 @@ async function runMigrations() {
       -- Per-venue role display names (JSON, e.g. {"SERVER":"Barista"} for coffee shops); display only
       ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "roleLabels" TEXT;
 
+      -- Opt-in staff login roles per venue (JSON array, e.g. ["BARISTA"])
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "staffRoles" TEXT;
+
       -- Cash drop reconciliation (PRD 3.10): one active count per venue per date
       CREATE TABLE IF NOT EXISTS "cash_counts" (
         "id" TEXT PRIMARY KEY,
@@ -291,6 +297,16 @@ async function runSetSupportSplitMode(tenantSlug: string, mode: 'POOLED' | 'PER_
   if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
   await setSupportSplitMode(tenantSlug, mode);
   return { success: true, tenant: tenant.slug, supportSplitMode: mode };
+}
+
+// Enable opt-in staff login roles at one venue, e.g. ["BARISTA"]. `[]` disables them.
+async function runSetStaffRoles(tenantSlug: string, roles: string[]) {
+  const { setStaffRoles } = require('./services/tenant.service');
+  try {
+    return { success: true, tenant: tenantSlug, staffRoles: await setStaffRoles(tenantSlug, roles) };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 // Rename roles for display in one venue, e.g. {"SERVER":"Barista"}. `{}` resets to the defaults.

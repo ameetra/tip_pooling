@@ -34,6 +34,7 @@ beforeAll(async () => {
       timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
       supportSplitMode TEXT NOT NULL DEFAULT 'POOLED',
       roleLabels TEXT,
+      staffRoles TEXT,
       shiftHoursSun REAL,
       shiftHoursMon REAL,
       shiftHoursTue REAL,

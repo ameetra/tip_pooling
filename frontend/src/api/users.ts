@@ -1,6 +1,6 @@
 import { get, post, patch, del } from './client';
 
-export type StaffRole = 'MANAGER' | 'SHIFT_LEAD';
+export type StaffRole = 'MANAGER' | 'SHIFT_LEAD' | 'BARISTA';
 
 export interface Staff {
   id: string;

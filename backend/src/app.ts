@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { tenantContext } from './middleware/tenant-context';
 import { verifyJWT, requireRole } from './middleware/auth';
 import { errorHandler } from './middleware/error-handler';
+import { SHIFT_LEAD_ROLES } from './validation/user.schema';
 import authRoutes from './routes/auth.routes';
 import tenantRoutes from './routes/tenant.routes';
 import employeeRoutes from './routes/employee.routes';
@@ -65,7 +66,7 @@ export function createApp() {
   // Shift-lead-accessible routes: tip entry creation and publishing + read-only employee lookup
   // for the form's dropdown. Registered before the broad mounts so these
   // specific paths bypass the adminOrManager gate.
-  const tipCreator = [verifyJWT, requireRole('ADMIN', 'MANAGER', 'SHIFT_LEAD')];
+  const tipCreator = [verifyJWT, requireRole('ADMIN', 'MANAGER', ...SHIFT_LEAD_ROLES)];
   app.post('/api/v1/tips/preview', ...tipCreator, validateBody(TipPreviewSchema), tipController.preview);
   app.post('/api/v1/tips/entries', ...tipCreator, validateBody(CreateTipEntrySchema), tipController.create);
   app.post('/api/v1/tips/entries/:id/publish', ...tipCreator, tipController.publish);

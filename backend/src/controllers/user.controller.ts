@@ -1,14 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import prisma from '../database/client';
+import { OPTIONAL_STAFF_ROLES, SHIFT_LEAD_ROLES } from '../validation/user.schema';
+import { getStaffRoles } from '../services/tenant.service';
 
 const forbidden = (res: Response) =>
   res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions.' } });
 
 // Which target roles a caller can list / create / remove / reset
 function allowedTargetRoles(callerRole: string | undefined): string[] {
-  if (callerRole === 'ADMIN') return ['MANAGER', 'SHIFT_LEAD'];
-  if (callerRole === 'MANAGER') return ['SHIFT_LEAD'];
+  if (callerRole === 'ADMIN') return ['MANAGER', ...SHIFT_LEAD_ROLES];
+  if (callerRole === 'MANAGER') return SHIFT_LEAD_ROLES;
   return [];
 }
 
@@ -29,6 +31,10 @@ export const userController = {
     try {
       const { email, password, role } = req.body as { email: string; password: string; role: string };
       if (!allowedTargetRoles(req.user?.role).includes(role)) return forbidden(res);
+      if (OPTIONAL_STAFF_ROLES.includes(role) && !(await getStaffRoles(req.tenantId!)).includes(role)) {
+        res.status(400).json({ success: false, error: { code: 'ROLE_NOT_ENABLED', message: 'This role is not available at this venue.' } });
+        return;
+      }
 
       const existing = await (prisma as any).user.findFirst({ where: { tenantId: req.tenantId, email } });
       // A login outside the caller's scope (e.g. a removed admin) is never taken over, even when inactive.

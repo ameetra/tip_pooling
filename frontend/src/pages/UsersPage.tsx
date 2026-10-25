@@ -10,14 +10,16 @@ import KeyIcon from '@mui/icons-material/Key';
 import AddIcon from '@mui/icons-material/Add';
 import { usersApi, type Staff, type StaffRole } from '../api/users';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
+import { formatRole } from '../constants/roles';
 import PasswordField from '../components/PasswordField';
 import { PASSWORD_RULES, passwordProblem, passwordSaveError } from '../utils/password';
-
-const roleLabel = (r: StaffRole) => (r === 'MANAGER' ? 'Manager' : 'Shift Lead');
 
 function AddStaffDialog({ open, onClose, callerRole }: { open: boolean; onClose: () => void; callerRole: string }) {
   const qc = useQueryClient();
   const canPickManager = callerRole === 'ADMIN';
+  const { staffRoles } = useTenant();
+  const roles: StaffRole[] = [...(canPickManager ? ['MANAGER' as const] : []), 'SHIFT_LEAD', ...(staffRoles.includes('BARISTA') ? ['BARISTA' as const] : [])];
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<StaffRole>(canPickManager ? 'MANAGER' : 'SHIFT_LEAD');
@@ -44,11 +46,10 @@ function AddStaffDialog({ open, onClose, callerRole }: { open: boolean; onClose:
           label="Role"
           value={role}
           onChange={(e) => setRole(e.target.value as StaffRole)}
-          disabled={!canPickManager}
+          disabled={roles.length < 2}
           fullWidth
         >
-          {canPickManager && <MenuItem value="MANAGER">Manager</MenuItem>}
-          <MenuItem value="SHIFT_LEAD">Shift Lead</MenuItem>
+          {roles.map((r) => <MenuItem key={r} value={r}>{formatRole(r)}</MenuItem>)}
         </TextField>
         <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
         <PasswordField label="Password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth autoComplete="new-password"
@@ -137,7 +138,7 @@ export default function UsersPage() {
                 <TableCell>
                   <Chip
                     size="small"
-                    label={roleLabel(s.role)}
+                    label={formatRole(s.role)}
                     color={s.role === 'MANAGER' ? 'primary' : 'default'}
                     variant="outlined"
                   />

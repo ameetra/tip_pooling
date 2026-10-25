@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { formatRole } from '../constants/roles';
+import { formatRole, isShiftLead } from '../constants/roles';
 import {
   AppBar, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography, IconButton, Tooltip,
 } from '@mui/material';
@@ -38,7 +38,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   const { logout, user } = useAuth();
   const { slug } = useTenant();
-  const navItems = user?.role === 'SHIFT_LEAD' ? shiftLeadNavItems : user?.role === 'ADMIN' ? adminNavItems : managerNavItems;
+  const navItems = isShiftLead(user?.role) ? shiftLeadNavItems : user?.role === 'ADMIN' ? adminNavItems : managerNavItems;
   const to = (path: string) => `/${slug}${path}`;
 
   return (

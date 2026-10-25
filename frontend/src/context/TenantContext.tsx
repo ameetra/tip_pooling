@@ -7,6 +7,7 @@ interface TenantInfo {
   name: string;
   logoUrl: string | null;
   roleLabels: Record<string, string>;
+  staffRoles: string[]; // opt-in staff login roles, e.g. ['BARISTA']
   loading: boolean;
   notFound: boolean;
 }
@@ -15,17 +16,17 @@ const TenantContext = createContext<TenantInfo | null>(null);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { venueSlug = '' } = useParams();
-  const [info, setInfo] = useState<TenantInfo>({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, loading: true, notFound: false });
+  const [info, setInfo] = useState<TenantInfo>({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: true, notFound: false });
 
   useEffect(() => {
-    setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, loading: true, notFound: false });
-    get<{ slug: string; name: string; logoUrl: string | null; roleLabels?: Record<string, string> }>(`/tenants/${venueSlug}/branding`)
+    setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: true, notFound: false });
+    get<{ slug: string; name: string; logoUrl: string | null; roleLabels?: Record<string, string>; staffRoles?: string[] }>(`/tenants/${venueSlug}/branding`)
       .then((d) => {
-        setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, roleLabels: d.roleLabels ?? {}, loading: false, notFound: false });
+        setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, roleLabels: d.roleLabels ?? {}, staffRoles: d.staffRoles ?? [], loading: false, notFound: false });
         document.title = `${d.name} — Gratify`;
       })
       .catch(() => {
-        setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, loading: false, notFound: true });
+        setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: false, notFound: true });
         document.title = 'Gratify';
       });
   }, [venueSlug]);
