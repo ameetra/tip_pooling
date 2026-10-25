@@ -40,6 +40,10 @@ export const handler = async (event: any, context: any) => {
     if (event.action === 'setRoleLabels' && event.tenantSlug && event.labels && typeof event.labels === 'object') {
       return runSetRoleLabels(event.tenantSlug, event.labels);
     }
+    if (event.action === 'getStaff' && event.tenantSlug) return runGetStaff(event.tenantSlug);
+    if (event.action === 'setStaffLoginRoles' && event.tenantSlug && Array.isArray(event.logins)) {
+      return runSetStaffLoginRoles(event.tenantSlug, event.logins);
+    }
     if (event.action === 'setStaffRoles' && event.tenantSlug && Array.isArray(event.roles)) {
       return runSetStaffRoles(event.tenantSlug, event.roles);
     }
@@ -255,12 +259,21 @@ async function runImportEmployees(tenantSlug: string, employees: any[]) {
       errors.push(`invalid: ${JSON.stringify(e)}`); continue;
     }
 
+    // Optional `role` sets the primary (default) role; it must be one of this row's rates.
+    const primaryRole = e.role ? String(e.role).trim().toUpperCase() : undefined;
+    if (primaryRole && !rates.some((r: any) => r.role === primaryRole)) {
+      errors.push(`role not in rates: ${JSON.stringify(e)}`); continue;
+    }
+
     const existing = await prisma.employee.findFirst({ where: { tenantId: tenant.id, email } });
     if (existing) {
+      if (primaryRole && primaryRole !== existing.role) {
+        await employeeService.update(tenant.id, existing.id, { role: primaryRole });
+      }
       await employeeService.setRoleRates(tenant.id, existing.id, { rates, effectiveDate: today });
       updated++;
     } else {
-      const role = primaryRolePriority.find((r) => rates.some((x: any) => x.role === r)) ?? rates[0].role;
+      const role = primaryRole ?? primaryRolePriority.find((r) => rates.some((x: any) => x.role === r)) ?? rates[0].role;
       await employeeService.create(tenant.id, { name, email, role, rates });
       created++;
     }
@@ -297,6 +310,26 @@ async function runSetSupportSplitMode(tenantSlug: string, mode: 'POOLED' | 'PER_
   if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
   await setSupportSplitMode(tenantSlug, mode);
   return { success: true, tenant: tenant.slug, supportSplitMode: mode };
+}
+
+// List a venue's staff logins (read-only).
+async function runGetStaff(tenantSlug: string) {
+  const { listStaff } = require('./services/tenant.service');
+  try {
+    return { success: true, tenant: tenantSlug, staff: await listStaff(tenantSlug) };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Switch existing logins between Shift Lead and Barista, e.g. [{"email":"a@x.com","role":"BARISTA"}].
+async function runSetStaffLoginRoles(tenantSlug: string, logins: { email: string; role: string }[]) {
+  const { setStaffLoginRoles } = require('./services/tenant.service');
+  try {
+    return { success: true, tenant: tenantSlug, ...(await setStaffLoginRoles(tenantSlug, logins)) };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 // Enable opt-in staff login roles at one venue, e.g. ["BARISTA"]. `[]` disables them.

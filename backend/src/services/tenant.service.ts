@@ -4,7 +4,7 @@ import { auditService } from './audit.service';
 import { ShiftHoursDefaultsInput } from '../validation/tip.schema';
 import { ROLE_VALUES, RoleLabels, parseRoleLabels } from '../types/tip-calculation.types';
 import { todayIn } from './effective-date';
-import { OPTIONAL_STAFF_ROLES } from '../validation/user.schema';
+import { OPTIONAL_STAFF_ROLES, SHIFT_LEAD_ROLES } from '../validation/user.schema';
 
 export interface Branding {
   slug: string;
@@ -67,6 +67,40 @@ export async function setStaffRoles(slug: string, roles: string[]) {
   await (prisma as any).tenant.update({ where: { slug }, data: { staffRoles: staffRoles.length ? JSON.stringify(staffRoles) : null } });
   await auditService.log({ tenantId: tenant.id, entityType: 'STAFF_ROLES', entityId: tenant.id, action: 'UPDATE', oldValues: { staffRoles: parseStaffRoles(tenant.staffRoles) }, newValues: { staffRoles } });
   return staffRoles;
+}
+
+/** A venue's staff logins (read-only, for the getStaff admin action). */
+export async function listStaff(slug: string) {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  return (prisma as any).user.findMany({
+    where: { tenantId: tenant.id },
+    select: { email: true, role: true, isActive: true, mustChangePassword: true, createdAt: true },
+    orderBy: [{ role: 'asc' }, { email: 'asc' }],
+  });
+}
+
+/**
+ * Switch existing active logins between the shift-lead-level roles (e.g. SHIFT_LEAD <-> BARISTA). Never touches
+ * Admin/Manager logins and never creates one; emails with no such login come back in `skipped`.
+ */
+export async function setStaffLoginRoles(slug: string, logins: { email: string; role: string }[]) {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  const enabled = parseStaffRoles(tenant.staffRoles);
+  const bad = logins.filter(({ role }) => !SHIFT_LEAD_ROLES.includes(role) || (OPTIONAL_STAFF_ROLES.includes(role) && !enabled.includes(role)));
+  if (bad.length) throw new Error(`Role not allowed or not enabled at ${slug}: ${bad.map((l) => `${l.email}=${l.role}`).join(', ')}`);
+
+  const changed: string[] = [], unchanged: string[] = [], skipped: string[] = [];
+  for (const { email, role } of logins) {
+    const user = await (prisma as any).user.findFirst({ where: { tenantId: tenant.id, email: email.trim().toLowerCase(), isActive: true } });
+    if (!user || !SHIFT_LEAD_ROLES.includes(user.role)) { skipped.push(email); continue; }
+    if (user.role === role) { unchanged.push(email); continue; }
+    await (prisma as any).user.update({ where: { id: user.id }, data: { role } });
+    await auditService.log({ tenantId: tenant.id, entityType: 'USER', entityId: user.id, action: 'ROLE_CHANGE', oldValues: { role: user.role }, newValues: { role, via: 'lambda-admin' } });
+    changed.push(`${user.email}: ${user.role} -> ${role}`);
+  }
+  return { changed, unchanged, skipped };
 }
 
 export async function listBranding(): Promise<Branding[]> {

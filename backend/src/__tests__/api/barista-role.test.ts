@@ -46,6 +46,37 @@ describe('Barista staff role', () => {
     expect((await request(app).get('/api/v1/tenants/test/branding')).body.data.staffRoles).toEqual(['BARISTA']);
   });
 
+  describe('setStaffLoginRoles admin action', () => {
+    const { setStaffLoginRoles, listStaff } = require('../../services/tenant.service');
+    const roleOf = async (email: string) => (await testPrisma.user.findFirst({ where: { email } }))?.role;
+    beforeEach(async () => {
+      await addStaff('ADMIN', 'SHIFT_LEAD', 'lead@test.com');
+      await addStaff('ADMIN', 'MANAGER', 'mgr@test.com');
+    });
+
+    it('refuses Barista until the venue enables it', async () => {
+      await expect(setStaffLoginRoles('test', [{ email: 'lead@test.com', role: 'BARISTA' }])).rejects.toThrow('not enabled');
+      expect(await roleOf('lead@test.com')).toBe('SHIFT_LEAD');
+    });
+
+    it('switches shift-lead-level logins only, never managers, never creating logins', async () => {
+      await setStaffRoles('test', ['BARISTA']);
+      const res = await setStaffLoginRoles('test', [
+        { email: 'Lead@test.com', role: 'BARISTA' },
+        { email: 'mgr@test.com', role: 'BARISTA' },
+        { email: 'nobody@test.com', role: 'BARISTA' },
+      ]);
+      expect(res).toEqual({ changed: ['lead@test.com: SHIFT_LEAD -> BARISTA'], unchanged: [], skipped: ['mgr@test.com', 'nobody@test.com'] });
+      expect(await roleOf('mgr@test.com')).toBe('MANAGER');
+      expect(await testPrisma.user.count({ where: { email: 'nobody@test.com' } })).toBe(0);
+      expect((await listStaff('test')).map((u: any) => [u.email, u.role])).toEqual([['lead@test.com', 'BARISTA'], ['mgr@test.com', 'MANAGER']]);
+    });
+
+    it('rejects target roles above shift lead', async () => {
+      await expect(setStaffLoginRoles('test', [{ email: 'lead@test.com', role: 'MANAGER' }])).rejects.toThrow('not allowed');
+    });
+  });
+
   it('setStaffRoles rejects roles that are not opt-in', async () => {
     await expect(setStaffRoles('test', ['MANAGER'])).rejects.toThrow('Unknown staff role(s): MANAGER');
   });
