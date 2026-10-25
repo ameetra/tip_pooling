@@ -8,7 +8,7 @@ import VenueBrand from '../components/VenueBrand';
 export default function EmployeeLoginPage() {
   const [params] = useSearchParams();
   const prefillEmail = params.get('email') ?? '';
-  const { slug } = useTenant();
+  const { slug, staffRoles } = useTenant();
 
   const [email, setEmail] = useState(prefillEmail);
   const [loading, setLoading] = useState(false);
@@ -62,7 +62,7 @@ export default function EmployeeLoginPage() {
         )}
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          Manager or shift lead?{' '}
+          {staffRoles.includes('BARISTA') ? 'Manager, shift lead, or barista?' : 'Manager or shift lead?'}{' '}
           <Link component={RouterLink} to={`/${slug}/manager-login`} underline="hover">Sign in here</Link>
         </Typography>
       </Paper>
