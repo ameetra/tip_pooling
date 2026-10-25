@@ -10,7 +10,7 @@ import PasswordField from '../components/PasswordField';
 export default function ManagerLoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { slug } = useTenant();
+  const { slug, staffRoles } = useTenant();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +38,7 @@ export default function ManagerLoginPage() {
         <VenueBrand />
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Management Sign In</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          For restaurant admins, managers, and shift leads. Sign in with your email and password.
+          For restaurant admins, managers, {staffRoles.includes('BARISTA') ? 'shift leads, and baristas' : 'and shift leads'}. Sign in with your email and password.
         </Typography>
 
         <form onSubmit={handleSubmit}>
