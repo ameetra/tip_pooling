@@ -32,6 +32,13 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  // 400, not 401: the API client treats a 401 as "signed out", and an old link shouldn't end a valid session.
+  if (['INVALID_TOKEN', 'TOKEN_USED', 'TOKEN_EXPIRED'].includes((err as any).code)) {
+    response.error = { code: (err as any).code, message: err.message };
+    res.status(400).json(response);
+    return;
+  }
+
   if ((err as any).code === 'TENANT_NOT_FOUND') {
     response.error = { code: 'TENANT_NOT_FOUND', message: err.message };
     res.status(404).json(response);

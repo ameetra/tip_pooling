@@ -102,9 +102,9 @@ export async function verifyMagicLink(rawToken: string): Promise<{ jwt: string }
   const token = hashToken(rawToken);
   const record = await (prisma as any).magicLinkToken.findUnique({ where: { token } });
 
-  if (!record) throw Object.assign(new Error('Invalid or expired magic link.'), { code: 'INVALID_TOKEN' });
-  if (record.isUsed) throw Object.assign(new Error('This magic link has already been used.'), { code: 'TOKEN_USED' });
-  if (record.expiresAt < new Date()) throw Object.assign(new Error('This magic link has expired.'), { code: 'TOKEN_EXPIRED' });
+  if (!record) throw Object.assign(new Error('This sign-in link is not valid. Request a new one to sign in.'), { code: 'INVALID_TOKEN' });
+  if (record.isUsed) throw Object.assign(new Error('This sign-in link has already been used. Request a new one to sign in.'), { code: 'TOKEN_USED' });
+  if (record.expiresAt < new Date()) throw Object.assign(new Error('This sign-in link has expired. Request a new one to sign in.'), { code: 'TOKEN_EXPIRED' });
 
   await (prisma as any).magicLinkToken.update({
     where: { token },

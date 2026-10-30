@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Box, CircularProgress, Typography, Alert } from '@mui/material';
+import { Box, Button, CircularProgress, Typography, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import api from '../api/client';
@@ -28,7 +28,12 @@ export default function VerifyPage() {
   if (error) {
     return (
       <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Alert severity="error" sx={{ maxWidth: 400 }}>{error}</Alert>
+        <Alert
+          severity="error" sx={{ maxWidth: 400 }}
+          action={<Button color="inherit" size="small" onClick={() => navigate(`/${slug}/login`)}>Get a new link</Button>}
+        >
+          {error}
+        </Alert>
       </Box>
     );
   }

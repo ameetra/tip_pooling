@@ -352,3 +352,30 @@
 
 **Prevention:**
 - Every form action needs a visible error path; dropdowns should offer only values the server will accept.
+
+---
+
+### 🟠 Bug #13: Used or expired sign-in links showed "An unexpected error occurred"
+**Date Found:** 2026-10-30
+**Severity:** Medium (UX; an employee couldn't tell what to do next)
+**Status:** ✅ RESOLVED
+**Found By:** Production logs, during the first week of real use (one occurrence on 2026-10-27)
+
+**Symptoms:**
+- Opening a sign-in link that was already used, expired or unknown showed a generic error, with no way forward.
+
+**Root Cause:**
+- `verifyMagicLink` throws clear errors with their own codes, but the error handler didn't list those codes, so they became a 500.
+
+**Fix:**
+- The error handler returns these as 400 with the real message. It's not a 401, because the API client treats that as signed out.
+- The messages tell the person to request a new link, and the page has a Get a new link button.
+
+**Files Modified:**
+- `backend/src/middleware/error-handler.ts`, `backend/src/services/auth.service.ts`, `frontend/src/pages/VerifyPage.tsx`
+
+**Test Added:**
+- `backend/src/__tests__/api/magic-link-verify.test.ts`. Frontend has no unit test runner; verify live.
+
+**Prevention:**
+- A new error code needs a matching case in the error handler, or it reaches the user as a generic 500.
