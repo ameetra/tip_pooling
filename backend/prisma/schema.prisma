@@ -112,6 +112,7 @@ model SupportStaffConfig {
 
 model TipEntry {
   id              String    @id @default(cuid())
+  poolName        String    @default("") // "" is the date's regular pool; a name marks a separate event
   tenantId        String
   entryDate       String    // YYYY-MM-DD (SQLite has no DATE type)
   cashInRegister  Float     @default(0)
@@ -195,6 +196,7 @@ model AuditLog {
 
 model CashCount {
   id             String    @id @default(cuid())
+  poolName       String    @default("") // matches the tip entry's pool on entryDate
   tenantId       String
   entryDate      String    // YYYY-MM-DD of the tip entry whose drop was counted
   expectedAmount Float     // the entry's cashInRegister when counted (re-snapshotted on edit)

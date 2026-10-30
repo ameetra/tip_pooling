@@ -19,8 +19,13 @@ const poolNonNegative = (d: { cashInRegister: number; cashSales: number; cashTip
   (d.cashInRegister - d.cashSales) + d.cashTips + d.posTips >= 0;
 const poolError = { message: 'Total tips cannot be negative', path: ['cashInRegister'] };
 
+// Empty is the date's regular pool; a name marks a separate event.
+const poolName = z.string().transform((s) => s.trim().replace(/\s+/g, ' ')).pipe(z.string().max(60, 'Event name must be 60 characters or fewer'));
+export const poolNameField = poolName.default('');
+
 export const TipPreviewSchema = z.object({
   entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
+  poolName: poolNameField,
   ...cashFields,
   // "Total Shift Hours" — the PER_PERSON support-split denominator. Optional here: whether it's
   // actually required depends on the tenant's supportSplitMode, enforced in the calculation engine.
@@ -51,7 +56,10 @@ export const ShiftHoursDefaultsSchema = z.object({
   sun: dayHours, mon: dayHours, tue: dayHours, wed: dayHours, thu: dayHours, fri: dayHours, sat: dayHours,
 });
 
+export const TipPoolsQuerySchema = z.object({ date: calendarDate });
+
 export const EditTipEntrySchema = z.object({
+  poolName: poolName.optional(),
   cashInRegister: z.number().min(0).optional(),
   cashSales: z.number().min(0).optional(),
   cashTips: z.number().min(0).optional(),

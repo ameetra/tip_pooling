@@ -4,7 +4,7 @@ import { tipEntryService } from '../services/tip-entry.service';
 import { payrollReportService } from '../services/payroll-report.service';
 import { roleBreakdown } from '../services/role-breakdown';
 import { getRoleLabels } from '../services/tenant.service';
-import { TipEntryQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
+import { TipEntryQuerySchema, TipPoolsQuerySchema, PayrollReportQuerySchema } from '../validation/tip.schema';
 import { formatRole } from '../types/tip-calculation.types';
 import { performer } from '../middleware/auth';
 import { hidesPay, tipsOnly } from '../utils/pay-redaction';
@@ -21,6 +21,13 @@ export const tipController = {
     try {
       const entry = await tipEntryService.create(req.tenantId, req.body, performer(req));
       res.status(201).json({ success: true, data: hidesPay(req) ? { ...entry, results: tipsOnly(entry.results) } : entry });
+    } catch (err) { next(err); }
+  },
+
+  async pools(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date } = TipPoolsQuerySchema.parse(req.query);
+      res.json({ success: true, data: await tipEntryService.poolsForDate(req.tenantId, date) });
     } catch (err) { next(err); }
   },
 

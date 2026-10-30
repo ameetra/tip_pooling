@@ -7,6 +7,7 @@ import { sendTipEmail } from './email.service';
 import { pickAsOf } from './effective-date';
 import { roleBreakdown } from './role-breakdown';
 import { supportConfigService } from './support-config.service';
+import { samePool } from '../utils/pool-name';
 
 async function buildCalcInput(tenantId: string, input: TipPreviewInput) {
   const cashTips = computeCashTips(input.cashInRegister, input.cashSales, input.cashTips);
@@ -79,6 +80,17 @@ const cashColumns = (input: { cashInRegister: number; cashSales: number; cashTip
   shiftHours: input.shiftHours ?? null,
 });
 
+async function assertPoolFree(tenantId: string, entryDate: string, poolName: string, exceptId?: string) {
+  const active = await prisma.tipEntry.findMany({ where: { tenantId, entryDate, isDeleted: false }, select: { id: true, poolName: true } });
+  if (!active.some((e) => e.id !== exceptId && samePool(e.poolName, poolName))) return;
+  throw new TipCalculationError(
+    poolName
+      ? `"${poolName}" already exists for ${entryDate}. Use a different name.`
+      : `An entry already exists for ${entryDate}. Enter an event name to add a separate tip pool.`,
+    'DUPLICATE_ENTRY',
+  );
+}
+
 export const tipEntryService = {
   async preview(tenantId: string, input: TipPreviewInput) {
     const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips, posTips } = await buildCalcInput(tenantId, input);
@@ -87,25 +99,20 @@ export const tipEntryService = {
   },
 
   async create(tenantId: string, input: CreateTipEntryInput, performedBy?: { userId: string; email: string }) {
-    const existing = await prisma.tipEntry.findFirst({
-      where: { tenantId, entryDate: input.entryDate, isDeleted: false },
-    });
-    if (existing) {
-      throw new TipCalculationError(`An active tip entry already exists for ${input.entryDate}`, 'DUPLICATE_ENTRY');
-    }
+    await assertPoolFree(tenantId, input.entryDate, input.poolName);
 
     const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, input);
     const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
 
     const tipEntry = await prisma.$transaction(async (tx) => {
       const entry = await tx.tipEntry.create({
-        data: { tenantId, entryDate: input.entryDate, ...cashColumns(input) },
+        data: { tenantId, entryDate: input.entryDate, poolName: input.poolName, ...cashColumns(input) },
       });
       await saveCalculations(tx, entry.id, calc.stints);
       return entry;
     });
 
-    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', performedBy, newValues: { entryDate: input.entryDate, totalTipPool } });
+    await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: tipEntry.id, action: 'CREATE', performedBy, newValues: { entryDate: input.entryDate, poolName: input.poolName, totalTipPool } });
     return { ...tipEntry, cashTips, totalTipPool, results: calc.employees };
   },
 
@@ -180,6 +187,7 @@ export const tipEntryService = {
 
     const merged: CreateTipEntryInput = {
       entryDate: existing.entryDate,
+      poolName: input.poolName ?? existing.poolName,
       cashInRegister: input.cashInRegister ?? existing.cashInRegister,
       cashSales: input.cashSales ?? existing.cashSales,
       cashTips: input.cashTips ?? existing.cashTips,
@@ -187,6 +195,7 @@ export const tipEntryService = {
       shiftHours: input.shiftHours ?? (existing as any).shiftHours ?? undefined,
       employees: input.employees,
     };
+    await assertPoolFree(tenantId, existing.entryDate, merged.poolName, existing.id);
 
     const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, merged);
     const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
@@ -195,7 +204,7 @@ export const tipEntryService = {
     const newEntry = await prisma.$transaction(async (tx) => {
       await tx.tipEntry.updateMany({ where: { id: existing.id }, data: { isDeleted: true, deletedAt: new Date() } });
       const entry = await tx.tipEntry.create({
-        data: { tenantId, entryDate: existing.entryDate, ...cashColumns(merged) },
+        data: { tenantId, entryDate: existing.entryDate, poolName: merged.poolName, ...cashColumns(merged) },
       });
       await saveCalculations(tx, entry.id, calc.stints);
       await tx.tipEntry.updateMany({ where: { id: existing.id }, data: { replacedById: entry.id } });
@@ -205,8 +214,8 @@ export const tipEntryService = {
     await auditService.log({
       tenantId, entityType: 'TIP_ENTRY', entityId: newEntry.id, action: 'UPDATE',
       performedBy,
-      oldValues: { id: existing.id, entryDate: existing.entryDate },
-      newValues: { id: newEntry.id, replacedOldId: existing.id },
+      oldValues: { id: existing.id, entryDate: existing.entryDate, poolName: existing.poolName },
+      newValues: { id: newEntry.id, replacedOldId: existing.id, poolName: merged.poolName },
     });
     return { ...newEntry, cashTips, totalTipPool, results: calc.employees };
   },
@@ -224,11 +233,25 @@ export const tipEntryService = {
     }
 
     const [data, total] = await Promise.all([
-      prisma.tipEntry.findMany({ where, orderBy: { entryDate: 'desc' }, skip, take: limit }),
+      prisma.tipEntry.findMany({ where, orderBy: [{ entryDate: 'desc' }, { poolName: 'asc' }], skip, take: limit }),
       prisma.tipEntry.count({ where }),
     ]);
 
     return { data, pagination: { page, limit, total } };
+  },
+
+  // For the entry form's same-date warning, open to shift leads and baristas, so it must never carry pay data.
+  async poolsForDate(tenantId: string, date: string) {
+    const entries = await prisma.tipEntry.findMany({
+      where: { tenantId, entryDate: date, isDeleted: false },
+      orderBy: { poolName: 'asc' },
+      include: { tipCalculations: { select: { employee: { select: { name: true } } } } },
+    });
+    return entries.map((e) => ({
+      poolName: e.poolName,
+      totalTipPool: Number((computeCashTips(e.cashInRegister, e.cashSales, e.cashTips) + e.posTips).toFixed(2)),
+      employees: [...new Set(e.tipCalculations.map((c) => c.employee.name))].sort(),
+    }));
   },
 
   findById(tenantId: string, id: string) {

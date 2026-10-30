@@ -114,6 +114,7 @@ model SupportStaffConfig {
 
 model TipEntry {
   id              String    @id @default(cuid())
+  poolName        String    @default("") // "" is the date's regular pool; a name marks a separate event
   tenantId        String
   entryDate       String
   cashInRegister  Float     @default(0)
@@ -197,6 +198,7 @@ model AuditLog {
 
 model CashCount {
   id             String    @id @default(cuid())
+  poolName       String    @default("") // matches the tip entry's pool on entryDate
   tenantId       String
   entryDate      String    // YYYY-MM-DD of the tip entry whose drop was counted
   expectedAmount Float     // the entry's cashInRegister when counted (re-snapshotted on edit)
@@ -218,7 +220,7 @@ model CashCount {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  // One active count per date: partial unique index created in raw SQL (Prisma can't express WHERE)
+  // One active count per pool on a date: partial unique index created in raw SQL (Prisma can't express WHERE)
   @@index([tenantId, entryDate, isDeleted])
   @@map("cash_counts")
 }

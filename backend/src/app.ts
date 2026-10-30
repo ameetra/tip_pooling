@@ -67,6 +67,7 @@ export function createApp() {
   // for the form's dropdown. Registered before the broad mounts so these
   // specific paths bypass the adminOrManager gate.
   const tipCreator = [verifyJWT, requireRole('ADMIN', 'MANAGER', ...SHIFT_LEAD_ROLES)];
+  app.get('/api/v1/tips/pools', ...tipCreator, tipController.pools);
   app.post('/api/v1/tips/preview', ...tipCreator, validateBody(TipPreviewSchema), tipController.preview);
   app.post('/api/v1/tips/entries', ...tipCreator, validateBody(CreateTipEntrySchema), tipController.create);
   app.post('/api/v1/tips/entries/:id/publish', ...tipCreator, tipController.publish);
