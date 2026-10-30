@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { poolNameField } from './tip.schema';
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD');
 const bills = z.number().int().min(0).max(10000).default(0);
@@ -17,7 +18,7 @@ export const CashCountBodySchema = z.object({
   comments: optionalText(500),
 });
 
-export const CreateCashCountSchema = CashCountBodySchema.extend({ entryDate: date });
+export const CreateCashCountSchema = CashCountBodySchema.extend({ entryDate: date, poolName: poolNameField });
 
 export const CashCountQuerySchema = z.object({
   from: date.optional(),
