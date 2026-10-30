@@ -96,8 +96,18 @@ async function runTipDataCheck() {
         (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, sum("totalHours")::numeric(14,2) AS hours, sum("finalTips")::numeric(14,2) AS "finalTips",
           sum("totalPay")::numeric(14,2) AS "totalPay" FROM "tip_calculations") t) AS "tipCalculations",
         (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, count(*) FILTER (WHERE NOT "isDeleted")::int AS active,
-          sum("expectedAmount")::numeric(14,2) AS "expectedAmount", sum("countedTotal")::numeric(14,2) AS "countedTotal" FROM "cash_counts") t) AS "cashCounts"`);
-    return { success: true, duplicates: duplicates.rows, totals: totals.rows[0] };
+          sum("expectedAmount")::numeric(14,2) AS "expectedAmount", sum("countedTotal")::numeric(14,2) AS "countedTotal" FROM "cash_counts") t) AS "cashCounts",
+        (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, sum("hourlyRate")::numeric(14,2) AS "hourlyRate" FROM "employee_role_rates") t) AS "roleRates",
+        (SELECT json_object_agg("role", n) FROM (SELECT "role", count(*)::int AS n FROM "employee_rate_history" GROUP BY 1) t) AS "rateHistoryByRole"`);
+    // Older migrations relabelled SERVER wage history to the employee's primary role on every run. Read-only signs of that:
+    // current role rates with no history for that role, and SERVER history the old statement would have relabelled.
+    const wageHistory = await pool.query(`
+      SELECT
+        (SELECT count(*)::int FROM "employee_role_rates" rr WHERE NOT EXISTS
+          (SELECT 1 FROM "employee_rate_history" rh WHERE rh."employeeId" = rr."employeeId" AND rh."role" = rr."role")) AS "ratesWithoutHistory",
+        (SELECT count(*)::int FROM "employee_rate_history" rh JOIN "employees" e ON e."id" = rh."employeeId"
+          WHERE rh."role" = 'SERVER' AND e."role" <> 'SERVER') AS "serverHistoryOnOtherPrimaryRole"`);
+    return { success: true, duplicates: duplicates.rows, totals: totals.rows[0], wageHistory: wageHistory.rows[0] };
   } catch (err: any) {
     return { success: false, error: err.message };
   } finally {
@@ -158,12 +168,8 @@ async function runMigrations() {
       -- Legacy drawer columns no longer written; relax constraints so new inserts can omit them
       ALTER TABLE "tip_entries" ALTER COLUMN "startingDrawer" DROP NOT NULL;
       ALTER TABLE "tip_entries" ALTER COLUMN "closingDrawer" DROP NOT NULL;
-      -- One-time backfill: POS tips carried over from the old electronicTips field
-      UPDATE "tip_entries" SET "posTips" = "electronicTips" WHERE "posTips" = 0 AND "electronicTips" <> 0;
 
       ALTER TABLE "employee_rate_history" ADD COLUMN IF NOT EXISTS "role" TEXT NOT NULL DEFAULT 'SERVER';
-      UPDATE "employee_rate_history" rh SET "role" = e."role"
-        FROM "employees" e WHERE rh."employeeId" = e."id" AND rh."role" = 'SERVER' AND e."role" <> 'SERVER';
 
       CREATE TABLE IF NOT EXISTS "employee_role_rates" (
         "id" TEXT NOT NULL,
