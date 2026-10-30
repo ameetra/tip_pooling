@@ -15,4 +15,4 @@ export const poolTitle = (entryDate: string, poolName?: string) => (poolName ? `
 export const deleteEntryMessage = (entry?: { entryDate: string; poolName?: string; publishedAt: string | null }) =>
   entry?.publishedAt
     ? `This entry was published and emailed to staff. Deleting it changes payroll totals for ${poolTitle(entry.entryDate, entry.poolName)}. Note the current amounts first.`
-    : 'This will soft-delete the entry.';
+    : `This will soft-delete the entry${entry?.poolName ? ` for ${poolTitle(entry.entryDate, entry.poolName)}` : ''}.`;

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { createApp } from '../../app';
 import { testPrisma } from '../setup';
 import { sendTipEmail } from '../../services/email.service';
+import prisma from '../../database/client';
 
 jest.mock('../../services/email.service', () => ({ sendTipEmail: jest.fn().mockResolvedValue(undefined) }));
 
@@ -114,11 +115,35 @@ describe('Multiple tip pools on one date', () => {
       expect(res.body.data.poolName).toBe('Private event');
     });
 
+    // Two people acting at once: the edit read the draft just before the other change landed.
+    it.each([
+      ['replaced', { isDeleted: true, deletedAt: new Date() }],
+      ['published', { publishedAt: new Date() }],
+    ])('refuses an edit of a draft %s after it was read, creating nothing', async (_label, change) => {
+      const { id } = (await create({ poolName: 'Original' })).body.data;
+      const stale = await testPrisma.tipEntry.findUnique({ where: { id } });
+      await testPrisma.tipEntry.update({ where: { id }, data: change });
+      const read = jest.spyOn(prisma.tipEntry, 'findFirst').mockResolvedValueOnce(stale as any);
+
+      const res = await request(app).patch(`/api/v1/tips/entries/${id}`).send(entry({ poolName: 'Other' }));
+      read.mockRestore();
+
+      expect(res.body.error.code).toBe('ENTRY_CHANGED');
+      expect(await testPrisma.tipEntry.count({ where: { poolName: 'Other' } })).toBe(0);
+    });
+
     it('allows changing only the capitals of its own name', async () => {
       const { id } = (await create({ poolName: 'private event' })).body.data;
       const res = await request(app).patch(`/api/v1/tips/entries/${id}`).send(entry({ poolName: 'Private Event' }));
       expect(res.body.data.poolName).toBe('Private Event');
     });
+  });
+
+  it('records poolName in the audit log when deleting', async () => {
+    const { id } = (await create({ poolName: 'Private event' })).body.data;
+    await request(app).delete(`/api/v1/tips/entries/${id}`);
+    const audit = await testPrisma.auditLog.findFirst({ where: { entityId: id, action: 'DELETE' } });
+    expect(JSON.stringify(audit?.newValues)).toContain('Private event');
   });
 
   it('passes the pool name to the email when publishing', async () => {

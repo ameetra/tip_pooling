@@ -203,7 +203,12 @@ export const tipEntryService = {
 
     // Delete first: the unique index on active pools would reject the new row while the old one is active.
     const newEntry = await prisma.$transaction(async (tx) => {
-      await tx.tipEntry.updateMany({ where: { id: existing.id }, data: { isDeleted: true, deletedAt: new Date() } });
+      // The filter also stops an edit overwriting a change someone else made since this draft was read.
+      const { count } = await tx.tipEntry.updateMany({
+        where: { id: existing.id, isDeleted: false, publishedAt: null },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+      if (!count) throw new TipCalculationError('This entry was just changed by someone else. Reload it and try again.', 'ENTRY_CHANGED');
       const entry = await tx.tipEntry.create({
         data: { tenantId, entryDate: existing.entryDate, poolName: merged.poolName, ...cashColumns(merged) },
       });
@@ -269,7 +274,7 @@ export const tipEntryService = {
   // A published entry has been emailed to staff and counted in payroll, so deleting it needs a reason
   // that admins can review (PRD 3.11). Drafts delete freely.
   async softDelete(tenantId: string, id: string, performedBy?: { userId: string; email: string }, why: DeleteTipEntryInput = {}) {
-    const entry = await prisma.tipEntry.findFirst({ where: { id, tenantId, isDeleted: false }, select: { publishedAt: true } });
+    const entry = await prisma.tipEntry.findFirst({ where: { id, tenantId, isDeleted: false }, select: { publishedAt: true, poolName: true } });
     if (!entry) return false;
     if (entry.publishedAt && !(why.reason && why.note)) {
       throw new TipCalculationError('A reason and note are required to delete a published entry', 'REASON_REQUIRED');
@@ -282,7 +287,7 @@ export const tipEntryService = {
       },
     });
     if (result.count > 0) {
-      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE', performedBy, newValues: why });
+      await auditService.log({ tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'DELETE', performedBy, newValues: { ...why, poolName: entry.poolName } });
     }
     return result.count > 0;
   },
