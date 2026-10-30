@@ -9,7 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SendIcon from '@mui/icons-material/Send';
 import { useEmployees } from '../api/employees';
-import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry, usePublishTipEntry } from '../api/tips';
+import { useTipPreview, useCreateTipEntry, useTipEntry, useEditTipEntry, usePublishTipEntry, useTipPools } from '../api/tips';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useShiftHoursConfig } from '../api/shift-hours';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ import { useTenant } from '../context/TenantContext';
 import type { Employee, EmployeeRole, ShiftHoursDay, TipEntryInput, EmployeeResult } from '../types';
 import { isShiftLead as isShiftLeadRole, useRoleLabels } from '../constants/roles';
 import { localDate } from '../utils/dates';
+import { poolTitle } from '../utils/tipEntry';
 
 const SHIFT_HOURS_DAYS: ShiftHoursDay[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 // entryDate is a plain YYYY-MM-DD string; parsing at noon UTC avoids the date shifting a day
@@ -69,6 +70,10 @@ export default function TipEntryFormPage() {
   const saving = createEntry.isPending || editEntry.isPending;
 
   const [entryDate, setEntryDate] = useState(today);
+  const [poolName, setPoolName] = useState('');
+  const [showPoolName, setShowPoolName] = useState(false);
+  const { data: pools = [] } = useTipPools(entryDate, !isEdit);
+  const hasRegularPool = pools.some((p) => !p.poolName);
   const [cashInRegister, setCashInRegister] = useState('');
   const [cashSales, setCashSales] = useState('');
   const [cashTips, setCashTips] = useState('');
@@ -77,7 +82,7 @@ export default function TipEntryFormPage() {
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [error, setError] = useState('');
   // A shift lead's just-saved entry, summarized here for publishing since they can't open the entry detail page.
-  const [saved, setSaved] = useState<{ id: string; entryDate: string; totalPool: number; results: EmployeeResult[]; published?: string } | null>(null);
+  const [saved, setSaved] = useState<{ id: string; entryDate: string; poolName: string; totalPool: number; results: EmployeeResult[]; published?: string } | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
 
   // Fill the form once from the saved draft; later refetches must not wipe the manager's changes.
@@ -86,6 +91,8 @@ export default function TipEntryFormPage() {
     if (!existing || prefilled.current) return;
     prefilled.current = true;
     setEntryDate(existing.entryDate);
+    setPoolName(existing.poolName);
+    setShowPoolName(!!existing.poolName);
     setCashInRegister(String(existing.cashInRegister));
     setCashSales(String(existing.cashSales));
     setCashTips(String(existing.cashTips));
@@ -108,6 +115,8 @@ export default function TipEntryFormPage() {
 
   const resetForm = () => {
     setEntryDate(today);
+    setPoolName('');
+    setShowPoolName(false);
     setCashInRegister('');
     setCashSales('');
     setCashTips('');
@@ -137,8 +146,10 @@ export default function TipEntryFormPage() {
     const emps = rows.filter((r) => r.employeeId && Number(r.hoursWorked) > 0);
     if (!emps.length || cashInRegister === '' || posTips === '') return null;
     if (isPerPerson && !(Number(shiftHours) > 0)) return null;
+    if (hasRegularPool && !poolName.trim()) return null;
     return {
       entryDate,
+      poolName,
       cashInRegister: amount(cashInRegister),
       cashSales: amount(cashSales),
       cashTips: amount(cashTips),
@@ -146,7 +157,7 @@ export default function TipEntryFormPage() {
       ...(isPerPerson ? { shiftHours: Number(shiftHours) } : {}),
       employees: emps.map((r) => ({ employeeId: r.employeeId, role: r.role, hoursWorked: Number(r.hoursWorked) })),
     };
-  }, [entryDate, cashInRegister, cashSales, cashTips, posTips, shiftHours, isPerPerson, rows]);
+  }, [entryDate, poolName, hasRegularPool, cashInRegister, cashSales, cashTips, posTips, shiftHours, isPerPerson, rows]);
 
   const handlePreview = () => {
     const input = buildInput();
@@ -174,7 +185,7 @@ export default function TipEntryFormPage() {
       }
       const result: any = await createEntry.mutateAsync(input);
       if (isShiftLead) {
-        setSaved({ id: result.id, entryDate: input.entryDate, totalPool, results: result.results });
+        setSaved({ id: result.id, entryDate: input.entryDate, poolName: result.poolName, totalPool, results: result.results });
         resetForm();
       } else {
         navigate(`/${slug}/tips/${result.id}`);
@@ -201,7 +212,7 @@ export default function TipEntryFormPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-              <Typography variant="h5">Tip Entry: {saved.entryDate}</Typography>
+              <Typography variant="h5">Tip Entry: {poolTitle(saved.entryDate, saved.poolName)}</Typography>
               {saved.published ? <Chip label="Published" color="success" /> : <Chip label="Draft" />}
             </Box>
             <Chip label={`Total Pool: $${saved.totalPool.toFixed(2)}`} color="primary" />
@@ -223,7 +234,7 @@ export default function TipEntryFormPage() {
         <ConfirmDialog
           open={confirmPublish}
           title="Publish & Send Emails"
-          message={`This will send tip summary emails to all ${saved.results.length} employee(s) for ${saved.entryDate}. This cannot be undone.`}
+          message={`This will send tip summary emails to all ${saved.results.length} employee(s) for ${poolTitle(saved.entryDate, saved.poolName)}. This cannot be undone.`}
           onConfirm={handlePublish}
           onCancel={() => setConfirmPublish(false)}
           confirmLabel="Publish & Send"
@@ -238,10 +249,36 @@ export default function TipEntryFormPage() {
       <Typography variant="h5" sx={{ mb: 2 }}>{isEdit ? 'Edit Tip Entry' : 'New Tip Entry'}</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
+      {pools.length > 0 && (
+        <Alert
+          severity="warning" sx={{ mb: 2 }}
+          action={hasRegularPool && !showPoolName && (
+            <Button color="inherit" size="small" onClick={() => setShowPoolName(true)}>Add a separate tip pool</Button>
+          )}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>An entry already exists for this date</Typography>
+          {pools.map((p) => (
+            <Typography variant="body2" key={p.poolName}>
+              {p.poolName || 'Regular shift'} · ${p.totalTipPool.toFixed(2)} total pool · {p.employees.join(', ')}
+            </Typography>
+          ))}
+        </Alert>
+      )}
+
       {/* Date + Cash inputs */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
+        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', alignItems: 'flex-start' }} useFlexGap>
           <TextField label="Date" type="date" value={entryDate} disabled={isEdit} onChange={(e) => setEntryDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          {showPoolName ? (
+            <TextField
+              label="Event name" value={poolName} required={hasRegularPool} autoFocus={!isEdit}
+              onChange={(e) => setPoolName(e.target.value)}
+              helperText={hasRegularPool ? 'Required for a separate tip pool' : 'Leave blank for the regular shift'}
+              slotProps={{ htmlInput: { maxLength: 60 } }}
+            />
+          ) : !hasRegularPool && (
+            <Button size="small" sx={{ alignSelf: 'center' }} onClick={() => setShowPoolName(true)}>This is a separate event</Button>
+          )}
           {isPerPerson && (
             <TextField
               label="Total Shift Hours" type="number" value={shiftHours} required

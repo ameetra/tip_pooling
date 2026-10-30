@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { get, post, patch, del } from './client';
-import type { DeletedEntriesReport, DeleteReason, TipEntry, TipEntryDetail, TipEntryInput, TipPreviewResponse } from '../types';
+import type { DeletedEntriesReport, DeleteReason, TipEntry, TipEntryDetail, TipEntryInput, TipPool, TipPreviewResponse } from '../types';
 import { dayBefore } from '../utils/dates';
 
 export interface PublishResult { emailsSent: number; emailsFailed: number; }
@@ -28,6 +28,14 @@ export const useOlderDrafts = (since: string) =>
 
 export const useTipEntry = (id: string) =>
   useQuery({ queryKey: ['tipEntries', id], queryFn: () => get<TipEntryDetail>(`/tips/entries/${id}`), enabled: !!id });
+
+// Under the tipEntries key so saving an entry refreshes the form's same-date warning.
+export const useTipPools = (date: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ['tipEntries', 'pools', date],
+    queryFn: () => get<TipPool[]>(`/tips/pools?date=${date}`),
+    enabled: enabled && !!date,
+  });
 
 export const useTipPreview = () =>
   useMutation({ mutationFn: (data: TipEntryInput) => post<TipPreviewResponse>('/tips/preview', data) });

@@ -78,6 +78,7 @@ export interface TipEntry {
   id: string;
   tenantId: string;
   entryDate: string;
+  poolName: string; // '' is the date's regular pool
   cashInRegister: number;
   cashSales: number;
   cashTips: number;
@@ -132,8 +133,15 @@ export interface EmployeeStintEntry {
   hoursWorked: number;
 }
 
+export interface TipPool {
+  poolName: string;
+  totalTipPool: number;
+  employees: string[];
+}
+
 export interface TipEntryInput {
   entryDate: string;
+  poolName: string;
   cashInRegister: number;
   cashSales: number;
   cashTips: number;
@@ -172,7 +180,7 @@ export type DeleteReason = 'WRONG_HOURS' | 'WRONG_EMPLOYEES' | 'WRONG_TIPS' | 'W
 
 export interface DeletedEntriesReport {
   entries: {
-    id: string; entryDate: string; publishedAt: string; deletedAt: string;
+    id: string; entryDate: string; poolName: string; publishedAt: string; deletedAt: string;
     deletedByEmail: string | null; deleteReason: DeleteReason | null; deleteNote: string | null; totalTipPool: number;
   }[];
   byUser: { email: string; count: number; reasons: Partial<Record<DeleteReason, number>> }[];
@@ -184,7 +192,7 @@ export interface PayrollReport {
   publishedEntries: number;
   employees: PayrollRow[];
   totalTips: number;
-  unpublished: { id: string; entryDate: string }[];
+  unpublished: { id: string; entryDate: string; poolName: string }[];
 }
 
 export type BillField = 'bills100' | 'bills50' | 'bills20' | 'bills10' | 'bills5' | 'bills2' | 'bills1';
@@ -194,6 +202,7 @@ export type CashCountInput = Record<BillField, number> & { coins: number; deposi
 export interface CashCount extends Record<BillField, number> {
   id: string;
   entryDate: string;
+  poolName: string;
   expectedAmount: number;
   coins: number;
   countedTotal: number;
@@ -205,6 +214,7 @@ export interface CashCount extends Record<BillField, number> {
 
 export interface CashCountRow {
   entryDate: string;
+  poolName: string;
   currentExpected: number | null; // Cash in Register on the day's tip entry now (null: no tip entry)
   count: CashCount | null;
   variance: number | null; // counted - expected at the time of counting
