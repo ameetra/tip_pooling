@@ -26,6 +26,29 @@ describe('sendTipEmail', () => {
     expect(Message.Body.Html.Data).toContain('$60.00');
   });
 
+  it('names the pool in the subject, HTML and text', async () => {
+    await sendTipEmail({ ...base, poolName: 'Private event' });
+    const { Message } = sentMessage();
+
+    expect(Message.Subject.Data).toBe('Your tips for 2026-09-22 – Private event — Demo Restaurant');
+    expect(Message.Body.Html.Data).toContain('<strong>2026-09-22 – Private event</strong>');
+    expect(Message.Body.Text.Data).toContain('Tip Summary for 2026-09-22 – Private event');
+  });
+
+  it('leaves the email unchanged for a regular pool', async () => {
+    await sendTipEmail({ ...base, poolName: '' });
+    const { Message } = sentMessage();
+
+    expect(Message.Subject.Data).toBe('Your tips for 2026-09-22 — Demo Restaurant');
+    expect(Message.Body.Html.Data).toContain('<strong>2026-09-22</strong>');
+    expect(Message.Body.Text.Data).toContain('Tip Summary for 2026-09-22\n');
+  });
+
+  it('escapes HTML in the pool name', async () => {
+    await sendTipEmail({ ...base, poolName: '<b>x</b>' });
+    expect(sentMessage().Message.Body.Html.Data).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+
   it('adds no per-role split for a single-role day', async () => {
     await sendTipEmail({ ...base, roleBreakdown: [{ role: 'Server', hours: 4, tips: 50 }] });
     const { Message } = sentMessage();

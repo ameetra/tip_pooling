@@ -17,6 +17,7 @@ export interface TipEmailData {
   slug?: string | null;
   logoUrl?: string | null;
   entryDate: string;
+  poolName?: string;
   roles: string[];
   roleBreakdown?: { role: string; hours: number; tips: number }[];
   roleLabels?: RoleLabels;
@@ -26,8 +27,10 @@ export interface TipEmailData {
   effectiveHourlyRate: number;
 }
 
+const poolTitle = (d: TipEmailData) => (d.poolName ? `${d.entryDate} – ${d.poolName}` : d.entryDate);
+
 export async function sendTipEmail(data: TipEmailData): Promise<void> {
-  const subject = `Your tips for ${data.entryDate} — ${data.restaurantName}`;
+  const subject = `Your tips for ${poolTitle(data)} — ${data.restaurantName}`;
   const loginPath = data.slug ? `/${data.slug}/login` : '/login';
   const loginUrl = `${APP_URL}${loginPath}?email=${encodeURIComponent(data.employeeEmail)}`;
   const body = buildEmailBody(data, loginUrl);
@@ -77,7 +80,7 @@ function buildEmailBody(d: TipEmailData, loginUrl: string): string {
   ${d.logoUrl ? `<img src="${esc(d.logoUrl)}" alt="${name}" style="max-height:56px; margin-bottom:8px;" />` : ''}
   <h2 style="color: #1976d2; margin-top:0;">${name}</h2>
   <p>Hi ${employee},</p>
-  <p>Here's your tip summary for <strong>${d.entryDate}</strong>:</p>
+  <p>Here's your tip summary for <strong>${esc(poolTitle(d))}</strong>:</p>
   <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
     <tr style="background:#f5f5f5;">
       <td style="padding: 8px 12px;">Role(s)</td>
@@ -147,7 +150,7 @@ export async function sendMagicLinkEmail(employeeName: string, employeeEmail: st
 }
 
 function buildPlainText(d: TipEmailData, loginUrl: string): string {
-  return `${d.restaurantName} — Tip Summary for ${d.entryDate}
+  return `${d.restaurantName} — Tip Summary for ${poolTitle(d)}
 
 Hi ${d.employeeName},
 

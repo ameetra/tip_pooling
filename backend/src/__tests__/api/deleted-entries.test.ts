@@ -27,6 +27,18 @@ describe('Deleting published entries requires a reason; admins see a report', ()
     aliceId = alice.body.data.id;
   });
 
+  it('names the pool of a deleted entry in the report', async () => {
+    const res = await request(app).post('/api/v1/tips/entries')
+      .send({ entryDate: '2026-04-10', poolName: 'Private event', ...cash, employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }] });
+    await publish(res.body.data.id);
+    await remove(res.body.data.id, { reason: 'WRONG_TIPS', note: 'Typo' });
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { entries } = (await request(app).get(`${REPORT}?start_date=2020-01-01&end_date=${today}`)).body.data;
+
+    expect(entries[0].poolName).toBe('Private event');
+  });
+
   describe('DELETE /tips/entries/:id', () => {
     it('rejects deleting a published entry without a reason and keeps it', async () => {
       const id = await createEntry('2026-04-10');

@@ -153,6 +153,7 @@ export const tipEntryService = {
           slug,
           logoUrl,
           entryDate: entry.entryDate,
+          poolName: entry.poolName,
           roles: r.roles,
           roleBreakdown: roleBreakdown(r.stints, roleLabels),
           roleLabels,
@@ -175,7 +176,7 @@ export const tipEntryService = {
     await auditService.log({
       tenantId, entityType: 'TIP_ENTRY', entityId: id, action: 'PUBLISH',
       performedBy,
-      newValues: { entryDate: entry.entryDate, emailsSent: emailResults.length - failed.length, emailsFailed: failed.length, emails: emailDetails },
+      newValues: { entryDate: entry.entryDate, poolName: entry.poolName, emailsSent: emailResults.length - failed.length, emailsFailed: failed.length, emails: emailDetails },
     });
     return { emailsSent: emailResults.length - failed.length, emailsFailed: failed.length };
   },
@@ -301,7 +302,7 @@ export const tipEntryService = {
       orderBy: { deletedAt: 'desc' },
     });
     const entries = rows.filter((r) => { const d = venueDay(r.deletedAt!); return d >= start && d <= end; }).map((r) => ({
-      id: r.id, entryDate: r.entryDate, publishedAt: r.publishedAt, deletedAt: r.deletedAt,
+      id: r.id, entryDate: r.entryDate, poolName: r.poolName, publishedAt: r.publishedAt, deletedAt: r.deletedAt,
       deletedByEmail: r.deletedByEmail, deleteReason: r.deleteReason, deleteNote: r.deleteNote,
       totalTipPool: Number((computeCashTips(r.cashInRegister, r.cashSales, r.cashTips) + r.posTips).toFixed(2)),
     }));

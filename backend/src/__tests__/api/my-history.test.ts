@@ -53,6 +53,39 @@ describe('GET /api/v1/tips/my-history', () => {
   });
 });
 
+describe('GET /api/v1/tips/my-history - two tip pools on one date', () => {
+  beforeEach(async () => {
+    await testPrisma.employee.create({
+      data: { id: EMPLOYEE_ID, tenantId: 'test-tenant', name: 'Test Server', email: 'server@test.com', role: 'SERVER', hourlyRate: 15 },
+    });
+  });
+
+  const publishedPool = async (entryDate: string, poolName: string, hoursWorked: number, posTips: number) => {
+    const res = await request(app).post('/api/v1/tips/entries').send({
+      entryDate, poolName, cashInRegister: 0, cashSales: 0, cashTips: 0, posTips,
+      employees: [{ employeeId: EMPLOYEE_ID, role: 'SERVER', hoursWorked }],
+    });
+    expect(res.status).toBe(201);
+    await testPrisma.tipEntry.update({ where: { id: res.body.data.id }, data: { publishedAt: new Date() } });
+    return res.body.data.id as string;
+  };
+
+  it('gives each pool its own record, regular first, and keeps dates newest first', async () => {
+    const date = daysAgo(1);
+    const eventId = await publishedPool(date, 'Private event', 3, 50);
+    const regularId = await publishedPool(date, '', 6, 90);
+    const olderId = await publishedPool(daysAgo(2), '', 8, 200);
+
+    const { records } = (await request(app).get('/api/v1/tips/my-history')).body.data;
+
+    expect(records.map((r: any) => [r.entryId, r.date, r.poolName, r.hours, r.tips])).toEqual([
+      [regularId, date, '', 6, 90],
+      [eventId, date, 'Private event', 3, 50],
+      [olderId, daysAgo(2), '', 8, 200],
+    ]);
+  });
+});
+
 describe('GET /api/v1/tips/my-history - two roles in one shift', () => {
   beforeEach(async () => {
     await testPrisma.employee.create({

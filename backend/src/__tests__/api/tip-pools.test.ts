@@ -2,6 +2,7 @@ import '../setup';
 import request from 'supertest';
 import { createApp } from '../../app';
 import { testPrisma } from '../setup';
+import { sendTipEmail } from '../../services/email.service';
 
 jest.mock('../../services/email.service', () => ({ sendTipEmail: jest.fn().mockResolvedValue(undefined) }));
 
@@ -118,6 +119,12 @@ describe('Multiple tip pools on one date', () => {
       const res = await request(app).patch(`/api/v1/tips/entries/${id}`).send(entry({ poolName: 'Private Event' }));
       expect(res.body.data.poolName).toBe('Private Event');
     });
+  });
+
+  it('passes the pool name to the email when publishing', async () => {
+    const { id } = (await create({ poolName: 'Private event' })).body.data;
+    await request(app).post(`/api/v1/tips/entries/${id}/publish`);
+    expect(sendTipEmail).toHaveBeenLastCalledWith(expect.objectContaining({ poolName: 'Private event' }));
   });
 
   describe('GET /api/v1/tips/pools', () => {

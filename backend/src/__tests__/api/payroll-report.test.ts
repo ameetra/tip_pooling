@@ -31,6 +31,31 @@ describe('Payroll report API', () => {
     await request(app).post('/api/v1/config/support-staff').send({ configs: [{ role: 'BUSSER', percentage: 20 }] });
   });
 
+  describe('two tip pools on one date', () => {
+    const pool = async (poolName: string, hoursWorked: number) => {
+      const res = await request(app).post('/api/v1/tips/entries')
+        .send({ entryDate: '2026-04-10', poolName, ...cash, employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked }] });
+      expect(res.status).toBe(201);
+      return res.body.data.id as string;
+    };
+
+    it('sums an employee across pools and counts one day', async () => {
+      await publish(await pool('', 6));
+      await publish(await pool('Private event', 3));
+
+      const { employees, publishedEntries } = (await request(app).get(`${REPORT}?start_date=2026-04-10&end_date=2026-04-10`)).body.data;
+
+      expect(publishedEntries).toBe(2);
+      expect(employees).toEqual([{ employeeId: aliceId, name: 'Alice', email: 'alice@test.com', daysWorked: 1, hours: 9, totalTips: 1000 }]);
+    });
+
+    it('names the pool in the unpublished list', async () => {
+      const id = await pool('Private event', 3);
+      const { unpublished } = (await request(app).get(`${REPORT}?start_date=2026-04-10&end_date=2026-04-10`)).body.data;
+      expect(unpublished).toEqual([{ id, entryDate: '2026-04-10', poolName: 'Private event' }]);
+    });
+  });
+
   describe('totals', () => {
     it('sums published, in-range, non-deleted entries per employee and lists drafts as excluded', async () => {
       // 04-10: Alice + Bob server 8h each -> 250 / 250

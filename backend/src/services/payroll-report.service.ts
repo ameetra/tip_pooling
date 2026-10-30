@@ -12,7 +12,7 @@ export const payrollReportService = {
       where: { tenantId, isDeleted: false, entryDate: { gte: startDate, lte: endDate } },
       orderBy: { entryDate: 'asc' },
       select: {
-        id: true, entryDate: true, publishedAt: true,
+        id: true, entryDate: true, poolName: true, publishedAt: true,
         tipCalculations: {
           select: { employeeId: true, totalHours: true, finalTips: true, employee: { select: { name: true, email: true } } },
         },
@@ -45,7 +45,7 @@ export const payrollReportService = {
       employees,
       // Sum of the rounded rows, so the footer always equals the column the manager is typing from.
       totalTips: round2(employees.reduce((sum, e) => sum + e.totalTips, 0)),
-      unpublished: entries.filter((e) => !e.publishedAt).map((e) => ({ id: e.id, entryDate: e.entryDate })),
+      unpublished: entries.filter((e) => !e.publishedAt).map((e) => ({ id: e.id, entryDate: e.entryDate, poolName: e.poolName })),
     };
   },
 };

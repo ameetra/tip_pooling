@@ -86,26 +86,28 @@ export const tipController = {
           // Drafts aren't final and haven't been shared with staff yet, so only published entries count.
           tipEntry: { tenantId: req.tenantId, isDeleted: false, publishedAt: { not: null }, entryDate: { gte: sinceStr } },
         },
-        include: { tipEntry: { select: { entryDate: true } } },
-        orderBy: { tipEntry: { entryDate: 'desc' } },
+        include: { tipEntry: { select: { entryDate: true, poolName: true } } },
+        orderBy: [{ tipEntry: { entryDate: 'desc' } }, { tipEntry: { poolName: 'asc' } }],
       });
 
-      // Aggregate per date — an employee may have multiple role stints on the same day.
-      const byDate = new Map<string, any>();
+      // Aggregate per entry — an employee may have multiple role stints in a pool, and each pool matches its own email.
+      const byEntry = new Map<string, any>();
       for (const c of calcs) {
-        const date = c.tipEntry.entryDate;
-        const r = byDate.get(date) ?? { date, roles: [], stints: [], hours: 0, hourlyPay: 0, tips: 0, totalPay: 0 };
+        const r = byEntry.get(c.tipEntryId)
+          ?? { entryId: c.tipEntryId, date: c.tipEntry.entryDate, poolName: c.tipEntry.poolName, roles: [], stints: [], hours: 0, hourlyPay: 0, tips: 0, totalPay: 0 };
         if (!r.roles.includes(c.roleOnDay)) r.roles.push(c.roleOnDay);
         r.stints.push(c);
         r.hours += c.totalHours;
         r.hourlyPay += c.hourlyPay;
         r.tips += c.finalTips;
         r.totalPay += c.totalPay;
-        byDate.set(date, r);
+        byEntry.set(c.tipEntryId, r);
       }
       const labels = await getRoleLabels(req.tenantId);
-      const records = [...byDate.values()].map((r) => ({
+      const records = [...byEntry.values()].map((r) => ({
+        entryId: r.entryId,
         date: r.date,
+        poolName: r.poolName,
         role: r.roles.map((role: string) => formatRole(role, labels)).join(', '),
         roleBreakdown: roleBreakdown(r.stints, labels),
         hours: Number(r.hours.toFixed(2)),
