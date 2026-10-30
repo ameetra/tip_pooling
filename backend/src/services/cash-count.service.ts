@@ -28,7 +28,6 @@ const daysBefore = (date: string, n: number) => {
 
 const auditValues = (c: CashCount) => Object.fromEntries(AUDITED.map((k) => [k, c[k]]));
 
-// A day normally has one active tip entry; a forced duplicate means two envelopes, counted together.
 async function expectedFor(tenantId: string, entryDate: string) {
   const entries = await prisma.tipEntry.findMany({ where: { tenantId, entryDate, isDeleted: false }, select: { cashInRegister: true } });
   return entries.length ? entries.reduce((sum, e) => sum + cents(e.cashInRegister), 0) / 100 : null;

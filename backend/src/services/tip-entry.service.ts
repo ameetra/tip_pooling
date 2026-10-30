@@ -86,14 +86,12 @@ export const tipEntryService = {
     return { entryDate: input.entryDate, cashTips, posTips, totalTipPool, results: calc.employees };
   },
 
-  async create(tenantId: string, input: CreateTipEntryInput, force = false, performedBy?: { userId: string; email: string }) {
-    if (!force) {
-      const existing = await prisma.tipEntry.findFirst({
-        where: { tenantId, entryDate: input.entryDate, isDeleted: false },
-      });
-      if (existing) {
-        throw new TipCalculationError(`An active tip entry already exists for ${input.entryDate}`, 'DUPLICATE_ENTRY');
-      }
+  async create(tenantId: string, input: CreateTipEntryInput, performedBy?: { userId: string; email: string }) {
+    const existing = await prisma.tipEntry.findFirst({
+      where: { tenantId, entryDate: input.entryDate, isDeleted: false },
+    });
+    if (existing) {
+      throw new TipCalculationError(`An active tip entry already exists for ${input.entryDate}`, 'DUPLICATE_ENTRY');
     }
 
     const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, input);
@@ -193,15 +191,14 @@ export const tipEntryService = {
     const { totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours, cashTips } = await buildCalcInput(tenantId, merged);
     const calc = calculateTips({ totalTipPool, stints, supportStaffConfig, supportSplitMode, shiftHours });
 
+    // Delete first: the unique index on active pools would reject the new row while the old one is active.
     const newEntry = await prisma.$transaction(async (tx) => {
+      await tx.tipEntry.updateMany({ where: { id: existing.id }, data: { isDeleted: true, deletedAt: new Date() } });
       const entry = await tx.tipEntry.create({
         data: { tenantId, entryDate: existing.entryDate, ...cashColumns(merged) },
       });
       await saveCalculations(tx, entry.id, calc.stints);
-      await tx.tipEntry.updateMany({
-        where: { id: existing.id },
-        data: { isDeleted: true, deletedAt: new Date(), replacedById: entry.id },
-      });
+      await tx.tipEntry.updateMany({ where: { id: existing.id }, data: { replacedById: entry.id } });
       return entry;
     });
 

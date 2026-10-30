@@ -124,11 +124,13 @@ beforeAll(async () => {
       deletedByEmail TEXT,
       deleteReason TEXT,
       deleteNote TEXT,
+      poolName TEXT NOT NULL DEFAULT '',
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenantId) REFERENCES tenants(id)
     )
   `);
+  await testPrisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tip_entries_unique_active_pool ON tip_entries(tenantId, entryDate, lower(poolName)) WHERE isDeleted = 0`);
 
   await testPrisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS tip_calculations (
@@ -214,12 +216,13 @@ beforeAll(async () => {
       isDeleted INTEGER NOT NULL DEFAULT 0,
       deletedAt DATETIME,
       replacedById TEXT,
+      poolName TEXT NOT NULL DEFAULT '',
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenantId) REFERENCES tenants(id)
     )
   `);
-  await testPrisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_counts_unique_active ON cash_counts(tenantId, entryDate) WHERE isDeleted = 0`);
+  await testPrisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_counts_unique_active_pool ON cash_counts(tenantId, entryDate, lower(poolName)) WHERE isDeleted = 0`);
 
   // Create indexes
   await testPrisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_employees_tenant_active ON employees(tenantId, isActive)`);

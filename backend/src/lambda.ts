@@ -51,6 +51,7 @@ export const handler = async (event: any, context: any) => {
       return runResetAdminPassword(event.tenantSlug, event.email, event.password);
     }
     if (event.action === 'dbStats') return runDbStats(event.host);
+    if (event.action === 'tipDataCheck') return runTipDataCheck();
   }
   return httpHandler(event, context);
 };
@@ -71,6 +72,32 @@ async function runDbStats(host?: string) {
       counts[tablename] = (await pool.query(`SELECT count(*)::int AS n FROM "${schema}"."${tablename}"`)).rows[0].n;
     }
     return { success: true, host: url.hostname, counts };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  } finally {
+    await pool.end();
+  }
+}
+
+// Read-only. Dates that would block the one-active-pool-per-name index, plus row counts and money totals
+// to compare before and after a migration: any difference means data changed.
+async function runTipDataCheck() {
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: require('./database/client').pgSsl() });
+  try {
+    const duplicates = await pool.query(`
+      SELECT "tenantId", "entryDate", count(*)::int AS count FROM "tip_entries"
+      WHERE "isDeleted" = false GROUP BY 1, 2 HAVING count(*) > 1 ORDER BY 1, 2`);
+    const totals = await pool.query(`
+      SELECT
+        (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, count(*) FILTER (WHERE NOT "isDeleted")::int AS active,
+          count("publishedAt")::int AS published, sum("cashInRegister")::numeric(14,2) AS "cashInRegister", sum("cashSales")::numeric(14,2) AS "cashSales",
+          sum("cashTips")::numeric(14,2) AS "cashTips", sum("posTips")::numeric(14,2) AS "posTips" FROM "tip_entries") t) AS "tipEntries",
+        (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, sum("totalHours")::numeric(14,2) AS hours, sum("finalTips")::numeric(14,2) AS "finalTips",
+          sum("totalPay")::numeric(14,2) AS "totalPay" FROM "tip_calculations") t) AS "tipCalculations",
+        (SELECT row_to_json(t) FROM (SELECT count(*)::int AS rows, count(*) FILTER (WHERE NOT "isDeleted")::int AS active,
+          sum("expectedAmount")::numeric(14,2) AS "expectedAmount", sum("countedTotal")::numeric(14,2) AS "countedTotal" FROM "cash_counts") t) AS "cashCounts"`);
+    return { success: true, duplicates: duplicates.rows, totals: totals.rows[0] };
   } catch (err: any) {
     return { success: false, error: err.message };
   } finally {
@@ -201,13 +228,19 @@ async function runMigrations() {
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS "cash_counts_tenantId_entryDate_isDeleted_idx" ON "cash_counts"("tenantId", "entryDate", "isDeleted");
-      CREATE UNIQUE INDEX IF NOT EXISTS "cash_counts_unique_active" ON "cash_counts"("tenantId", "entryDate") WHERE "isDeleted" = false;
 
       -- Who deleted a tip entry and why (PRD 3.11)
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deletedByUserId" TEXT;
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deletedByEmail" TEXT;
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deleteReason" TEXT;
       ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "deleteNote" TEXT;
+
+      -- Multiple tip pools per date: '' is the regular pool
+      ALTER TABLE "tip_entries" ADD COLUMN IF NOT EXISTS "poolName" TEXT NOT NULL DEFAULT '';
+      ALTER TABLE "cash_counts" ADD COLUMN IF NOT EXISTS "poolName" TEXT NOT NULL DEFAULT '';
+      CREATE UNIQUE INDEX IF NOT EXISTS "tip_entries_unique_active_pool" ON "tip_entries"("tenantId", "entryDate", lower("poolName")) WHERE "isDeleted" = false;
+      CREATE UNIQUE INDEX IF NOT EXISTS "cash_counts_unique_active_pool" ON "cash_counts"("tenantId", "entryDate", lower("poolName")) WHERE "isDeleted" = false;
+      DROP INDEX IF EXISTS "cash_counts_unique_active";
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {

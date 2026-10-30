@@ -286,15 +286,27 @@ describe('Tip Entry API - E2E Workflow', () => {
     });
   });
 
-  describe('POST /api/v1/tips/entries?force=true', () => {
-    it('allows a duplicate entry with the force flag', async () => {
-      const entry = {
-        entryDate: '2026-04-10', cashInRegister: 300, cashSales: 0, cashTips: 0, posTips: 100,
-        employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }],
-      };
-      await request(app).post('/api/v1/tips/entries').send(entry);
-      expect((await request(app).post('/api/v1/tips/entries').send(entry)).status).toBe(400);
-      expect((await request(app).post('/api/v1/tips/entries?force=true').send(entry)).status).toBe(201);
+  describe('one regular pool per date', () => {
+    const entry = () => ({
+      entryDate: '2026-04-10', cashInRegister: 300, cashSales: 0, cashTips: 0, posTips: 100,
+      employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }],
+    });
+
+    it('ignores a force flag: a repeat regular pool is refused', async () => {
+      await request(app).post('/api/v1/tips/entries').send(entry());
+      const res = await request(app).post('/api/v1/tips/entries?force=true').send(entry());
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('DUPLICATE_ENTRY');
+    });
+
+    it('edits a draft under the unique index, leaving one active row', async () => {
+      const created = await request(app).post('/api/v1/tips/entries').send(entry());
+      const res = await request(app).patch(`/api/v1/tips/entries/${created.body.data.id}`).send({ ...entry(), posTips: 150 });
+      expect(res.status).toBe(200);
+      const active = await testPrisma.tipEntry.findMany({ where: { entryDate: '2026-04-10', isDeleted: false } });
+      expect(active.map((e) => e.posTips)).toEqual([150]);
+      const old = await testPrisma.tipEntry.findUnique({ where: { id: created.body.data.id } });
+      expect(old?.replacedById).toBe(active[0].id);
     });
   });
 
