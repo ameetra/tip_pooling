@@ -8,6 +8,7 @@ import CashCountDialog from '../components/CashCountDialog';
 import type { CashCountRow } from '../types';
 import { cents, money, signedMoney } from '../utils/cash';
 import { localDate } from '../utils/dates';
+import { poolTitle } from '../utils/tipEntry';
 
 const STATUS = {
   NOT_COUNTED: { label: 'Not counted', color: 'default' },
@@ -69,8 +70,8 @@ export default function CashReconciliationPage() {
           </TableHead>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.entryDate} hover sx={{ cursor: 'pointer' }} onClick={() => setSelected(r)}>
-                <TableCell>{r.entryDate}</TableCell>
+              <TableRow key={`${r.entryDate}|${r.poolName}`} hover sx={{ cursor: 'pointer' }} onClick={() => setSelected(r)}>
+                <TableCell>{poolTitle(r.entryDate, r.poolName)}</TableCell>
                 <TableCell align="right">{money(r.count?.expectedAmount ?? r.currentExpected ?? 0)}</TableCell>
                 <TableCell align="right">{r.count ? money(r.count.countedTotal) : '—'}</TableCell>
                 <TableCell align="right" sx={{ color: !r.variance ? undefined : r.variance < 0 ? 'error.main' : 'warning.main' }}>

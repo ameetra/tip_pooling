@@ -10,6 +10,7 @@ import { useTipEntries, useOlderDrafts, useDeleteTipEntry, TIP_ENTRIES_LIMIT } f
 import DeleteTipEntryDialog from '../components/DeleteTipEntryDialog';
 import { useTenant } from '../context/TenantContext';
 import { localDate } from '../utils/dates';
+import { poolTitle } from '../utils/tipEntry';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function TipEntriesPage() {
           {olderDrafts.slice(0, 6).map((d, i) => (
             <span key={d.id}>
               {i > 0 && ', '}
-              <Link component={RouterLink} to={`/${slug}/tips/${d.id}`}>{d.entryDate}</Link>
+              <Link component={RouterLink} to={`/${slug}/tips/${d.id}`}>{poolTitle(d.entryDate, d.poolName)}</Link>
             </span>
           ))}
           {olderDrafts.length > 6 && ', …'}
@@ -73,7 +74,7 @@ export default function TipEntriesPage() {
           <TableBody>
             {entries.map((entry) => (
               <TableRow key={entry.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/${slug}/tips/${entry.id}`)}>
-                <TableCell>{entry.entryDate}</TableCell>
+                <TableCell>{poolTitle(entry.entryDate, entry.poolName)}</TableCell>
                 <TableCell>${entry.cashInRegister.toFixed(2)}</TableCell>
                 <TableCell>${entry.cashSales.toFixed(2)}</TableCell>
                 <TableCell>${entry.cashTips.toFixed(2)}</TableCell>

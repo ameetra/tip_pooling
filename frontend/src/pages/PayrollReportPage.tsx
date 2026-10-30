@@ -9,6 +9,7 @@ import { usePayrollReport } from '../api/payroll';
 import { useTenant } from '../context/TenantContext';
 import { downloadCsv } from '../utils/csv';
 import { localDate } from '../utils/dates';
+import { poolTitle } from '../utils/tipEntry';
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -54,7 +55,7 @@ export default function PayrollReportPage() {
               {report.unpublished.map((u, i) => (
                 <span key={u.id}>
                   {i > 0 && ', '}
-                  <Link component={RouterLink} to={`/${slug}/tips/${u.id}`}>{u.entryDate}</Link>
+                  <Link component={RouterLink} to={`/${slug}/tips/${u.id}`}>{poolTitle(u.entryDate, u.poolName)}</Link>
                 </span>
               ))}
             </Alert>

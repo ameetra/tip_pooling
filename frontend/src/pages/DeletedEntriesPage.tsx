@@ -6,7 +6,7 @@ import { useDeletedEntriesReport } from '../api/tips';
 import type { DeleteReason } from '../types';
 import { money } from '../utils/cash';
 import { localDate } from '../utils/dates';
-import { DELETE_REASON_LABELS } from '../utils/tipEntry';
+import { DELETE_REASON_LABELS, poolTitle } from '../utils/tipEntry';
 
 const reasonLabel = (r: string | null) => (r ? DELETE_REASON_LABELS[r as DeleteReason] : '—');
 
@@ -54,7 +54,7 @@ export default function DeletedEntriesPage() {
           <TableBody>
             {data?.entries.map((e) => (
               <TableRow key={e.id}>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{e.entryDate}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{poolTitle(e.entryDate, e.poolName)}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(e.deletedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                 <TableCell>{e.deletedByEmail ?? '—'}</TableCell>
                 <TableCell><Chip size="small" label={reasonLabel(e.deleteReason)} /></TableCell>

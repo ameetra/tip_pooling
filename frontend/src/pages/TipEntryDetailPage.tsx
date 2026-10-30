@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteTipEntryDialog from '../components/DeleteTipEntryDialog';
 import { useTenant } from '../context/TenantContext';
 import { useRoleLabels } from '../constants/roles';
+import { poolTitle } from '../utils/tipEntry';
 
 export default function TipEntryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,7 +66,7 @@ export default function TipEntryDetailPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Typography variant="h5">Tip Entry: {entry.entryDate}</Typography>
+            <Typography variant="h5">Tip Entry: {poolTitle(entry.entryDate, entry.poolName)}</Typography>
             {entry.publishedAt
               ? <Chip label={`Published ${new Date(entry.publishedAt).toLocaleDateString()}`} color="success" />
               : <Chip label="Draft" />}
@@ -121,7 +122,7 @@ export default function TipEntryDetailPage() {
       <ConfirmDialog
         open={confirmPublish}
         title="Publish & Send Emails"
-        message={`This will send tip summary emails to all ${rows.length} employee(s) for ${entry.entryDate}. This cannot be undone.`}
+        message={`This will send tip summary emails to all ${rows.length} employee(s) for ${poolTitle(entry.entryDate, entry.poolName)}. This cannot be undone.`}
         onConfirm={handlePublish}
         onCancel={() => setConfirmPublish(false)}
         confirmLabel="Publish & Send"

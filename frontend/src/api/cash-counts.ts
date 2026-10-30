@@ -14,8 +14,8 @@ export const useCashCounts = (since: string, deposit: string) =>
 export const useSaveCashCount = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, entryDate, ...data }: CashCountInput & { id?: string; entryDate: string }) =>
-      id ? put<CashCount>(`/cash-counts/${id}`, data) : post<CashCount>('/cash-counts', { entryDate, ...data }),
+    mutationFn: ({ id, entryDate, poolName, ...data }: CashCountInput & { id?: string; entryDate: string; poolName: string }) =>
+      id ? put<CashCount>(`/cash-counts/${id}`, data) : post<CashCount>('/cash-counts', { entryDate, poolName, ...data }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cashCounts'] }),
   });
 };

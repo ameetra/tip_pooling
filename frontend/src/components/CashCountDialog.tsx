@@ -5,6 +5,7 @@ import {
 import type { BillField, CashCountRow } from '../types';
 import { useDeleteCashCount, useSaveCashCount } from '../api/cash-counts';
 import { BILLS, cents, money, signedMoney } from '../utils/cash';
+import { poolTitle } from '../utils/tipEntry';
 import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
@@ -42,7 +43,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
 
   const handleSave = async () => {
     await save.mutateAsync({
-      id: count?.id, entryDate: row.entryDate,
+      id: count?.id, entryDate: row.entryDate, poolName: row.poolName,
       ...Object.fromEntries(BILLS.map(([k]) => [k, num(f[k])])) as Record<BillField, number>,
       coins: num(f.coins), deposit: f.deposit, comments: f.comments,
     });
@@ -56,7 +57,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
 
   return (
     <Dialog open onClose={onClose} fullScreen={fullScreen} maxWidth="xs" fullWidth>
-      <DialogTitle>{count ? 'Edit count' : 'Count drop'}: {row.entryDate}</DialogTitle>
+      <DialogTitle>{count ? 'Edit count' : 'Count drop'}: {poolTitle(row.entryDate, row.poolName)}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Expected (Cash in Register): <b>{money(expected)}</b>
@@ -105,7 +106,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
       <ConfirmDialog
         open={confirmDelete}
         title="Delete count"
-        message={`Delete the count for ${row.entryDate}? The drop will show as not counted (the deleted count is kept in the audit trail).`}
+        message={`Delete the count for ${poolTitle(row.entryDate, row.poolName)}? The drop will show as not counted (the deleted count is kept in the audit trail).`}
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}
         confirmLabel="Delete"

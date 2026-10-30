@@ -6,7 +6,7 @@ import type { DeleteReason } from '../types';
 import { DELETE_REASON_LABELS, deleteEntryMessage } from '../utils/tipEntry';
 
 interface Props {
-  entry?: { entryDate: string; publishedAt: string | null };
+  entry?: { entryDate: string; poolName?: string; publishedAt: string | null };
   onConfirm: (why?: { reason: DeleteReason; note: string }) => Promise<unknown>;
   onCancel: () => void;
 }

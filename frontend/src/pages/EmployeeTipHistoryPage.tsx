@@ -2,9 +2,12 @@ import { Box, Card, CardContent, Chip, CircularProgress, Divider, Stack, Typogra
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../api/client';
+import { poolTitle } from '../utils/tipEntry';
 
 interface TipRecord {
+  entryId: string;
   date: string;
+  poolName: string;
   role: string;
   roleBreakdown: { role: string; hours: number; tips: number }[];
   hours: number;
@@ -85,10 +88,10 @@ export default function EmployeeTipHistoryPage() {
 
           <Stack spacing={2}>
             {records.map((r) => (
-              <Card key={r.date} variant="outlined">
+              <Card key={r.entryId} variant="outlined">
                 <CardContent>
                   <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography sx={{ fontWeight: 600 }}>{fmtDate(r.date)}</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{poolTitle(fmtDate(r.date), r.poolName)}</Typography>
                     <Chip label={r.role} size="small" variant="outlined" />
                   </Stack>
 
