@@ -149,8 +149,8 @@ A cloud-based tip pooling management system that automates the calculation and d
   - [ ] All display dates/times converted to tenant's timezone - *The browser's local time is used*
 - [x] Manager selects date for tip entry
 - [x] System checks if tip entry already exists for selected date
-- [ ] If entry exists, system displays warning and prompts manager to edit existing entry - *Shows an 'entry already exists' error; corrections are made by deleting the entry and entering it again*
-- [ ] Manager can override warning with explicit confirmation (for correction scenarios) - *The API has an admin-only override; the screen does not offer it*
+- [x] If entry exists, system displays a warning when the date is picked *(built for 3.12: lists what's already entered and offers a separate tip pool; corrections are still made by deleting the entry and entering it again)*
+- [ ] Manager can override warning with explicit confirmation (for correction scenarios) - *Replaced by named tip pools (3.12); the admin-only API override was removed 2026-10-30*
 - [ ] Manager enters starting drawer balance - *Not needed: the float is removed before counting, so the form asks for Cash in Register instead*
 - [x] Manager enters closing drawer balance *(built as Cash in Register (after removing the starting float))*
 - [x] Manager enters cash sales (from POS system or daily report)
@@ -366,7 +366,7 @@ Each night's cash goes into an envelope in the drop box. About once a week an Ad
 
 #### 3.10.1 Counting a Drop
 - [x] Admins and Managers only (Shift Leads and employees can't see or use it, in the app or the API)
-- [x] One count per tip entry date. The expected amount is that entry's **Cash in Register**, draft or published
+- [x] One count per tip pool on a date (3.12). The expected amount is that entry's **Cash in Register**, draft or published
 - [x] The count is entered as **number of bills** for $100, $50, $20, $10, $5, $2 and $1, plus **coins as a dollar amount**
 - [x] The form shows each denomination's dollar value, the counted total and the over/under (counted - expected) as you type
 - [x] Optional **Deposit** reference (e.g. the bank deposit number) to group drops that went to the bank together
@@ -385,9 +385,9 @@ Each night's cash goes into an envelope in the drop box. About once a week an Ad
 
 #### 3.10.3 Edge Cases
 - [x] The expected amount is saved with the count. If the tip entry is later corrected (deleted and entered again) with a different Cash in Register, the drop is flagged **Entry changed since count** instead of silently changing the over/under
-- [x] Counts are linked to the date, not the tip entry record, so they survive the delete + re-enter correction flow
+- [x] Counts are linked to the date and pool name, not the tip entry record, so they survive the delete + re-enter correction flow. Re-entering under a different name leaves the old count flagged **No tip entry**
 - [x] If the day's tip entry is deleted and not re-entered, the count stays visible and is flagged **No tip entry**
-- [x] One envelope per date: if a day had two envelopes, add them together when counting
+- [x] One envelope per tip pool: each named event has its own row, count and deposit (3.12). A named event with $0 cash has no row unless it already has a count
 - [x] A count of $0 is allowed (missing envelope), and shows as Short by the full amount
 
 ### 3.11 Deleted Entry Reasons *(built 2026-10-02)*
@@ -407,6 +407,29 @@ A published entry has been emailed to staff and counted in payroll, and deleting
 - [x] One row per deleted published entry: entry date, when deleted, deleted by, reason, note, total tips
 - [x] A summary per person at the top: how many entries they deleted, broken down by reason
 - [x] Only covers deletions made after this shipped (no published entries had been deleted before)
+
+### 3.12 Multiple Tip Pools on One Date *(built 2026-10-30; requested after Protagonist and Antagonist staff couldn't enter a special event)*
+
+A venue can run a special event alongside its regular shift, with a smaller crew and its own tips. A date can hold a regular shift plus any number of named events, each calculated, published and counted on its own.
+
+#### 3.12.1 Entering a Tip Pool
+- [x] Anyone who can enter tips can add a pool (Shift Leads and Baristas included)
+- [x] A normal shift needs no name. The form only adds a small **This is a separate event** control that reveals an optional **Event name** (up to 60 characters)
+- [x] Picking a date that already has entries shows a warning listing each pool's name, total pool and employee names. It never shows hours, wages or individual payouts
+- [x] If the date already has a regular shift, the new pool must be named. **Add a separate tip pool** reveals the field, and Save stays disabled until it's filled in
+- [x] If the date only has named events, the regular shift can still be saved with no name, so an event can be entered first
+- [x] Names on a date must be different, ignoring capitals and extra spaces. The database enforces this, so the same pool can't be entered twice even by two people at once
+- [x] A draft can be renamed. Published entries are still corrected by deleting and entering again
+
+#### 3.12.2 What Each Pool Gets
+- [x] Its own crew, tips and calculation. The tip math doesn't change
+- [x] Its own publish step and email, with the event name in the subject and body
+- [x] The name shown as `date – name` in the entries list, entry detail, delete dialog, publish confirmation, payroll's unpublished list and the Deleted Entries report
+- [x] Its own card in employee history
+- [x] Payroll adds an employee's hours and tips across pools and counts the date as one day worked
+- [x] Its own row and count on the Cash page (3.10)
+- [ ] Hours checked across a person's pools - *The 24-hour limit applies per pool*
+- [ ] Total Shift Hours checked on an event at per-person-split venues - *It fills in the day's default, and the person changes it by hand*
 
 ---
 
