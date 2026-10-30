@@ -85,7 +85,7 @@ describe('Payroll report API', () => {
         { employeeId: bobId, name: 'Bob', email: 'bob@test.com', daysWorked: 2, hours: 16, totalTips: 516.67 },
       ]);
       expect(report.totalTips).toBe(1000);
-      expect(report.unpublished).toEqual([{ id: draft, entryDate: '2026-04-12' }]);
+      expect(report.unpublished).toEqual([{ id: draft, entryDate: '2026-04-12', poolName: '' }]);
     });
 
     it('returns an empty report when nothing is published in the range', async () => {

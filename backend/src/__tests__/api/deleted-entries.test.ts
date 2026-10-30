@@ -32,9 +32,9 @@ describe('Deleting published entries requires a reason; admins see a report', ()
       .send({ entryDate: '2026-04-10', poolName: 'Private event', ...cash, employees: [{ employeeId: aliceId, role: 'SERVER', hoursWorked: 8 }] });
     await publish(res.body.data.id);
     await remove(res.body.data.id, { reason: 'WRONG_TIPS', note: 'Typo' });
-    const today = new Date().toISOString().slice(0, 10);
+    const dayOffset = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
-    const { entries } = (await request(app).get(`${REPORT}?start_date=2020-01-01&end_date=${today}`)).body.data;
+    const { entries } = (await request(app).get(`${REPORT}?start_date=${dayOffset(-2)}&end_date=${dayOffset(2)}`)).body.data;
 
     expect(entries[0].poolName).toBe('Private event');
   });
