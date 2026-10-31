@@ -52,6 +52,7 @@ export const handler = async (event: any, context: any) => {
     }
     if (event.action === 'dbStats') return runDbStats(event.host);
     if (event.action === 'tipDataCheck') return runTipDataCheck();
+    if (event.action === 'correctCashExpected' && event.tenantSlug) return runCorrectCashExpected(event.tenantSlug, event.apply === true);
   }
   return httpHandler(event, context);
 };
@@ -113,6 +114,15 @@ async function runTipDataCheck() {
   } finally {
     await pool.end();
   }
+}
+
+// Previews saved counts whose Expected left out Cash Tips; changes them only with apply: true.
+async function runCorrectCashExpected(tenantSlug: string, apply: boolean) {
+  const { getTenantBySlug } = require('./services/tenant.service');
+  const { cashCountService } = require('./services/cash-count.service');
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) return { success: false, error: `Unknown tenant slug: ${tenantSlug}` };
+  return { success: true, tenant: tenant.slug, applied: apply, corrections: await cashCountService.correctExpectedForCashTips(tenant.id, apply) };
 }
 
 async function runResetAdminPassword(tenantSlug: string, email: string, password: string) {

@@ -362,11 +362,11 @@ A cloud-based tip pooling management system that automates the calculation and d
 
 ### 3.10 Cash Drop Reconciliation *(built 2026-10-02; requested by the Pieces owner)*
 
-Each night's cash goes into an envelope in the drop box. About once a week an Admin or Manager counts each envelope and checks it against the Cash in Register on that day's tip entry. This replaces the `Cash_Over-Under` tab of the Pieces daily cash log spreadsheet.
+Each night's cash goes into an envelope in the drop box. About once a week an Admin or Manager counts each envelope and checks it against the Cash in Register plus Cash Tips on that day's tip entry. This replaces the `Cash_Over-Under` tab of the Pieces daily cash log spreadsheet.
 
 #### 3.10.1 Counting a Drop
 - [x] Admins and Managers only (Shift Leads and employees can't see or use it, in the app or the API)
-- [x] One count per tip pool on a date (3.12). The expected amount is that entry's **Cash in Register**, draft or published
+- [x] One count per tip pool on a date (3.12). The expected amount is that entry's **Cash in Register + Cash Tips**, draft or published *(Cash Tips added 2026-10-31: the jar goes in the envelope too)*
 - [x] The count is entered as **number of bills** for $100, $50, $20, $10, $5, $2 and $1, plus **coins as a dollar amount**
 - [x] The form shows each denomination's dollar value, the counted total and the over/under (counted - expected) as you type
 - [x] Optional **Deposit** reference (e.g. the bank deposit number) to group drops that went to the bank together
@@ -377,17 +377,17 @@ Each night's cash goes into an envelope in the drop box. About once a week an Ad
 - [x] A short or over count does **not** change tip calculations or payouts; it is a record only
 
 #### 3.10.2 Reconciliation Screen
-- [x] A Cash Reconciliation page lists tip entry dates with: Date, Expected, Counted, Over/Under, Deposit, Status
+- [x] A Cash Reconciliation page lists tip entry dates with: Date, Expected, Counted, Bills Only (counted total without coins, the amount that goes to the bank; over/under still uses the full count), Over/Under, Deposit, Status
 - [x] Status: **Not counted**, **Matches**, **Short** or **Over**
 - [x] Defaults to every uncounted drop (last 60 days) plus the last 14 days; Admin/Manager can pick the start date *(no end date: the list runs to today)*
-- [x] Filter by Deposit reference (click a deposit in the list), with totals (expected, counted, net over/under) for the counted rows shown
+- [x] Filter by Deposit reference (click a deposit in the list), with totals (expected, counted, bills only, net over/under) for the counted rows shown
 - [x] Usable on a phone (counting happens at a desk, not always at a computer) *(the count form opens full screen; the side menu is still the desktop layout)*
 
 #### 3.10.3 Edge Cases
-- [x] The expected amount is saved with the count. If the tip entry is later corrected (deleted and entered again) with a different Cash in Register, the drop is flagged **Entry changed since count** instead of silently changing the over/under
+- [x] The expected amount is saved with the count. If the tip entry is later corrected (deleted and entered again) with a different Cash in Register or Cash Tips, the drop is flagged **Entry changed since count** instead of silently changing the over/under
 - [x] Counts are linked to the date and pool name, not the tip entry record, so they survive the delete + re-enter correction flow. Re-entering under a different name leaves the old count flagged **No tip entry**
 - [x] If the day's tip entry is deleted and not re-entered, the count stays visible and is flagged **No tip entry**
-- [x] One envelope per tip pool: each named event has its own row, count and deposit (3.12). A named event with $0 cash has no row unless it already has a count
+- [x] One envelope per tip pool: each named event has its own row, count and deposit (3.12). A named event with $0 cash (register and tips) has no row unless it already has a count
 - [x] A count of $0 is allowed (missing envelope), and shows as Short by the full amount
 
 ### 3.11 Deleted Entry Reasons *(built 2026-10-02)*

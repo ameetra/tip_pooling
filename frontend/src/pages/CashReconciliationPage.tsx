@@ -34,7 +34,7 @@ export default function CashReconciliationPage() {
     <Box>
       <Typography variant="h5" sx={{ mb: 0.5 }}>Cash Reconciliation</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Count each drop envelope and compare it with the day's Cash in Register. Click a row to count it.
+        Count each drop envelope and compare it with the day's Cash in Register plus Cash Tips. Click a row to count it.
       </Typography>
 
       <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -63,6 +63,7 @@ export default function CashReconciliationPage() {
               <TableCell>Date</TableCell>
               <TableCell align="right">Expected</TableCell>
               <TableCell align="right">Counted</TableCell>
+              <TableCell align="right">Bills Only</TableCell>
               <TableCell align="right">Over/Under</TableCell>
               <TableCell>Deposit</TableCell>
               <TableCell>Status</TableCell>
@@ -74,6 +75,7 @@ export default function CashReconciliationPage() {
                 <TableCell>{poolTitle(r.entryDate, r.poolName)}</TableCell>
                 <TableCell align="right">{money(r.count?.expectedAmount ?? r.currentExpected ?? 0)}</TableCell>
                 <TableCell align="right">{r.count ? money(r.count.countedTotal) : '—'}</TableCell>
+                <TableCell align="right">{r.billsTotal === null ? '—' : money(r.billsTotal)}</TableCell>
                 <TableCell align="right" sx={{ color: !r.variance ? undefined : r.variance < 0 ? 'error.main' : 'warning.main' }}>
                   {r.variance === null ? '—' : signedMoney(r.variance)}
                 </TableCell>
@@ -84,7 +86,7 @@ export default function CashReconciliationPage() {
                   <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     <Chip size="small" label={STATUS[r.status].label} color={STATUS[r.status].color} />
                     {r.entryChanged && (
-                      <Tooltip title={`Cash in Register is now ${money(r.currentExpected!)}. Recount (edit and save) to compare against it.`}>
+                      <Tooltip title={`Expected is now ${money(r.currentExpected!)}. Recount (edit and save) to compare against it.`}>
                         <Chip size="small" variant="outlined" color="warning" label="Entry changed since count" />
                       </Tooltip>
                     )}
@@ -98,7 +100,7 @@ export default function CashReconciliationPage() {
             ))}
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">{isFetching ? 'Loading...' : 'No drops in this range.'}</TableCell>
+                <TableCell colSpan={7} align="center">{isFetching ? 'Loading...' : 'No drops in this range.'}</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -108,6 +110,7 @@ export default function CashReconciliationPage() {
                 <TableCell>Total ({counted.length} counted)</TableCell>
                 <TableCell align="right">{money(sum(counted.map((r) => r.count!.expectedAmount)))}</TableCell>
                 <TableCell align="right">{money(sum(counted.map((r) => r.count!.countedTotal)))}</TableCell>
+                <TableCell align="right">{money(sum(counted.map((r) => r.billsTotal!)))}</TableCell>
                 <TableCell align="right">{signedMoney(sum(counted.map((r) => r.variance!)))}</TableCell>
                 <TableCell colSpan={2} />
               </TableRow>

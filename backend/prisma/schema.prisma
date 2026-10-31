@@ -199,7 +199,7 @@ model CashCount {
   poolName       String    @default("") // matches the tip entry's pool on entryDate
   tenantId       String
   entryDate      String    // YYYY-MM-DD of the tip entry whose drop was counted
-  expectedAmount Float     // the entry's cashInRegister when counted (re-snapshotted on edit)
+  expectedAmount Float     // the entry's cashInRegister + cashTips when counted (re-snapshotted on edit)
   bills100       Int       @default(0)
   bills50        Int       @default(0)
   bills20        Int       @default(0)

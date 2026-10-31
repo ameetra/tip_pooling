@@ -29,9 +29,13 @@ const daysBefore = (date: string, n: number) => {
 
 const auditValues = (c: CashCount) => Object.fromEntries(AUDITED.map((k) => [k, c[k]]));
 
+// The envelope holds the register cash and the tip jar.
+const expectedOf = (e: { cashInRegister: number; cashTips: number }) => (cents(e.cashInRegister) + cents(e.cashTips)) / 100;
+
 async function expectedFor(tenantId: string, entryDate: string, poolName: string) {
-  const entries = await prisma.tipEntry.findMany({ where: { tenantId, entryDate, isDeleted: false }, select: { poolName: true, cashInRegister: true } });
-  return entries.find((e) => samePool(e.poolName, poolName))?.cashInRegister ?? null;
+  const entries = await prisma.tipEntry.findMany({ where: { tenantId, entryDate, isDeleted: false }, select: { poolName: true, cashInRegister: true, cashTips: true } });
+  const entry = entries.find((e) => samePool(e.poolName, poolName));
+  return entry ? expectedOf(entry) : null;
 }
 
 const poolKey = (entryDate: string, poolName: string) => `${entryDate}|${poolName.toLowerCase()}`;
@@ -43,6 +47,8 @@ function toRow(entryDate: string, poolName: string, currentExpected: number | nu
     poolName,
     currentExpected,
     count,
+    // Coins stay behind when the envelope goes to the bank.
+    billsTotal: count ? (cents(count.countedTotal) - cents(count.coins)) / 100 : null,
     variance,
     status: variance === null ? 'NOT_COUNTED' : variance === 0 ? 'MATCHES' : variance < 0 ? 'SHORT' : 'OVER',
     entryChanged: !!count && currentExpected !== null && cents(currentExpected) !== cents(count.expectedAmount),
@@ -59,7 +65,7 @@ export const cashCountService = {
   // A deposit filter instead returns every count in that deposit, whatever its date.
   async list(tenantId: string, query: CashCountQuery) {
     const active = { tenantId, isDeleted: false };
-    let entries: { entryDate: string; poolName: string; cashInRegister: number }[];
+    let entries: { entryDate: string; poolName: string; cashInRegister: number; cashTips: number }[];
     let counts: CashCount[];
     let shown: (date: string, counted: boolean) => boolean;
 
@@ -75,7 +81,7 @@ export const cashCountService = {
       const lookback = daysBefore(today, UNCOUNTED_LOOKBACK_DAYS);
       [entries, counts] = await Promise.all([
         prisma.tipEntry.findMany({
-          where: { ...active, OR: [{ entryDate: { gte: from, lte: to } }, { entryDate: { gte: lookback, lt: from }, cashInRegister: { gt: 0 } }] },
+          where: { ...active, OR: [{ entryDate: { gte: from, lte: to } }, { entryDate: { gte: lookback, lt: from }, OR: [{ cashInRegister: { gt: 0 } }, { cashTips: { gt: 0 } }] }] },
         }),
         prisma.cashCount.findMany({ where: { ...active, entryDate: { gte: from < lookback ? from : lookback, lte: to } } }),
       ]);
@@ -88,11 +94,11 @@ export const cashCountService = {
     return [...new Set([...entryByKey.keys(), ...countByKey.keys()])]
       .map((key) => ({ entry: entryByKey.get(key), count: countByKey.get(key) }))
       // A card-only event has no envelope, so it would otherwise sit at "Not counted" forever.
-      .filter(({ entry, count }) => count || (entry?.poolName ? entry.cashInRegister > 0 : true))
+      .filter(({ entry, count }) => count || (entry?.poolName ? expectedOf(entry) > 0 : true))
       .map(({ entry, count }) => ({ entryDate: (entry ?? count)!.entryDate, poolName: (entry ?? count)!.poolName, entry, count }))
       .filter(({ entryDate, count }) => shown(entryDate, !!count))
       .sort((a, b) => b.entryDate.localeCompare(a.entryDate) || a.poolName.localeCompare(b.poolName))
-      .map(({ entryDate, poolName, entry, count }) => toRow(entryDate, poolName, entry?.cashInRegister ?? null, count ?? null));
+      .map(({ entryDate, poolName, entry, count }) => toRow(entryDate, poolName, entry ? expectedOf(entry) : null, count ?? null));
   },
 
   async create(tenantId: string, { entryDate, poolName, ...input }: CreateCashCountInput, performedBy?: Performer) {
@@ -124,6 +130,36 @@ export const cashCountService = {
       oldValues: { id, ...auditValues(existing) }, newValues: auditValues(created),
     });
     return created;
+  },
+
+  // One-time fix for counts saved when Expected left out Cash Tips. A count whose snapshot no longer
+  // matches the entry's Cash in Register keeps its "entry changed" flag and needs a real recount.
+  async correctExpectedForCashTips(tenantId: string, apply: boolean) {
+    const active = { tenantId, isDeleted: false };
+    const [counts, entries] = await Promise.all([
+      prisma.cashCount.findMany({ where: active, orderBy: { entryDate: 'asc' } }),
+      prisma.tipEntry.findMany({ where: active }),
+    ]);
+    const entryByKey = new Map(entries.map((e) => [poolKey(e.entryDate, e.poolName), e]));
+    const stale = counts.flatMap((count) => {
+      const entry = entryByKey.get(poolKey(count.entryDate, count.poolName));
+      return entry && entry.cashTips > 0 && cents(entry.cashInRegister) === cents(count.expectedAmount) ? [{ count, entry }] : [];
+    });
+    if (apply) {
+      for (const { count, entry } of stale) {
+        const updated = await prisma.cashCount.update({ where: { id: count.id }, data: { expectedAmount: expectedOf(entry) } });
+        await auditService.log({
+          tenantId, entityType: 'CASH_COUNT', entityId: count.id, action: 'UPDATE',
+          oldValues: auditValues(count), newValues: auditValues(updated),
+        });
+      }
+    }
+    return stale.map(({ count, entry }) => ({
+      entryDate: count.entryDate, poolName: count.poolName, cashInRegister: entry.cashInRegister, cashTips: entry.cashTips,
+      countedTotal: count.countedTotal, oldExpected: count.expectedAmount, newExpected: expectedOf(entry),
+      oldVariance: (cents(count.countedTotal) - cents(count.expectedAmount)) / 100,
+      newVariance: (cents(count.countedTotal) - cents(expectedOf(entry))) / 100,
+    }));
   },
 
   async remove(tenantId: string, id: string, performedBy?: Performer) {

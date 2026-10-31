@@ -36,7 +36,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
 
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const valid = BILLS.every(([k]) => isBillCount(f[k])) && isCoins(f.coins);
-  // Saving re-reads Cash in Register from the tip entry, so a recount compares against today's figure.
+  // Saving re-reads the expected amount from the tip entry, so a recount compares against today's figure.
   const expected = row.currentExpected ?? count!.expectedAmount;
   const totalCents = BILLS.reduce((sum, [k, face]) => sum + num(f[k]) * face * 100, 0) + cents(num(f.coins));
   const variance = (totalCents - cents(expected)) / 100;
@@ -60,7 +60,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
       <DialogTitle>{count ? 'Edit count' : 'Count drop'}: {poolTitle(row.entryDate, row.poolName)}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Expected (Cash in Register): <b>{money(expected)}</b>
+          Expected (Cash in Register + Cash Tips): <b>{money(expected)}</b>
         </Typography>
         {row.noEntry && <Alert severity="warning" sx={{ mb: 2 }}>This day's tip entry was deleted. Expected is the amount when it was counted.</Alert>}
 

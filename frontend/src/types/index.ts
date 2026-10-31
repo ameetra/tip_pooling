@@ -215,8 +215,9 @@ export interface CashCount extends Record<BillField, number> {
 export interface CashCountRow {
   entryDate: string;
   poolName: string;
-  currentExpected: number | null; // Cash in Register on the day's tip entry now (null: no tip entry)
+  currentExpected: number | null; // Cash in Register + Cash Tips on the day's tip entry now (null: no tip entry)
   count: CashCount | null;
+  billsTotal: number | null; // counted total without coins, the amount that goes to the bank
   variance: number | null; // counted - expected at the time of counting
   status: 'NOT_COUNTED' | 'MATCHES' | 'SHORT' | 'OVER';
   entryChanged: boolean;
