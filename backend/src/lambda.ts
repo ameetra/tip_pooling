@@ -108,7 +108,11 @@ async function runTipDataCheck() {
           (SELECT 1 FROM "employee_rate_history" rh WHERE rh."employeeId" = rr."employeeId" AND rh."role" = rr."role")) AS "ratesWithoutHistory",
         (SELECT count(*)::int FROM "employee_rate_history" rh JOIN "employees" e ON e."id" = rh."employeeId"
           WHERE rh."role" = 'SERVER' AND e."role" <> 'SERVER') AS "serverHistoryOnOtherPrimaryRole"`);
-    return { success: true, duplicates: duplicates.rows, totals: totals.rows[0], wageHistory: wageHistory.rows[0] };
+    const cashTipsByVenue = await pool.query(`
+      SELECT t."slug", count(*) FILTER (WHERE e."cashTips" > 0)::int AS "entriesWithCashTips", count(*)::int AS "activeEntries",
+        coalesce(sum(e."cashTips"), 0)::numeric(14,2) AS "cashTips"
+      FROM "tip_entries" e JOIN "tenants" t ON t."id" = e."tenantId" WHERE NOT e."isDeleted" GROUP BY 1 ORDER BY 1`);
+    return { success: true, duplicates: duplicates.rows, totals: totals.rows[0], wageHistory: wageHistory.rows[0], cashTipsByVenue: cashTipsByVenue.rows };
   } catch (err: any) {
     return { success: false, error: err.message };
   } finally {
@@ -257,6 +261,9 @@ async function runMigrations() {
       CREATE UNIQUE INDEX IF NOT EXISTS "tip_entries_unique_active_pool" ON "tip_entries"("tenantId", "entryDate", lower("poolName")) WHERE "isDeleted" = false;
       CREATE UNIQUE INDEX IF NOT EXISTS "cash_counts_unique_active_pool" ON "cash_counts"("tenantId", "entryDate", lower("poolName")) WHERE "isDeleted" = false;
       DROP INDEX IF EXISTS "cash_counts_unique_active";
+
+      -- Venues with no tip jar hide the Cash Tips field (display only)
+      ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "tipJarEnabled" BOOLEAN NOT NULL DEFAULT true;
     `);
     return { success: true, message: 'Migrations applied' };
   } finally {
