@@ -12,6 +12,7 @@ export interface Branding {
   logoUrl: string | null;
   roleLabels?: RoleLabels;
   staffRoles: string[];
+  tipJar: boolean;
 }
 
 export async function getTenantBySlug(slug: string) {
@@ -20,7 +21,7 @@ export async function getTenantBySlug(slug: string) {
 
 export async function getBranding(slug: string): Promise<Branding | null> {
   const t = await getTenantBySlug(slug);
-  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels), staffRoles: parseStaffRoles(t.staffRoles) } : null;
+  return t ? { slug: t.slug, name: t.name, logoUrl: t.logoUrl ?? null, roleLabels: parseRoleLabels(t.roleLabels), staffRoles: parseStaffRoles(t.staffRoles), tipJar: t.tipJarEnabled } : null;
 }
 
 // Today's calendar date (YYYY-MM-DD) in the venue's timezone.
@@ -170,6 +171,15 @@ export async function createTenant(input: CreateTenantInput) {
   const tenant = await upsertTenant(input);
   await upsertVenueAdmin(tenant.id, input.adminEmail, input.adminPassword);
   return { id: tenant.id, slug: tenant.slug, name: tenant.name };
+}
+
+/** Show or hide the Cash Tips field at a venue. Display only: amounts already entered still count. */
+export async function setTipJarEnabled(slug: string, tipJarEnabled: boolean) {
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Unknown tenant slug: ${slug}`);
+  await (prisma as any).tenant.update({ where: { slug }, data: { tipJarEnabled } });
+  await auditService.log({ tenantId: tenant.id, entityType: 'TIP_JAR_SETTING', entityId: tenant.id, action: 'UPDATE', oldValues: { tipJarEnabled: tenant.tipJarEnabled }, newValues: { tipJarEnabled } });
+  return tipJarEnabled;
 }
 
 /** Switch a venue's support-staff split behavior (POOLED: shared role %; PER_PERSON: each support worker gets the full role %). */

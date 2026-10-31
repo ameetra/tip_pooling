@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { useCashCounts } from '../api/cash-counts';
 import CashCountDialog from '../components/CashCountDialog';
+import { useTenant } from '../context/TenantContext';
 import type { CashCountRow } from '../types';
 import { cents, money, signedMoney } from '../utils/cash';
 import { localDate } from '../utils/dates';
@@ -20,6 +21,7 @@ const STATUS = {
 const sum = (ns: number[]) => ns.reduce((s, n) => s + cents(n), 0) / 100;
 
 export default function CashReconciliationPage() {
+  const { tipJar } = useTenant();
   const [since, setSince] = useState(() => localDate(13));
   const [deposit, setDeposit] = useState('');
   // A week's envelopes usually go to the bank together, so new counts start with the last deposit used.
@@ -34,7 +36,7 @@ export default function CashReconciliationPage() {
     <Box>
       <Typography variant="h5" sx={{ mb: 0.5 }}>Cash Reconciliation</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Count each drop envelope and compare it with the day's Cash in Register plus Cash Tips. Click a row to count it.
+        Count each drop envelope and compare it with the day's Cash in Register{tipJar && ' plus Cash Tips'}. Click a row to count it.
       </Typography>
 
       <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>

@@ -17,7 +17,7 @@ import { poolTitle } from '../utils/tipEntry';
 export default function TipEntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { slug } = useTenant();
+  const { slug, tipJar } = useTenant();
   const { formatRole } = useRoleLabels();
   const { data: entry, isLoading } = useTipEntry(id!);
   const deleteMut = useDeleteTipEntry();
@@ -74,7 +74,7 @@ export default function TipEntryDetailPage() {
           <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }} useFlexGap>
             <Chip label={`Cash in Register: ${fmt(entry.cashInRegister)}`} />
             <Chip label={`Cash Sales: ${fmt(entry.cashSales)}`} />
-            <Chip label={`Cash Tips (jar): ${fmt(entry.cashTips)}`} />
+            {(tipJar || !!entry.cashTips) && <Chip label={`Cash Tips (jar): ${fmt(entry.cashTips)}`} />}
             <Chip label={`POS Tips: ${fmt(entry.posTips)}`} />
             <Chip label={`Cash Tips Total: ${fmt(cashTipsTotal)}`} color="info" />
             <Chip label={`Total Pool: ${fmt(totalPool)}`} color="primary" />

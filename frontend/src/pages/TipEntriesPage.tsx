@@ -14,13 +14,14 @@ import { poolTitle } from '../utils/tipEntry';
 
 export default function TipEntriesPage() {
   const navigate = useNavigate();
-  const { slug } = useTenant();
+  const { slug, tipJar } = useTenant();
   // Default to the trailing 14 days: older entries have already been through payroll.
   const [since, setSince] = useState(() => localDate(13));
   const { data: entries = [], isFetching } = useTipEntries(since);
   const { data: olderDrafts = [] } = useOlderDrafts(since);
   const deleteMut = useDeleteTipEntry();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const showCashTips = tipJar || entries.some((e) => e.cashTips);
 
   return (
     <Box>
@@ -65,7 +66,7 @@ export default function TipEntriesPage() {
               <TableCell>Date</TableCell>
               <TableCell>Cash in Register</TableCell>
               <TableCell>Cash Sales</TableCell>
-              <TableCell>Cash Tips (jar)</TableCell>
+              {showCashTips && <TableCell>Cash Tips (jar)</TableCell>}
               <TableCell>POS Tips</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -77,7 +78,7 @@ export default function TipEntriesPage() {
                 <TableCell>{poolTitle(entry.entryDate, entry.poolName)}</TableCell>
                 <TableCell>${entry.cashInRegister.toFixed(2)}</TableCell>
                 <TableCell>${entry.cashSales.toFixed(2)}</TableCell>
-                <TableCell>${entry.cashTips.toFixed(2)}</TableCell>
+                {showCashTips && <TableCell>${entry.cashTips.toFixed(2)}</TableCell>}
                 <TableCell>${entry.posTips.toFixed(2)}</TableCell>
                 <TableCell>
                   {entry.publishedAt
@@ -92,7 +93,7 @@ export default function TipEntriesPage() {
             ))}
             {entries.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={showCashTips ? 7 : 6} align="center">
                   {isFetching ? 'Loading...' : 'No tip entries in this date range.'}
                 </TableCell>
               </TableRow>

@@ -52,6 +52,7 @@ export const handler = async (event: any, context: any) => {
     }
     if (event.action === 'dbStats') return runDbStats(event.host);
     if (event.action === 'tipDataCheck') return runTipDataCheck();
+    if (event.action === 'setTipJar' && event.tenantSlug && typeof event.enabled === 'boolean') return runSetTipJar(event.tenantSlug, event.enabled);
     if (event.action === 'correctCashExpected' && event.tenantSlug) return runCorrectCashExpected(event.tenantSlug, event.apply === true);
   }
   return httpHandler(event, context);
@@ -393,6 +394,16 @@ async function runSetStaffRoles(tenantSlug: string, roles: string[]) {
   const { setStaffRoles } = require('./services/tenant.service');
   try {
     return { success: true, tenant: tenantSlug, staffRoles: await setStaffRoles(tenantSlug, roles) };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Show or hide the Cash Tips field at one venue.
+async function runSetTipJar(tenantSlug: string, enabled: boolean) {
+  const { setTipJarEnabled } = require('./services/tenant.service');
+  try {
+    return { success: true, tenant: tenantSlug, tipJar: await setTipJarEnabled(tenantSlug, enabled) };
   } catch (err: any) {
     return { success: false, error: err.message };
   }

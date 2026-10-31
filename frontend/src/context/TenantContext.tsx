@@ -8,6 +8,7 @@ interface TenantInfo {
   logoUrl: string | null;
   roleLabels: Record<string, string>;
   staffRoles: string[]; // opt-in staff login roles, e.g. ['BARISTA']
+  tipJar: boolean; // false hides the Cash Tips field
   loading: boolean;
   notFound: boolean;
 }
@@ -16,17 +17,17 @@ const TenantContext = createContext<TenantInfo | null>(null);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { venueSlug = '' } = useParams();
-  const [info, setInfo] = useState<TenantInfo>({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: true, notFound: false });
+  const [info, setInfo] = useState<TenantInfo>({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], tipJar: true, loading: true, notFound: false });
 
   useEffect(() => {
-    setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: true, notFound: false });
-    get<{ slug: string; name: string; logoUrl: string | null; roleLabels?: Record<string, string>; staffRoles?: string[] }>(`/tenants/${venueSlug}/branding`)
+    setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], tipJar: true, loading: true, notFound: false });
+    get<{ slug: string; name: string; logoUrl: string | null; roleLabels?: Record<string, string>; staffRoles?: string[]; tipJar?: boolean }>(`/tenants/${venueSlug}/branding`)
       .then((d) => {
-        setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, roleLabels: d.roleLabels ?? {}, staffRoles: d.staffRoles ?? [], loading: false, notFound: false });
+        setInfo({ slug: venueSlug, name: d.name, logoUrl: d.logoUrl, roleLabels: d.roleLabels ?? {}, staffRoles: d.staffRoles ?? [], tipJar: d.tipJar ?? true, loading: false, notFound: false });
         document.title = `${d.name} — Gratify`;
       })
       .catch(() => {
-        setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], loading: false, notFound: true });
+        setInfo({ slug: venueSlug, name: '', logoUrl: null, roleLabels: {}, staffRoles: [], tipJar: true, loading: false, notFound: true });
         document.title = 'Gratify';
       });
   }, [venueSlug]);

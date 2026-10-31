@@ -57,7 +57,7 @@ export default function TipEntryFormPage() {
   const isEdit = !!id;
   const { data: existing, isLoading } = useTipEntry(id ?? '');
   const { user } = useAuth();
-  const { slug } = useTenant();
+  const { slug, tipJar } = useTenant();
   const { roleOptions } = useRoleLabels();
   const isShiftLead = isShiftLeadRole(user?.role);
   const { data: employees = [] } = useEmployees();
@@ -289,7 +289,8 @@ export default function TipEntryFormPage() {
           )}
           <MoneyField label="Cash in Register" value={cashInRegister} onChange={setCashInRegister} required helperText="After removing the starting float" />
           <MoneyField label="Cash Sales (POS)" value={cashSales} onChange={setCashSales} />
-          <MoneyField label="Cash Tips (jar)" value={cashTips} onChange={setCashTips} />
+          {/* A saved amount stays visible and editable, or it would count in the pool unseen. */}
+          {(tipJar || !!existing?.cashTips) && <MoneyField label="Cash Tips (jar)" value={cashTips} onChange={setCashTips} />}
           <MoneyField label="POS Tips" value={posTips} onChange={setPosTips} required />
         </Stack>
         <Stack direction="row" spacing={3} sx={{ mt: 2, flexWrap: 'wrap' }} useFlexGap>

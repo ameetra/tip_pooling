@@ -35,6 +35,7 @@ beforeAll(async () => {
       supportSplitMode TEXT NOT NULL DEFAULT 'POOLED',
       roleLabels TEXT,
       staffRoles TEXT,
+      tipJarEnabled BOOLEAN NOT NULL DEFAULT 1,
       shiftHoursSun REAL,
       shiftHoursMon REAL,
       shiftHoursTue REAL,

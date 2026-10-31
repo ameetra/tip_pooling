@@ -4,6 +4,7 @@ import {
 } from '@mui/material';
 import type { BillField, CashCountRow } from '../types';
 import { useDeleteCashCount, useSaveCashCount } from '../api/cash-counts';
+import { useTenant } from '../context/TenantContext';
 import { BILLS, cents, money, signedMoney } from '../utils/cash';
 import { poolTitle } from '../utils/tipEntry';
 import ConfirmDialog from './ConfirmDialog';
@@ -23,6 +24,7 @@ const num = (v: string) => Number(v || 0);
 
 export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose }: Props) {
   const fullScreen = useMediaQuery(useTheme().breakpoints.down('sm'));
+  const { tipJar } = useTenant();
   const { count } = row;
   const [f, setF] = useState<Fields>(() => ({
     ...Object.fromEntries(BILLS.map(([k]) => [k, count?.[k] ? String(count[k]) : ''])) as Record<BillField, string>,
@@ -60,7 +62,7 @@ export default function CashCountDialog({ row, defaultDeposit, onSaved, onClose 
       <DialogTitle>{count ? 'Edit count' : 'Count drop'}: {poolTitle(row.entryDate, row.poolName)}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Expected (Cash in Register + Cash Tips): <b>{money(expected)}</b>
+          Expected (Cash in Register{tipJar && ' + Cash Tips'}): <b>{money(expected)}</b>
         </Typography>
         {row.noEntry && <Alert severity="warning" sx={{ mb: 2 }}>This day's tip entry was deleted. Expected is the amount when it was counted.</Alert>}
 

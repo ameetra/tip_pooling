@@ -169,6 +169,8 @@ A cloud-based tip pooling management system that automates the calculation and d
 - **Separate tip jar?** If tips are collected separately (not in register), enter starting = $0, closing = total tips collected, cash sales = $0
 
 > **Update:** the form now asks for **Cash in Register** (float already removed), **Cash Sales**, **Cash Tips (jar)** and **POS Tips**. The pool is (Cash in Register - Cash Sales) + Cash Tips (jar) + POS Tips.
+>
+> **Venues with no tip jar** (per-venue setting, 2026-10-31; Pieces): the Cash Tips (jar) field is hidden on the form, the entries list and the entry detail, and the Cash page leaves "Cash Tips" out of its wording. Display only: a saved Cash Tips amount still counts, and stays visible and editable on that entry. Set by the support team with the `setTipJar` admin action.
 
 #### 3.4.2 Employee Shift Entry
 - [x] Manager adds employees to the daily entry
