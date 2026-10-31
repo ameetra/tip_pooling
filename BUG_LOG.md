@@ -385,7 +385,7 @@
 ### 🟡 Bug #14: Cash page Expected left out Cash Tips, so drops showed Over
 **Date Found:** 2026-10-31
 **Severity:** High (incorrect reconciliation figures; tips and payouts were not affected)
-**Status:** ✅ RESOLVED in code; saved counts need the one-time `correctCashExpected` action per venue
+**Status:** ✅ RESOLVED (10 saved counts corrected 2026-10-31, audit-logged; the one-time action has been removed)
 **Found By:** Owner, reconciling Protagonist deposits (10/26: Expected $129.19, envelope also held $16.19 in Cash Tips)
 
 **Root Cause:**
@@ -394,13 +394,13 @@
 **Fix:**
 - Expected is now Cash in Register + Cash Tips. A pool or older drop whose only cash is Cash Tips is now listed too.
 - Added a Bills Only column (counted total without coins) for the bank deposit.
-- Saved counts keep their old Expected until corrected: `correctCashExpected` previews by default and changes only `expectedAmount` with `apply: true`, audit-logged. It stays out of `migrate` because it must not rerun.
+- Saved counts kept their old Expected, so a one-time, previewed Lambda action corrected only `expectedAmount` at Protagonist and Antagonist (total +$236.78; all other totals unchanged). It stayed out of `migrate` because it must not rerun.
 
 **Files Modified:**
 - `backend/src/services/cash-count.service.ts`, `backend/src/lambda.ts`, `frontend/src/pages/CashReconciliationPage.tsx`, `frontend/src/components/CashCountDialog.tsx`
 
 **Test Added:**
-- `backend/src/__tests__/api/cash-count.test.ts` (expected amount and deposit total, correctExpectedForCashTips)
+- `backend/src/__tests__/api/cash-count.test.ts` (expected amount and deposit total)
 
 **Prevention:**
 - A figure saved as a snapshot doesn't follow a change in its formula: plan the correction of saved rows with the formula change.

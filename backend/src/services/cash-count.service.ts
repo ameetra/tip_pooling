@@ -132,36 +132,6 @@ export const cashCountService = {
     return created;
   },
 
-  // One-time fix for counts saved when Expected left out Cash Tips. A count whose snapshot no longer
-  // matches the entry's Cash in Register keeps its "entry changed" flag and needs a real recount.
-  async correctExpectedForCashTips(tenantId: string, apply: boolean) {
-    const active = { tenantId, isDeleted: false };
-    const [counts, entries] = await Promise.all([
-      prisma.cashCount.findMany({ where: active, orderBy: { entryDate: 'asc' } }),
-      prisma.tipEntry.findMany({ where: active }),
-    ]);
-    const entryByKey = new Map(entries.map((e) => [poolKey(e.entryDate, e.poolName), e]));
-    const stale = counts.flatMap((count) => {
-      const entry = entryByKey.get(poolKey(count.entryDate, count.poolName));
-      return entry && entry.cashTips > 0 && cents(entry.cashInRegister) === cents(count.expectedAmount) ? [{ count, entry }] : [];
-    });
-    if (apply) {
-      for (const { count, entry } of stale) {
-        const updated = await prisma.cashCount.update({ where: { id: count.id }, data: { expectedAmount: expectedOf(entry) } });
-        await auditService.log({
-          tenantId, entityType: 'CASH_COUNT', entityId: count.id, action: 'UPDATE',
-          oldValues: auditValues(count), newValues: auditValues(updated),
-        });
-      }
-    }
-    return stale.map(({ count, entry }) => ({
-      entryDate: count.entryDate, poolName: count.poolName, cashInRegister: entry.cashInRegister, cashTips: entry.cashTips,
-      countedTotal: count.countedTotal, oldExpected: count.expectedAmount, newExpected: expectedOf(entry),
-      oldVariance: (cents(count.countedTotal) - cents(count.expectedAmount)) / 100,
-      newVariance: (cents(count.countedTotal) - cents(expectedOf(entry))) / 100,
-    }));
-  },
-
   async remove(tenantId: string, id: string, performedBy?: Performer) {
     const existing = await prisma.cashCount.findFirst({ where: { id, tenantId, isDeleted: false } });
     if (!existing) return false;

@@ -3,7 +3,6 @@ import request from 'supertest';
 import { createApp } from '../../app';
 import { testPrisma } from '../setup';
 import { todayIn } from '../../services/effective-date';
-import { cashCountService } from '../../services/cash-count.service';
 
 const app = createApp();
 
@@ -187,58 +186,6 @@ describe('Cash Counts API', () => {
       await addEntryWithTips(daysAgo(30), 0, 30);
       const dates = (await list(`?from=${daysAgo(13)}`)).body.data.map((r: any) => r.entryDate);
       expect(dates).toEqual([daysAgo(30)]);
-    });
-  });
-
-  describe('correctExpectedForCashTips', () => {
-    const oldCount = (entryDate: string, expectedAmount: number, tenantId = 'test-tenant') =>
-      testPrisma.cashCount.create({ data: { tenantId, entryDate, expectedAmount, countedTotal: 145.38, bills100: 1, bills20: 2, bills5: 1, coins: 0.38 } });
-    const entry = (entryDate: string, cashInRegister: number, cashTips: number) =>
-      testPrisma.tipEntry.create({ data: { tenantId: 'test-tenant', entryDate, cashInRegister, cashTips } });
-
-    it('previews the corrections without changing anything', async () => {
-      await entry(day, 129.19, 16.19);
-      const c = await oldCount(day, 129.19);
-
-      const result = await cashCountService.correctExpectedForCashTips('test-tenant', false);
-
-      expect(result).toEqual([{ entryDate: day, poolName: '', cashInRegister: 129.19, cashTips: 16.19, countedTotal: 145.38, oldExpected: 129.19, newExpected: 145.38, oldVariance: 16.19, newVariance: 0 }]);
-      expect((await testPrisma.cashCount.findUnique({ where: { id: c.id } }))!.expectedAmount).toBe(129.19);
-      expect(await testPrisma.auditLog.count({ where: { entityType: 'CASH_COUNT' } })).toBe(0);
-    });
-
-    it('applies the correction in place, keeping who counted, and audits it', async () => {
-      await entry(day, 129.19, 16.19);
-      const c = await oldCount(day, 129.19);
-
-      await cashCountService.correctExpectedForCashTips('test-tenant', true);
-
-      expect((await testPrisma.cashCount.findUnique({ where: { id: c.id } }))!.isDeleted).toBe(false);
-      expect(rowFor((await list()).body.data, day)).toMatchObject({ status: 'MATCHES', variance: 0, entryChanged: false });
-      const audit = await testPrisma.auditLog.findFirst({ where: { entityType: 'CASH_COUNT', entityId: c.id, action: 'UPDATE' } });
-      expect(JSON.stringify(audit?.oldValues)).toContain('129.19');
-      expect(JSON.stringify(audit?.newValues)).toContain('145.38');
-    });
-
-    it('finds nothing to correct on a second run', async () => {
-      await entry(day, 129.19, 16.19);
-      await oldCount(day, 129.19);
-      await cashCountService.correctExpectedForCashTips('test-tenant', true);
-
-      expect(await cashCountService.correctExpectedForCashTips('test-tenant', true)).toEqual([]);
-    });
-
-    it('skips counts with no cash tips, a changed entry, a deleted entry or another venue', async () => {
-      await entry(daysAgo(1), 145.38, 0);
-      await oldCount(daysAgo(1), 145.38);
-      await entry(daysAgo(2), 200, 10); // entry re-entered with a different Cash in Register: stays flagged for a recount
-      await oldCount(daysAgo(2), 129.19);
-      await oldCount(daysAgo(3), 129.19);
-      await testPrisma.tenant.create({ data: { id: 'other-tenant', name: 'Other', slug: 'other' } });
-      await testPrisma.tipEntry.create({ data: { tenantId: 'other-tenant', entryDate: daysAgo(4), cashInRegister: 129.19, cashTips: 16.19 } });
-      await oldCount(daysAgo(4), 129.19, 'other-tenant');
-
-      expect(await cashCountService.correctExpectedForCashTips('test-tenant', true)).toEqual([]);
     });
   });
 
