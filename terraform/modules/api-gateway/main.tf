@@ -75,6 +75,43 @@ resource "aws_api_gateway_stage" "main" {
   deployment_id = aws_api_gateway_deployment.main.id
   stage_name    = var.environment
   tags          = var.tags
+
+  # One line per request; no bodies, cookies or tokens. Added after a 4xx burst we couldn't trace (2026-11-09).
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access.arn
+    format = jsonencode({
+      time = "$context.requestTime", requestId = "$context.requestId", ip = "$context.identity.sourceIp",
+      userAgent = "$context.identity.userAgent", method = "$context.httpMethod", path = "$context.path",
+      status = "$context.status", latencyMs = "$context.responseLatency", lambdaMs = "$context.integration.latency",
+      bytes = "$context.responseLength", error = "$context.error.message"
+    })
+  }
+}
+
+# --- Access logging ---
+resource "aws_cloudwatch_log_group" "access" {
+  name              = "/aws/apigateway/${var.name_prefix}-api-access"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+# REST API logging needs this region-wide account setting (HTTP APIs, e.g. vault-booking, don't use it).
+resource "aws_iam_role" "cloudwatch" {
+  name = "tip-pooling-apigw-cloudwatch"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{ Effect = "Allow", Principal = { Service = "apigateway.amazonaws.com" }, Action = "sts:AssumeRole" }]
+  })
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch" {
+  role       = aws_iam_role.cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "main" {
+  cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
 }
 
 resource "aws_api_gateway_method_settings" "main" {
