@@ -404,3 +404,26 @@
 
 **Prevention:**
 - A figure saved as a snapshot doesn't follow a change in its formula: plan the correction of saved rows with the formula change.
+
+---
+
+### 🟠 Bug #15: Unknown email or rate-limited magic-link request returned a 500
+**Date Found:** 2026-11-14
+**Severity:** Medium (UX; an employee saw "An unexpected error occurred" instead of the reason)
+**Status:** ✅ RESOLVED (deployed 2026-11-14; live check returns 400 with the message)
+**Found By:** One-month performance review (Lambda log, 2026-11-07)
+
+**Root Cause:**
+- `requestMagicLink` throws `EMPLOYEE_NOT_FOUND`, `RATE_LIMIT_EMAIL` and `RATE_LIMIT_IP`, but the error handler had no case for them, so they fell through to the 500. Same pattern as Bug #13.
+
+**Fix:**
+- `EMPLOYEE_NOT_FOUND` → 400 (not 404: CloudFront rewrites 404 to index.html and would hide the message); rate limits → 429.
+
+**Files Modified:**
+- `backend/src/middleware/error-handler.ts`
+
+**Test Added:**
+- `backend/src/__tests__/api/magic-link-request.test.ts`
+
+**Prevention:**
+- Repeat of Bug #13: when a service throws a new error code, add its case to the error handler in the same change.

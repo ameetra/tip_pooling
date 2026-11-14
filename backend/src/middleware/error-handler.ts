@@ -33,9 +33,16 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   }
 
   // 400, not 401: the API client treats a 401 as "signed out", and an old link shouldn't end a valid session.
-  if (['INVALID_TOKEN', 'TOKEN_USED', 'TOKEN_EXPIRED'].includes((err as any).code)) {
+  // EMPLOYEE_NOT_FOUND is 400, not 404: CloudFront rewrites 404 to index.html, hiding the message.
+  if (['INVALID_TOKEN', 'TOKEN_USED', 'TOKEN_EXPIRED', 'EMPLOYEE_NOT_FOUND'].includes((err as any).code)) {
     response.error = { code: (err as any).code, message: err.message };
     res.status(400).json(response);
+    return;
+  }
+
+  if (['RATE_LIMIT_EMAIL', 'RATE_LIMIT_IP'].includes((err as any).code)) {
+    response.error = { code: (err as any).code, message: err.message };
+    res.status(429).json(response);
     return;
   }
 
