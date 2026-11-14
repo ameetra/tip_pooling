@@ -22,6 +22,8 @@ export const init = (async () => {
 
 export const handler = async (event: any, context: any) => {
   const httpHandler = await init;
+  // Scheduled ping keeps one instance warm; init above already did the slow work.
+  if (event.warmup) return { warm: true };
   const ADMIN_SECRET = process.env.LAMBDA_ADMIN_SECRET;
   // Handle admin actions invoked directly (not via API Gateway)
   // Require a secret to prevent unauthorized invocations

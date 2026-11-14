@@ -440,6 +440,7 @@ A venue can run a special event alongside its regular shift, with a smaller crew
 ### 4.1 Performance
 - [x] Tip calculation completes in < 5 seconds for up to 50 employees *(measured at about 0.1 ms for 50 employees)*
 - [ ] Page load time < 2 seconds on 4G connection
+  - [x] A ping every 5 minutes keeps one API instance warm, so the first request after a quiet spell no longer waits ~1.3 s for a cold start *(2026-11-14)*
 - [ ] System supports 100 concurrent users
 - [x] Database queries optimized with proper indexing *(indexes on the main lookup columns)*
 

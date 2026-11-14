@@ -49,6 +49,28 @@ resource "aws_lambda_function" "api" {
   tags = var.tags
 }
 
+# --- Warm-up ping ---
+# Traffic is light, so ~15% of requests hit a ~1.3s cold start. A ping every 5 minutes keeps one instance warm.
+resource "aws_cloudwatch_event_rule" "warmup" {
+  name                = "${var.name_prefix}-api-warmup"
+  schedule_expression = "rate(5 minutes)"
+  tags                = var.tags
+}
+
+resource "aws_cloudwatch_event_target" "warmup" {
+  rule  = aws_cloudwatch_event_rule.warmup.name
+  arn   = aws_lambda_function.api.arn
+  input = jsonencode({ warmup = true })
+}
+
+resource "aws_lambda_permission" "warmup" {
+  statement_id  = "AllowWarmupSchedule"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.warmup.arn
+}
+
 # --- Outputs ---
 output "function_arns" {
   value = { api = aws_lambda_function.api.arn }
